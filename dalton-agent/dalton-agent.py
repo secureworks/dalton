@@ -127,17 +127,6 @@ except Exception, e:
 if SENSOR_UID == 'auto':
     SENSOR_UID = socket.gethostname()
 
-MERGECAP_BINARY = 'auto'
-try:
-    MERGECAP_BINARY = config.get('dalton', 'MERGECAP_BINARY')
-except Exception, e:
-    pass
-if MERGECAP_BINARY == 'auto':
-    MERGECAP_BINARY = find_file('mergecap')
-if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
-        print "Could not find 'mergecap' binary."
-        MERGECAP_BINARY = ''
-
 TCPDUMP_BINARY = 'auto'
 try:
     TCPDUMP_BINARY = config.get('dalton', 'TCPDUMP_BINARY')
@@ -178,7 +167,6 @@ print "\tSENSOR_UID: %s" % SENSOR_UID
 print "\tSENSOR_TECHNOLOGY: %s" % SENSOR_TECHNOLOGY
 print "\tIDS_BINARY: %s" % IDS_BINARY
 print "\tTCPDUMP_BINARY: %s" % TCPDUMP_BINARY
-print "\tMERGECAP_BINARY: %s" % MERGECAP_BINARY
 
 #************************
 #*** Global Variables ***
@@ -805,7 +793,7 @@ def reset_globals():
 # main function
 # gets passed directory of submitted files (rules file, pcap file(s), variables file) and job ID
 def submit_job(job_id, job_directory):
-    global JOB_ID, SENSOR_TECHNOLOGY, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, VARIABLES_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, MERGECAP_BINARY, IDS_BINARY
+    global JOB_ID, SENSOR_TECHNOLOGY, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, VARIABLES_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY
     # reset and populate global vars
     reset_globals()
     (JOB_ID, JOB_DIRECTORY) = (job_id, job_directory)
@@ -976,25 +964,18 @@ def submit_job(job_id, job_directory):
         suri_yaml_fh.write("\n")
         suri_vars_fh.close()
         # add rules
+        #TODO: this will redefine the default-rule-path and rules-file config nodes
+        # is this desired? Do we only want rulesets from the controller or can
+        # other rules files be included in the config? If the latter we will need
+        # to parse the YAML and insert the rules includes appropriately.
         print_debug("adding rules files(s) to yaml:\n%s\n" % '\n'.join(IDS_RULES_FILES))
         suri_yaml_fh.write("default-rule-path: %s\n" % JOB_DIRECTORY)
         suri_yaml_fh.write("rule-files:\n")
         for rules_file in IDS_RULES_FILES:
             suri_yaml_fh.write(" - %s\n" % rules_file)
         suri_yaml_fh.close()
-        # combine pcap files
         if len(PCAP_FILES) > 1:
-            print_msg("Merging pcaps")
-            combined_file = "%s/combined.pcap" % JOB_DIRECTORY
-            mergecap_command = "%s -w %s -F pcap %s" % (MERGECAP_BINARY, combined_file, ' '.join(PCAP_FILES))
-            print_debug("Multiple pcap files sumitted to Suricata, combining the following into one file:\n%s\n" % '\n'.join(PCAP_FILES))
-            try:
-                mergecap_output = subprocess.Popen(mergecap_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
-                if len(mergecap_output) > 0:
-                    print_error("Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
-                PCAP_FILES[0] = combined_file
-            except Exception, e:
-                print_error("Could not merge pcaps.  Error: %s" % e)
+            print_error("Multiple pcap files were submitted to the Dalton Agent for a Suricata job.\n\nSuricata can only read a single pcap file so multiple pcaps submitted to the Dalton Controller should have been combined by the Controller when packaging the job.\n\nIf you see this, something went wrong on the Controller or you are doing something untoward.")
     if SENSOR_TECHNOLOGY.startswith('snort'):
         # this section applies only to Snort sensors
         # Snort uses DAQ dump and pcap read mode
