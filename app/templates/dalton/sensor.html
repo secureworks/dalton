@@ -1,0 +1,34 @@
+{% extends "dalton/layout.html" %}
+{% block body %}
+    <div class="row">
+        <div class="span10">
+            <h2>Sensors</h2>
+            <br/>
+            <table class="table table-striped">
+                <tr>
+                    <th>Sensor ID</th>
+                    <th>Technology</th>
+                    <th>Agent Version</th>
+                    <th>IP Address</th>
+                    <th>Last Heartbeat</th>
+                </tr>
+		{% for sensor,data in sensors.items() %}
+			<tr>
+				<td>{{ data.uid }}</td>
+				<td>
+                {% set tlist = data.tech.split('-') %}
+                {% if tlist|length > 1 %}
+                    {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+                {% else %}
+                    {{data.tech|title}}
+                {% endif %}
+				</td>
+                <td>{{ data.agent_version }}</td>
+				<td>{{ data.ip }}</td>
+				<td>{{ data.time }}</td>			
+			</tr>
+		{% endfor %}
+            </table>
+        </div>
+    </div>
+{% endblock %}

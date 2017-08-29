@@ -1,0 +1,49 @@
+version: '2'
+
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dalton:latest
+    container_name: dalton_controller
+    ports:
+      - "80:80"
+    
+    volumes:
+      - ./app:/opt/dalton/app
+      - ./run.py:/opt/dalton/run.py
+      - ./rulesets:/opt/dalton/rulesets
+      - ./engine-configs:/opt/dalton/engine-configs
+
+    restart: always
+
+  redis:
+    image: redis:3.2.10
+    container_name: dalton_redis  
+    restart: always
+
+  agent-suricata:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfile_suricata-3.0
+    image: agent-suricata:3.0-stock
+    container_name: suricata-3.0-stock
+    restart: always
+
+  agent-snort:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfile_snort-2.9.7.0
+    image: agent-snort:2.9.7.0-stock
+    container_name: snort-2.9.7.0-stock
+
+    volumes:
+      - ./dalton-agent:/opt/dalton-agent
+
+    restart: always
+
+
+volumes:
+  flask:
+  suri:

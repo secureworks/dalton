@@ -1,0 +1,52 @@
+{% extends "dalton/layout.html" %}
+{% block body %}
+    <script type='text/javascript'>
+	var countdown = 1;
+        $(document).ready(function() {
+            $.ajaxSetup({ cache: false }); // This part addresses an IE bug.  without it, IE will only load the first number and will never refresh
+            setInterval(function() {
+		$.get('/dalton/sensor_api/job_status/{{job_id}}', function(data){
+			if (data.indexOf("Click here") != -1) {
+				// job done
+				if (data.indexOf("ERROR") != -1) {
+					// error occurred, show countdown
+					$('#job-status').html(data);
+					$('#alt-message').html('(redirecting in ' + countdown + ' seconds)');
+					countdown--;
+					if (countdown <= 0) {
+						window.location = window.location.href;
+					}
+				} else {
+					<!-- job done, no error, redirect immediately to results page -->
+					$('#job-status').html("Redirecting...");
+					window.location = window.location.href;
+				}
+			} else {
+				$('#job-status').html(data);
+			}
+		});
+            }, 1000); <!-- time to refresh the div.  it is in milliseconds. -->
+        });
+    </script>
+    <div class="row">
+        <div class="span9">
+            <h2>
+		Status for job {{job_id}}
+        {% set tlist = tech.split('-') %}
+        {% if tlist|length > 1 %}
+            ({{tlist[0]|title}} {{tlist[1:]|join('-')}})
+        {% else %}
+            ({{tech|title}})
+        {% endif %}        
+	    </h2>
+        <p>Your tests have been queued. You can track your progress below:</p>
+        <h3><center><span id='job-status'>getting status ... </span></center></h3>
+	    <h4><center><span id='alt-message'></span></center></h4>
+        <p><b>Links:</b></p>
+        <ul>
+	    <li><a href="/dalton/sensor_api/get_job/{{job_id}}">Download Job Zipfile</a> (includes pcap, rules, and variables)</li>
+        <li><a href="/dalton/job/{{job_id}}">Results Page</a></li>
+        </ul>
+        </div>
+    </div><!--/row-->
+{% endblock %}
