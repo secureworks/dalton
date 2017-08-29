@@ -1,0 +1,50 @@
+{% extends "dalton/layout.html" %}
+{% block body %}
+    <div class="row">
+        <div class="span9">
+            <h2>Recent Jobs</h2>
+            <h4>Queued Jobs: {{ queued_jobs }}&nbsp;&nbsp;|&nbsp;&nbsp;Running Jobs: {{ running_jobs }}</h4>
+            <h5>Show Recent:
+            &nbsp;
+            <script type='text/javascript'>
+            var showOptions=[25,50,100,200,300,500,1000];
+            for(var i=0; i < showOptions.length; i++) {
+                if (i != 0) {
+                    document.write("&nbsp;|&nbsp;");
+                }
+                if (showOptions[i] == {{ num_jobs }}) {
+                    document.write(showOptions[i]);
+                } else {
+                    document.write("<a href=\"queue?numjobs=" + showOptions[i] + "\">" + showOptions[i] + "</a>");
+                }   
+            }
+            </script>
+            </h5>
+            <table class="table table-striped">
+                <tr>
+                    <th>Job ID</th>
+                  <!--  <th>User</th> -->
+                    <th>Queue</th>
+        		    <th>Submission Time</th>
+                    <th>Status</th>
+                </tr>
+                {% for job in queue %}
+			<tr>
+				<td><a href="/dalton/job/{{job.jid}}">{{ job.jid }}</td>
+              <!--  <td>{{ job.user }}</td> -->
+				<td>
+                {% set tlist = job.tech.split('-') %}
+                {% if tlist|length > 1 %}
+                    {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+                {% else %}
+                    {{job.tech|title}}
+                {% endif %}
+			    </td>
+				<td>{{ job.time }}</td>
+				<td>{{ job.status }}</td>
+			</tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div><!--/row-->
+{% endblock %}

@@ -1,0 +1,35 @@
+# Builds Snort 2.9.7.5 Dalton agent using Snort from Ubuntu repos
+FROM ubuntu:16.04
+MAINTAINER David Wharton
+
+# tcpdump for pcap analysis; not *requried* for
+#  the agent but nice to have....
+#  should be included in wireshark anyway (see below)
+RUN apt-get update -y && apt-get install -y \
+    python-dev \
+    tcpdump
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y snort=2.9.7.0-5
+
+# the ubuntu snort package uses /usr/lib but the default config uses /usr/local/lib
+RUN ln -s /usr/lib/snort_dynamicpreprocessor /usr/local/lib/snort_dynamicpreprocessor
+RUN ln -s /usr/lib/snort_dynamicengine /usr/local/lib/snort_dynamicengine
+RUN ln -s /usr/lib/snort_dynamicrules /usr/local/lib/snort_dynamicrules
+
+RUN apt-get install -y python-pip
+RUN pip install -U pip
+RUN pip install https://github.com/jasonish/py-idstools/archive/master.zip
+
+# wireshark needed for mergecap; statically compiled
+#  mergecap would be smaller but doing this for now
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install wireshark
+
+RUN mkdir -p /opt/dalton-agent/
+
+WORKDIR /opt/dalton-agent
+
+COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
+COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
+
+CMD python /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1 | tee /var/log/dalton-agent.log
+

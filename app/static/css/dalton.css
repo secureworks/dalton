@@ -1,0 +1,11 @@
+/* dalton.css */
+body {
+        font-family:"Tahoma";
+/*        background-image: url("/static/images/dalton.png"); */
+/*        background-repeat: no-repeat; */
+/*        background-position: 14px 58px; */
+}
+
+h1, h2, h3, h4, h5, h6 {
+        font-family:"Times New Roman"
+}

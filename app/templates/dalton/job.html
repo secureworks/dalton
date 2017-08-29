@@ -1,0 +1,109 @@
+{% extends "dalton/layout.html" %}
+{% block body %}
+    <div class="row">
+        <div class="span9">
+            <h2>
+		Report for {{jobid}}
+        {% set tlist = tech.split('-') %}
+        {% if tlist|length > 1 %}
+            {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+        {% else %}
+            {{tech|title}}
+        {% endif %}
+	    </h2>
+            	{% if overview.status == 'Success' %}
+	        		Status: <span class='label label-success'>Success</span>
+	        	{% else %}
+	        		Status: <span class='label label-important'>An error occurred</span>
+	        	{% endif %}
+	        	&nbsp;&nbsp;&nbsp;
+	        	{% if overview.alert_count > 0 %}
+	        		Alerts: <span class='badge badge-success'>{{overview.alert_count}}</span>
+	        	{% else %}
+	        		Alerts: <span class='badge badge-info'>{{overview.alert_count}}</span>
+	        	{% endif %}
+			&nbsp;&nbsp;&nbsp;
+			Processing Time:
+			{% if total_time %}
+				{{total_time}}&nbsp;seconds
+			{% else %}
+				unknown
+			{% endif %}
+			<br/><br/>
+			    <a href="/dalton/sensor_api/get_job/{{jobid}}">Download Job Zipfile</a> (includes pcap, rules, and variables)
+			    <br/><br/>
+	        <div class="tabbable">
+	            <ul class="nav nav-tabs">
+        			{% if error == "" %}
+		    		    <li class='active'><a href="#alerts" data-toggle='tab'><i class="icon-warning-sign"></i>&nbsp;Alerts</a></li>
+			        {% else %}
+				        <li><a href="#alerts" data-toggle='tab'><i class="icon-warning-sign"></i>&nbsp;Alerts</a></li>
+			        {% endif %}
+                    {% if alert_detailed != "" %}
+                        <li><a href="#alert-detailed" data-toggle='tab'><i class="icon-zoom-in"></i>&nbsp;Alert Details</a></li>
+                    {% endif %}
+                    <li><a href="#ids" data-toggle='tab'><i class="icon-eye-open"></i>&nbsp;IDS Engine</a></li>
+				    {% if perf != "" %}
+				  	    <li><a href="#perf" data-toggle='tab'><i class="icon-heart"></i>&nbsp;Performance</a></li>
+				    {% endif %}
+
+                    {% if other_logs != "" %}
+                        {% for log_description in other_logs %}
+                            {% if "Perf" in log_description %}
+                                <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-heart"></i>&nbsp;{{log_description}}</a></li>
+			    {% elif "EVE" in log_description %}
+                                <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-leaf"></i>&nbsp;{{log_description}}</a></li>
+                            {% else %}
+                                <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-file"></i>&nbsp;{{log_description}}</a></li>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+
+				    {% if debug != "" %}
+				  	    <li><a href="#debug" data-toggle='tab'><i class="icon-list-alt"></i>&nbsp;Debug</a></li>
+				    {% endif %}
+				    {% if error != "" %}
+				  	    <li class='active'><a href="#error" data-toggle='tab' style="color:#B94A48;"><i class="icon-exclamation-sign"></i><b>&nbsp;Error</b></a></li>
+				    {% endif %}
+				</ul>
+			    <div class="tab-content">
+				    {% if error == "" %}
+					    <div class="tab-pane active" id="alerts"><pre>{{alert}}</pre></div>
+				    {% else %}
+					    <div class="tab-pane" id="alerts"><pre>{{alert}}</pre></div>
+				    {% endif %}
+
+                    {% if alert_detailed != "" %}
+                        <div class="tab-pane" id="alert-detailed"><pre>{{alert_detailed}}</pre></div>
+                    {% endif %}
+
+			    	<div class="tab-pane" id="ids"><pre>{{ids}}</pre></div>
+			        {% if perf != "" %}
+			        	<div class="tab-pane" id="perf"><pre style="font-size:12px">{{perf}}</pre></div>
+			        {% endif %}
+
+                    {% if other_logs != "" %}
+                        {% for log_description in other_logs %}
+                            {% if "Perf" in log_description or "Stats" in log_description %}
+                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
+                            {% elif "EVE" in log_description  %}
+                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]|tojson}}</pre></div>
+                            {% else %}
+                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre>{{other_logs[log_description]}}</pre></div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if debug != "" %}
+    			        <div class="tab-pane" id="debug"><pre>{{debug}}</pre></div>
+                    {% endif %}
+				{% if error == "" %}
+				        <div class="tab-pane" id="error"><pre>{{error}}</pre></div>
+				{% else %}
+					<div class="tab-pane active" id="error"><pre>{{error}}</pre></div>
+				{% endif %}
+			    </div>
+			</div>
+        </div>
+    </div>
+{% endblock %}
