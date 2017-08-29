@@ -21,6 +21,7 @@ from distutils.version import LooseVersion
 import ConfigParser
 import logging
 from logging.handlers import RotatingFileHandler
+import subprocess
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -54,7 +55,7 @@ try:
     dalton_config_filename = 'dalton.conf'
     dalton_config = ConfigParser.SafeConfigParser()
     dalton_config.read(dalton_config_filename)
-    # user-configurable vairables; see comments in dalton.conf for details.
+    # user-configurable variables; see comments in dalton.conf for details.
     TEMP_STORAGE_PATH = dalton_config.get('dalton', 'temp_path')
     VARIABLES_STORAGE_PATH = dalton_config.get('dalton', 'var_path')
     RULESET_STORAGE_PATH = dalton_config.get('dalton', 'ruleset_path')
@@ -65,8 +66,13 @@ try:
     JOB_RUN_TIMEOUT = int(dalton_config.get('dalton', 'job_run_timeout'))
     REDIS_HOST = dalton_config.get('dalton', 'redis_host')
     API_KEYS = dalton_config.get('dalton', 'api_keys')
+    MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
 except Exception as e:
     critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
+
+if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
+    error("mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap." % MERGECAP_BINARY)
+    MERGECAP_BINARY = None
 
 #connect to the datastore
 try:
@@ -311,7 +317,7 @@ def get_engine_conf_file(sensor):
                             engine_config += "# NOTE: variables have been removed from this section of the file and can be found elsewhere.\r\n"
                             variables += "%s\r\n" % line
                             line = next(lines).rstrip('\r\n')
-                            # assumes relevant comments are indented too
+                            # assumes relevant comments are indented too!!!
                             while len(line) == 0 or line.startswith(' '):
                                 if len(line) != 0:
                                     variables += "%s\r\n" % line
@@ -820,6 +826,27 @@ def page_coverage_summary():
             count += 1
             pcap_files.append({'filename': filename, 'pcappath': pcappath})
             pcap_file.save(pcappath)
+
+        # If multiple files submitted to Suricata, merge them here since
+        #  Suricata can only read one file.
+        if len(pcap_files) > 1:
+            if not MERGECAP_BINARY:
+                error("No mergecap binary; unable to merge pcaps for Suricata job.")
+                return render_template('/dalton/error.html', jid="<not_defined>", msg="No mergecap binary found on Dalton Controller.  Unable to process multiple pcaps for this Suricata job.")
+            combined_file = "%s/combined-%s.pcap" % (os.path.join(TEMP_STORAGE_PATH, job_id), job_id)
+            mergecap_command = "%s -w %s -F pcap %s" % (MERGECAP_BINARY, combined_file, ' '.join([p['pcappath'] for p in pcap_files]))
+            debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s" % ', '.join([p['filename'] for p in pcap_files]))
+            try:
+                # validation on pcap filenames done above; otherwise OS command injeciton here
+                mergecap_output = subprocess.Popen(mergecap_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
+                if len(mergecap_output) > 0:
+                    # return error?
+                    error("Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
+                    return render_template('/dalton/error.html', jid="<not_defined>", msg="Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
+                pcap_files = [{'filename': os.path.basename(combined_file), 'pcappath': combined_file}]
+            except Exception as e:
+                error("Could not merge pcaps.  Error: %s" % e)
+                return render_template('/dalton/error.html', jid="<not_defined>", msg="Could not merge pcaps.  Error: %s" % e)
 
         # get enable all rules option
         bEnableAllRules = False

@@ -2,22 +2,17 @@
 FROM ubuntu:16.04
 MAINTAINER David Wharton
 
-# tcpdump for pcap analysis; not *requried* for
+# tcpdump is for pcap analysis; not *required* for
 #  the agent but nice to have....
-#  should be included in wireshark anyway (see below)
 RUN apt-get update -y && apt-get install -y \
-    python-dev \
-    tcpdump
+    python=2.7.11-1 \
+    tcpdump=4.9.0-1ubuntu1~ubuntu16.04.1
 
 RUN apt-get install -y suricata=3.0-1
 
-RUN apt-get install -y python-pip
-RUN pip install -U pip
-RUN pip install https://github.com/jasonish/py-idstools/archive/master.zip
-
-# wireshark needed for mergecap; statically compiled
-#  mergecap would be smaller but doing this for now
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y install wireshark
+#RUN apt-get install -y python-pip
+#RUN pip install -U pip
+#RUN pip install https://github.com/jasonish/py-idstools/archive/master.zip
 
 RUN mkdir -p /opt/dalton-agent/
 
