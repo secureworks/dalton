@@ -6,4 +6,4 @@ To see it in action, run:
 
 `docker-compose build && docker-compose up -d`
 
-Then navigate to http://<docker-host>/dalton/
+Then navigate to `http://<docker-host>/dalton/`
