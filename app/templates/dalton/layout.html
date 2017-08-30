@@ -31,7 +31,11 @@
    
         <a class="brand" href="/dalton/">Dalton</a>
               <ul class="nav">
-                <li><a href="/dalton/"><i class="icon-home"></i>&nbsp;Home</a></li>
+                {% if (request.url_rule|string).endswith("/dalton/") %}
+                    <li class="active"><a href="/dalton/"><i class="icon-home"></i>&nbsp;Home</a></li>
+                {% else %}
+                    <li><a href="/dalton/"><i class="icon-home"></i>&nbsp;Home</a></li>
+                {% endif %}
                 <li class="dropdown">
                   <a href="#" class='dropdown-toggle' data-toggle='dropdown'>
                     <i class="icon-plus"></i>&nbsp;New&nbsp;
@@ -42,16 +46,27 @@
                     <li><a href="/dalton/coverage/snort/">Snort Test</a></li>
                   </ul>
                 </li>
-                <li><a href="/dalton/queue" id='jobs-toggle'><i class="icon-list"></i>&nbsp;Queue</a></li>
-                <li><a href="/dalton/sensor" id='sensor-toggle'><i class="icon-hdd"></i>&nbsp;Sensors</a></li>
+                {% if (request.url_rule|string).endswith("/queue") %}
+                    <li class="active"><a href="/dalton/queue" id='jobs-toggle'><i class="icon-list"></i>&nbsp;Queue</a></li>
+                {% else %}
+                    <li><a href="/dalton/queue" id='jobs-toggle'><i class="icon-list"></i>&nbsp;Queue</a></li>
+                {% endif %}
+                {% if (request.url_rule|string).endswith("/sensor") %}
+                    <li class="active"><a href="/dalton/sensor" id='sensor-toggle'><i class="icon-hdd"></i>&nbsp;Sensors</a></li>
+                {% else %}
+                    <li><a href="/dalton/sensor" id='sensor-toggle'><i class="icon-hdd"></i>&nbsp;Sensors</a></li>
+                {% endif %}
                 <li><a href="/flowsynth/" id='flowsynth-toggle'><i class="icon-wrench"></i>&nbsp;Flowsynth</a></li>
-                <li><a href="/dalton/about" id="about-toggle"><i class="icon-info-sign"></i>&nbsp;About</a></li>
-              </ul>
+                {% if (request.url_rule|string).endswith("/about") %}
+                    <li class="active"><a href="/dalton/about" id="about-toggle"><i class="icon-info-sign"></i>&nbsp;About</a></li>
+                {% else %}
+                    <li><a href="/dalton/about" id="about-toggle"><i class="icon-info-sign"></i>&nbsp;About</a></li>
+                {% endif %}
+                </ul>
         </div>
       </div>
     </div>
   </div>
-
     <div class="container-fluid">
         <div class="row-fluid">
             <div class="span1">
