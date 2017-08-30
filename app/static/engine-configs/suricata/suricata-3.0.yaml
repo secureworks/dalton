@@ -95,7 +95,7 @@ outputs:
 
   # Extensible Event Format (nicknamed EVE) event log in JSON format
   - eve-log:
-      enabled: yes
+      enabled: no
       filetype: regular #regular|syslog|unix_dgram|unix_stream|redis
       filename: eve.json
       #prefix: "@cee: " # prefix to prepend to each log entry
@@ -132,7 +132,7 @@ outputs:
             # helpful when reviewing alerts for traffic that is being reverse
             # or forward proxied.
             xff:
-              enabled: no
+              enabled: yes
               # Two operation modes are available, "extra-data" and "overwrite".
               mode: extra-data
               # Two proxy deployments are supported, "reverse" and "forward". In
@@ -143,6 +143,7 @@ outputs:
               # than one IP address is present, the last IP address will be the
               # one taken into consideration.
               header: X-Forwarded-For
+              header: Original-Client-IP
         - http:
             extended: yes     # enable this for extended logging information
             # custom allows additional http fields to be included in eve-log
@@ -181,7 +182,7 @@ outputs:
 
   # alert output for use with Barnyard2
   - unified2-alert:
-      enabled: no
+      enabled: yes
       filename: unified2.alert
 
       # File size limit.  Can be specified in kb, mb, gb.  Just a number
@@ -201,7 +202,7 @@ outputs:
       # This is helpful when reviewing alerts for traffic that is being reverse
       # or forward proxied.
       xff:
-        enabled: no
+        enabled: yes
         # Two operation modes are available, "extra-data" and "overwrite". Note
         # that in the "overwrite" mode, if the reported IP address in the HTTP
         # X-Forwarded-For header is of a different version of the packet
@@ -228,7 +229,7 @@ outputs:
 
   # a line based log of TLS handshake parameters (no alerts)
   - tls-log:
-      enabled: no  # Log TLS connections.
+      enabled: yes  # Log TLS connections.
       filename: tls.log # File to store TLS logs.
       append: yes
       #filetype: regular # 'regular', 'unix_stream' or 'unix_dgram'
@@ -241,7 +242,7 @@ outputs:
 
   # a line based log of DNS requests and/or replies (no alerts)
   - dns-log:
-      enabled: no
+      enabled: yes
       filename: dns.log
       append: yes
       #filetype: regular # 'regular', 'unix_stream' or 'unix_dgram'
@@ -296,7 +297,7 @@ outputs:
   # a full alerts log containing much information for signature writers
   # or for investigating suspected false positives.
   - alert-debug:
-      enabled: no
+      enabled: yes
       filename: alert-debug.log
       append: yes
       #filetype: regular # 'regular', 'unix_stream' or 'unix_dgram'
