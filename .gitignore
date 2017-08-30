@@ -6,6 +6,9 @@ rulesets/snort/*.rules
 rulesets/suricata/*.rules
 todo.txt
 notes.txt
+*.save
+*.save.*
+*.swp
 
 #####
 
