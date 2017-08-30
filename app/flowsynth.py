@@ -10,5 +10,6 @@ def index_redirect():
 @flowsynth_blueprint.route("/flowsynth/")
 @flowsynth_blueprint.route("/flowsynth")
 def page_index():
-    return "FLOWSYTH ... coming soon."
-#    return render_template('/flowsynth/index.html', page='')
+#    return "FLOWSYTH ... coming soon."
+#    return render_template('/dalton/flowsynth.html', page='')
+    return render_template('/pcapwg/packet_gen.html', page='')
