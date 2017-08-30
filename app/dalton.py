@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 """
-Dalton - a UI and management tool for submitting and viewing IDS sensor jobs
+Dalton - a UI and management tool for submitting and viewing IDS jobs
 """
 
 # app imports
@@ -468,7 +468,6 @@ def post_job_results(jobid):
     logger.debug("Dalton agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
 
     #save results to db
-    # Feb 2015 - DRW - older agent version use 'snort' for IDS output, newer versions use 'ids'
     if 'ids' in result_obj:
         ids = result_obj['ids']
     elif 'snort' in result_obj:
@@ -495,14 +494,13 @@ def post_job_results(jobid):
         time = result_obj['total_time']
     else:
         time = ""
-    # Jan 15, 2014 - DRW - alert_detail may not be supported on all Dalton Agents yet.
-    #   alert_detailed currently is (for the most part) output from u2spewfoo and should contain packet details from alerts.
+    # alert_detailed currently is (for the most part) output from u2spewfoo and should contain packet details from alerts.
     alert_detailed = ""
     if 'alert_detailed' in result_obj:
         alert_detailed = result_obj['alert_detailed']
     else:
         alert_detailed = ""
-    # Feb 2015 - DRW - other_logs only supported on Suricata for now
+    # other_logs only supported on Suricata for now
     if "other_logs" in result_obj:
         other_logs = result_obj['other_logs']
     else:
@@ -639,7 +637,7 @@ def page_coverage_default(sensor_tech, error=None):
     # get list of rulesets based on engine
     rulesets = get_rulesets(sensor_tech.split('-')[0])
 
-    # Feb 09, 2015 - DRW - enumerate sensor versions based on available sensors and pass them to coverage.html
+    # enumerate sensor versions based on available sensors and pass them to coverage.html
     #   This way we can dynamically update the submission page as soon as new sensor versions check in
     clear_old_agents()
     sensors = []
@@ -730,8 +728,8 @@ def page_show_job(jid):
 
         return render_template('/dalton/job.html', overview=overview,page = '', jobid = jid, ids=ids, perf=perf, alert=alert, error=error, debug=debug, total_time=total_time, tech=tech, custom_rules=custom_rules, alert_detailed=alert_detailed, other_logs=other_logs)
 
-# Feb 27, 2014 - DRW - abstracting the job submission method away from the HTTP POST and creating this
-#  function so that it can be called easier (e.g. from an API)
+#  abstracting the job submission method away from the HTTP POST and creating this
+#   function so that it can be called easier (e.g. from an API)
 def submit_job():
     debug("submit_job() called")
     # never finished coding this...
@@ -891,7 +889,7 @@ def page_coverage_summary():
         except:
             pass
 
-        # Jan 15, 2014 - DRW - used to tell the agent to return pcap data from alerts.
+        # used to tell the agent to return pcap data from alerts.
         #   This is only supported (for now) for agents that generage/process unified2 alerts
         #   and return pcap details from them.
         bGetAlertDetailed = False
@@ -901,7 +899,7 @@ def page_coverage_summary():
         except:
             pass
 
-        # Feb 2015 - get other logs (only supported in Suricata for now)
+        # get other logs (only supported in Suricata for now)
         bGetOtherLogs = False
         try:
             if request.form.get('optionOtherLogs'):
@@ -965,7 +963,7 @@ def page_coverage_summary():
                     # add sid if not included
                     if not re.search(r'(\s|\x3B)sid\s*\:\s*\d+\s*\x3B', line) and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
-                        # Mar 22, 2013 - DRW - comment out below line and add code to fix automatically instead of throwing an error
+                        # if no sid in rule, fix automatically instead of throwing an error
                         #return page_coverage_default(request.form.get('sensor_tech'),"\'sid\' not specified in rule, this will error.  Rule: %s" % line)
                         line = re.sub(r'\x29$', " sid:%d;)" % (sid_base + sid_offset), line)
                         sid_offset += 1
@@ -1057,10 +1055,15 @@ def page_coverage_summary():
                     delete_temp_files(job_id)
                     return render_template('/dalton/error.html', jid=jid, msg="Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path))
                 else:
-                    # if these options are set, modify prod ruleset accordingly
+                    # if these options are set, modify ruleset accordingly
                     if bEnableAllRules or bShowFlowbitAlerts:
                         modified_rules_path = "%s/%s_prod_modified.rules" % (TEMP_STORAGE_PATH, job_id)
+                        ### begin superfluous code (see possible_negated_vars comment)
                         modified_vars_file = "%s/%s_variables_modified.conf" % (TEMP_STORAGE_PATH, job_id)
+                        # not populated at the moment so most of the below code is
+                        #  unnecessary.  (Enable flowbits rules code still used.)
+                        possible_negated_vars = []
+                        RFC_1918 = '[10.0.0.0/8,192.168.0.0/16,172.16.0.0/12]'
 
                         # load all variables into variables_dict dictionary
                         variables_dict = {}
@@ -1068,6 +1071,7 @@ def page_coverage_summary():
                             if sensor_tech.startswith('suri'):
                                 # this is YAML; we could use some YAML libs to parse but probably overkill.
                                 # Assumming at least 4 spaces before variable definitions
+                                # TODO: think thru this a little more
                                 regex = re.compile(r"^\s{4,}(?P<name>[^\x3A\x23]+)\x3A\s+[\x22\x27]?(?P<value>[^\x22\x27]+)")
                             else:
                                 # can add other sensor formats with elif clauses
@@ -1088,7 +1092,7 @@ def page_coverage_summary():
                         # rules to identify !any situations but I don't think that is
                         # necessary at this point.
                         #
-                        # Oct 16, 2013 - DRW - do variable expansion on variables_dict
+                        # do variable expansion on variables_dict
                         for var in variables_dict.keys():
                             original_var_value = variables_dict[var]
                             count = 0
@@ -1107,6 +1111,32 @@ def page_coverage_summary():
                                     variables_dict[var] = original_var_value
                                     break
 
+                        # Sometimes there are variables that are set to 'any' by default but are used
+                        # in a negated context in the (disabled by default) ruleset.  Set those vars to RFC1918 if that is the case.
+                        # Only do this if enable all rules is selected since !any rules should not be enabled in a default ruleset.
+                        if bEnableAllRules:
+                            vars_fh = open(vars_file, 'rb')
+                            modified_vars_fh = open(modified_vars_file, 'wb')
+                            for line in vars_fh:
+                                for var in possible_negated_vars:
+                                    if var in line and var in variables_dict and variables_dict[var] == 'any':
+                                        if sensor_tech.startswith('suri'):
+                                            regex = re.compile(r"^\s{4}" + re.escape(var) + r"\s*\x3A\s+[\x22\x27]?(?P<value>[^\x22\x27]+)")
+                                        else:
+                                            regex = re.compile(r"^(ip)?var\s+" + re.escape(var) + r"\s+(?P<value>.*)")
+                                        result = regex.search(line)
+                                        if result:
+                                            value = result.group('value')
+                                            new_line = re.sub(re.escape(value), RFC_1918, line, 1)
+                                            line = new_line
+                                            break
+                                modified_vars_fh.write(line)
+                            modified_vars_fh.close()
+                            vars_fh.close()
+                            vars_file = modified_vars_file
+                        ### end superfluous code (see possible_negated_vars comment)
+
+
                         regex = re.compile(r"^#+\s*(alert|log|pass|activate|dynamic|drop|reject|sdrop)\s")
                         prod_rules_fh = open(ruleset_path, 'rb')
                         modified_rules_fh = open(modified_rules_path, 'wb')
@@ -1114,10 +1144,10 @@ def page_coverage_summary():
                             # if Enable disabled rules checked, do the needful
                             if bEnableAllRules:
                                 if regex.search(line):
-                                    line = line.lstrip('#')
+                                    line = line.lstrip('# \t')
                             # if show all flowbit alerts set, strip out 'flowbits:noalert;'
                             if bShowFlowbitAlerts:
-                                line = re.sub(r'(\x3B|\s)flowbits\s*\x3A\s*noalert\s*\x3B', '', line)
+                                line = re.sub(r'([\x3B\s])flowbits\s*\x3A\s*noalert\s*\x3B', '\g<1>', line)
                             modified_rules_fh.write(line)
                         prod_rules_fh.close()
                         modified_rules_fh.close()
@@ -1260,7 +1290,7 @@ def page_queue_default():
                         status_msg = "Interrupted"
                     elif status == STAT_CODE_TIMEOUT:
                         status_msg = "Timeout"
-                    # Note: Dec 18, 2013 - DRW - add logic to not show teapot jobs?; add if teapotjob: job['teapot'] = "True" else: "False"
+                    # Note: could add logic to not show teapot jobs?; add if teapotjob: job['teapot'] = "True" else: "False"
                     job = {}
                     job['jid'] = jid
                     job ['tech'] = "%s" % r.get("%s-tech" % jid)
@@ -1278,7 +1308,7 @@ def page_about_default():
     return render_template('/dalton/about.html', page='')
 
 #########################################
-# Dec 06, 2013 - DRW - API handling code
+# API handling code
 #########################################
 
 @dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>', methods=['GET'])
