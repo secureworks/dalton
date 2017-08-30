@@ -11,7 +11,7 @@ RUN apt-get install -y less nano net-tools
 
 # wireshark needed for mergecap; statically compiled
 #  mergecap would be smaller but doing this for now
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y install wireshark
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install wireshark-common=2.2.6+g32dac6a-2ubuntu0.16.04
 
 RUN mkdir -p /opt/dalton/ && \
     mkdir -p /var/log/supervisord
