@@ -1,0 +1,16 @@
+{% extends "/pcapwg/layout.html" %}
+{% block body %}
+    <!--<h1>PCAP Generator</h1>-->
+    <div class="row">
+        <div class="span4">
+            <h1>Build</h1>
+            <p>Build a packet or test case by specifying the ethernet, IP, and protocol settings and providing a payload.</p>
+            <p><a class="btn btn-primary btn-large" href="build">Go &raquo;</a></p>
+        </div>
+        <div class="span4">
+            <h1>Convert</h1>
+            <p>Convert an ASCII hexdump of a packet capture to the pcap file format.</p>
+            <p><a class="btn btn-primary btn-large" href="convert">Go &raquo;</a></p>
+        </div>
+    </div><!--/row-->
+{% endblock %}
