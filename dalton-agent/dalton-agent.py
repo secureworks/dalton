@@ -1,12 +1,10 @@
 #!/usr/bin/python
 #
-# Author: David Wharton (DRW) - dwharton@secureworks.com
-# Created: Jan 2013
+# Note: originally written to run on Python 2.4 and up without the need for
+# non-standard libararies so that is why some things are written the way 
+# they are. This is especially noticable (painful?) with the use of urllib2
+# instead of urllib3 or Requests.
 #
-##### Changelog #####
-# Jan 29, 2013 - DRW - Created this file
-# <snip>
-# Aug 2017 - DRW - clean up for open source release
 
 import os
 import sys
