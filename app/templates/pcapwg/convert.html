@@ -1,0 +1,14 @@
+{% extends "/pcapwg/layout.html" %}
+{% block body %}
+    <h1>Convert</h1>
+    <form action="/generate" method="post">
+        <input type="hidden" name="generate_method" value="convert">
+        <label class="checkbox">Compute TCP Handshake <input type="checkbox" name="compute_tcp_handshake" value="Yes"></label>
+        <textarea name="hexdump" rows='28' style='width: 100%;'></textarea>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Generate PCAP</button>
+          <button type="button" class="btn">Cancel</button>
+        </div>
+    <form>
+
+{% endblock %}

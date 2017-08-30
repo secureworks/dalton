@@ -1,0 +1,122 @@
+{% extends "/pcapwg/layout.html" %}
+{% block js %}
+$('#payload_raw').click (function ()
+  {
+  var thisCheck = $(this);
+    if (thisCheck.is (':checked'))
+    {
+      $.ajax({url:"{{ url_for('static', filename='ajax/payload_raw.html') }}",success:function(result){
+      $("#payload_area").html(result);
+      }});
+    }
+  });
+  $('#payload_http').click (function ()
+  {
+  var thisCheck = $(this);
+    if (thisCheck.is (':checked'))
+    {
+      $.ajax({url:"{{ url_for('static', filename='ajax/payload_http.html') }}",success:function(result){
+      $("#payload_area").html(result);
+      }});
+    }
+  });
+  $('#payload_cert').click (function ()
+  {
+  var thisCheck = $(this);
+    if (thisCheck.is (':checked'))
+    {
+      $.ajax({url:"{{ url_for('static', filename='ajax/payload_cert.html') }}",success:function(result){
+      $("#payload_area").html(result);
+      }});
+    }
+  });
+{% endblock %}
+{% block body %}
+    <form action="generate" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="generate_method" value="build">
+      <h1>Build Packet Capture</h1>
+    <div class="tabbable tabs-left"> <!-- Only required for left/right tabs -->
+      <ul class="nav nav-tabs">
+        <li class="active"><a href="#layer3" data-toggle="tab">Network Layer</a></li>
+        <li><a href="#layer4" data-toggle="tab">Transport Layer</a></li>
+        <li><a href="#payload" data-toggle="tab">Payload</a></li>
+      </ul>
+      <div class="tab-content" style="height: 450px;">
+        <div class="tab-pane active" id="layer3">
+          <legend>Network Layer</legend>
+
+          <table>
+              <tr>
+                  <Td><label>Source IP</label></Td>
+                  <td></td>
+                  <td><label>Destination IP</label></td>
+              </tr>
+              <tr>
+                  <td>
+                    <select name="l3_src_ip">
+                        <option value="$EXTERNAL_NET" >$EXTERNAL_NET</option>
+                        <option value="$HOME_NET" selected>$HOME_NET</option>
+                    </select>
+                  </td>
+                  <td>
+                    <i class="icon-arrow-right"></i>
+                  </td>
+                  <td>
+                    <select name="l3_dst_ip">
+                            <option value="$EXTERNAL_NET" selected>$EXTERNAL_NET</option>
+                            <option value="$HOME_NET">$HOME_NET</option>
+                    </select>
+                  </td>
+              </tr>
+          </table>
+              <p><b>Note:</b><br/>
+                $EXTERNAL_NET resolves to 172.16.x.x, $HOME_NET resolves to 192.168.x.x<br/>
+             </p>
+
+
+        </div>
+        <div class="tab-pane" id="layer4">
+          <legend>Transport Layer</legend>
+         <p style="float: right"><b>Note:</b><br/>
+            'any' resolves to a random high-order port (10000 or higher)<br/>
+         </p>
+          <label>Protocol</label>
+          <select name="l3_protocol">
+            <option>TCP</option>
+            <option>UDP</option>
+          </select>
+          <label class="checkbox">
+          <input type="checkbox" name="l3_flow_established" value="Yes" checked>
+            Flow Established
+          </label>
+          <label>Source Port</label>
+          <input type="text" name="l4_src_port" value="any">
+          <label>Destination Port</label>
+          <input type="text" name="l4_dst_port" value="any">
+        </div>
+        <div class="tab-pane" id="payload">
+          <legend>Payload Wizards</legend>
+          <label class="radio">
+            <input type="radio" name="payload_format" id="payload_raw" value="raw">
+            Raw
+          </label>
+          <label class="radio">
+            <input type="radio" name="payload_format" id="payload_http" value="http">
+            HTTP
+          </label>
+          <label class="radio">
+            <input type="radio" name="payload_format" id="payload_cert" value="cert">
+            Certificate
+          </label>
+          <div id="payload_area">
+            <i>Please select a payload type.</i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Generate FlowSynth</button>
+      <button type="button" class="btn">Cancel</button>
+    </div>
+  </form>
+{% endblock %}
