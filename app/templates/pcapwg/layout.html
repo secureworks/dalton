@@ -1,0 +1,68 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>FlowSynth</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="{{ url_for('static', filename='bootstrap/css/bootstrap.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/pcapgen.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', filename='bootstrap/js/jquery.js')}}"></script>
+    <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.js')}}"></script>
+
+    <style>
+      body {
+        padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
+      }
+    </style>
+    <link href="{{ url_for('static', filename='bootstrap/css/bootstrap-responsive.css') }}" rel="stylesheet">
+
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+          <a class="brand" href="#">FlowSynth WebUI</a>
+          <div class="nav-collapse collapse">
+            <ul class="nav">
+                {%  if page == 'build': %}
+                    <li class="active"><a href="#">Build</a></li>
+                {%  else: %}
+                    <li><a href="/flowsynth/pcap/build">Build</a></li>
+                {%  endif %}
+                {%  if page == 'compile': %}
+                    <li class="active"><a href="#">Compile</a></li>
+                {%  else: %}
+                    <li><a href="/flowsynth/pcap/compile">Compile</a></li>
+                {%  endif %}
+                {%  if page == 'about': %}
+                    <li class="active"><a href="#">About</a></li>
+                {%  else: %}
+                    <li><a href="/flowsynth/pcapwg/about">About</a></li>
+                {%  endif %}
+            </ul>
+          </div><!--/.nav-collapse -->
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      {% block body %}{% endblock %}
+    </div> <!-- /container -->
+
+    <!-- 
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script type="text/javascript">
+    {% block js %}{% endblock %}
+    </script>
+  </body>
+</html>

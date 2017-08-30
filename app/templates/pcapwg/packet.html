@@ -1,0 +1,43 @@
+{% extends "/pcapwg/layout.html" %}
+{% block body %}
+    <script type="text/javascript">
+    function loading_image() {
+        return 'Loading...';
+    }
+
+    $(document).ready(function(){   
+        $('#testcase').click(function(){
+            $("#testcase-status").html(loading_image());
+		  $("#pcap-link").html("");
+
+            postdata = { engine: $("#engine").val(), filename: $("#filename").val() };
+
+            $.post("savetestcase", postdata, function (data) {
+                $("#testcase-status").html(data);
+            });
+        });
+    });
+    </script>
+
+    <div style='width: 70%;'>
+		{% if buildstatus['successful'] %}
+		<legend>Build Status <span class="label label-success">Success</span></legend>
+
+		<a href="get_pcap/{{ filename }}"><img src="/images/disk-black-24.png">&nbsp;Click Here to Download PCAP</a></br>
+        <legend>Add Test Case</legend>
+        <input type="hidden" id="filename" value="{{ filename }}">
+            <label>Engine</label>
+            <select id="engine">
+              <option value="suricata">Suricata</option>
+              <option value="snort">Snort</option>
+              <option value="both" selected>Both (Suricata / Snort)</option>
+            </select></br>
+        <div id="testcase-status"></div>
+		<input type="button" class="btn btn-inverse" id="testcase" value="Send to sensor">
+		{% else %}
+		<legend>Build Status <span class="label label-failure">Failure</span></legend>
+		There was a problem with your Flowsynth script:
+		<pre>{{ buildstatus['error'] }}</pre>
+		{% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "/pcapwg/layout.html" %}
+{% block body %}
+    <form action="/flowsynth/pcap/compile_fs" method="post">
+        <h1>Compile </h1>
+        <div style='width: 70%;'>
+            <textarea rows=20 class="field span12" name="code">{{ flowsynth_code }}</textarea>
+        </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Compile FlowSynth</button>
+      <button type="button" class="btn">Cancel</button>
+    </div>
+  </form>
+{% endblock %}
