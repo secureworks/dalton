@@ -22,6 +22,7 @@ import ConfigParser
 import logging
 from logging.handlers import RotatingFileHandler
 import subprocess
+import yaml
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
