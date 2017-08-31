@@ -470,7 +470,7 @@ def process_snort_alerts():
     os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
 
     job_alert_log_fh = open(JOB_ALERT_LOG, "wb")
-    for alert_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "alert*")):
+    for alert_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "alert-full_dalton-agent*")):
         alert_filehandle = open(alert_file, "rb")
         print_debug("Processing snort alert file %s" % alert_file)
         job_alert_log_fh.write(alert_filehandle.read())
@@ -723,6 +723,8 @@ def process_unified2_logs():
             print_debug("Error: the file \'%s\' referenced in U2_ANALYZER_BINARY (\'%s\') does not exist on this sensor, not processing unified2 logs." % (myitem, U2_ANALYZER_BINARY))
             #print_error("Error processing unified2 files.  Files needed to perform analysis not found.  This sensor may not support detailed alert data yet.  See debug log for details.")
             u2_binary_exists = False
+            # for testing; going to delete this later anyway..
+            u2_binary_exists = True
 
     if u2_binary_exists:
         # see if unified2 logs exist and process them; add to JOB_ALERT_DETAILED_LOG
@@ -732,13 +734,16 @@ def process_unified2_logs():
         #  this isn't normal behavior; it should be file, 'unified2.alert.<timestamp>'.
         #  glob treats files with leading period differently (won't match '*')
         #  glob thru ".unified2.alert*" and "unified2.alert*", put in a list, and then iterate thru that
-        unified2_files = []
+        unified2_files = set([])
         for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, ".unified2.alert*")):
             print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
-            unified2_files.append(u2_file)
+            unified2_files.add(u2_file)
         for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "unified2.alert*")):
             print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
-            unified2_files.append(u2_file)
+            unified2_files.add(u2_file)
+        for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "unified2.dalton.alert*")):
+            print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
+            unified2_files.add(u2_file)
         # below print line use for testing; comment it out when not debugging
         # print "unified2_files for processing: %s" % unified2_files
         if len(unified2_files) <= 0:
@@ -746,7 +751,7 @@ def process_unified2_logs():
         for unified2_file in unified2_files:
             # call to u2spewfoo.py here, populate JOB_ALERT_DETAILED_LOG
             # filename validation to prevent OS command injection; will need to update if future sensor versions use different file names
-            if not re.match('\.?unified2\.alert\.?\d*', os.path.basename(unified2_file)):
+            if not re.match('\.?unified2\.alert\.?\d*', os.path.basename(unified2_file)) and False:
                 print_debug("Invalid unified2 filename found, not processing: %s" % unified2_file)
             else:
                 # call to process unified2 alerts
@@ -982,6 +987,16 @@ def submit_job(job_id, job_directory):
         for rules_file in IDS_RULES_FILES:
             snort_conf_fh.write("\ninclude %s\n" % rules_file)
         snort_conf_fh.write("\ninclude %s\n" % VARIABLES_FILE)
+        
+        # set these output filenames explicitly so there is no guess where/what they are
+        # NOTE: when MULTIPLE "output unified2:" directives are defined, Snort will
+        #  write to both but only writes ExtraData records to one of them -- the last
+        #  one defined. (The 'extra_data_config' (void pointer) variable used to log
+        #  ExtraData is a global variable and thus only points to one config and thus
+        #  one log file.).  This one is defined last so we get ExtraData which we want. 
+        snort_conf_fh.write("\noutput alert_full: alert-full_dalton-agent\n")
+        snort_conf_fh.write("\noutput unified2: filename unified2.dalton.alert\n")
+
         snort_conf_fh.close()
 
     if SENSOR_TECHNOLOGY.startswith('suri'):
