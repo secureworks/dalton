@@ -664,8 +664,9 @@ def process_other_logs(other_logs):
         for log_name in other_logs:
             if not os.path.exists("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name])):
                 log_name_new = other_logs[log_name].replace("-", "_")
-                print_debug("Log file \'%s\' not present, trying \'%s\'..." % (other_logs[log_name], log_name_new))
-                other_logs[log_name] = log_name_new
+                if log_name_new != other_logs[log_name]:
+                    print_debug("Log file \'%s\' not present, trying \'%s\'..." % (other_logs[log_name], log_name_new))
+                    other_logs[log_name] = log_name_new
             if os.path.exists("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name])):
                 log_fh = open("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name]), "rb")
                 all_other_logs[log_name] = log_fh.read()
