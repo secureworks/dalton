@@ -28,10 +28,75 @@ import ConfigParser
 from optparse import OptionParser
 import struct
 import socket
+import logging
+from logging.handlers import RotatingFileHandler
 
 # urllib2 in Python < 2.6 doesn't support setting a timeout so doing it like this
 socket.setdefaulttimeout(30)
 
+#*********************************
+#*** Parse Comand Line Options ***
+#*********************************
+parser = OptionParser()
+parser.add_option("-c", "--config",
+                    dest="configfile",
+                    help="path to config file [default: %default]",
+                    default="dalton-agent.conf")
+(options, args) = parser.parse_args()
+
+dalton_config_file = options.configfile
+
+# get options from dalton config file
+config = ConfigParser.SafeConfigParser()
+
+if not os.path.exists(dalton_config_file):
+    # just print to stdout; logging hasn't started yet
+    print "Config file \'%s' does not exist.\n\nexiting." % dalton_config_file
+    sys.exit(1)
+
+try:
+    config.read(dalton_config_file)
+except Exception, e:
+    # just print to stdout; logging hasn't started yet
+    print "Error reading config file, \'%s\'.\n\nexiting." % dalton_config_file
+    sys.exit(1)
+
+try:
+    DEBUG = config.getboolean('dalton', 'DEBUG')
+    STORAGE_PATH = config.get('dalton', 'STORAGE_PATH')
+    SENSOR_TECHNOLOGY = config.get('dalton', 'SENSOR_TECHNOLOGY').lower()
+    SENSOR_UID = config.get('dalton', 'SENSOR_UID')
+    DALTON_API = config.get('dalton', 'DALTON_API')
+    API_KEY = config.get('dalton', 'API_KEY')
+    POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
+    U2_ANALYZER_BINARY = config.get('dalton', 'U2_ANALYZER_BINARY')
+    KEEP_JOB_FILES = config.getboolean('dalton', 'KEEP_JOB_FILES')
+except Exception, e:
+    # just print to stdout; logging hasn't started yet
+    print "Error parsing config file, \'%s\':\n\n%s\n\nexiting." % (dalton_config_file, e)
+    sys.exit(1)
+
+#***************
+#*** Logging ***
+#***************
+
+file_handler = RotatingFileHandler('/var/log/dalton-agent.log', 'a', 1 * 1024 * 1024, 10)
+if DEBUG:
+    file_handler.setLevel(logging.DEBUG)
+else:
+    file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+#file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
+logger = logging.getLogger("dalton-agent")
+logger.addHandler(file_handler)
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+
+#************************************************
+#** Helper Functions to populate config values **
+#************************************************
 ''' returns full path to file if found on system '''
 def find_file(name):
     ret_path = None
@@ -73,18 +138,6 @@ def get_engine_version(path):
         pass
     return version
 
-#*********************************
-#*** Parse Comand Line Options ***
-#*********************************
-parser = OptionParser()
-parser.add_option("-c", "--config",
-                    dest="configfile",
-                    help="path to config file [default: %default]",
-                    default="dalton.conf")
-(options, args) = parser.parse_args()
-
-dalton_config_file = options.configfile
-
 #**************************
 #*** Constant Variables ***
 #**************************
@@ -94,35 +147,8 @@ HTTP_HEADERS = {
     "User-Agent" : "Dalton Agent %s" % AGENT_VERSION
 }
 
-tcpdump_binary = '/usr/sbin/tcpdump'
-
-# get options from dalton config file
-config = ConfigParser.SafeConfigParser()
-
-if not os.path.exists(dalton_config_file):
-    print "Config file \'%s' does not exist.\n\nexiting." % dalton_config_file
-    sys.exit(1)
-
-try:
-    config.read(dalton_config_file)
-except Exception, e:
-    print "Error reading config file, \'%s\'.\n\nexiting." % dalton_config_file
-    sys.exit(1)
-
-try:
-    DEBUG = config.getboolean('dalton', 'DEBUG')
-    STORAGE_PATH = config.get('dalton', 'STORAGE_PATH')
-    SENSOR_TECHNOLOGY = config.get('dalton', 'SENSOR_TECHNOLOGY').lower()
-    SENSOR_UID = config.get('dalton', 'SENSOR_UID')
-    DALTON_API = config.get('dalton', 'DALTON_API')
-    API_KEY = config.get('dalton', 'API_KEY')
-    POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
-    U2_ANALYZER_BINARY = config.get('dalton', 'U2_ANALYZER_BINARY')
-    KEEP_JOB_FILES = config.getboolean('dalton', 'KEEP_JOB_FILES')
-except Exception, e:
-    print "Error parsing config file, \'%s\':\n\n%s\n\nexiting." % (dalton_config_file, e)
-    sys.exit(1)
-
+# check options from config file
+# done here after logging has been set up
 if SENSOR_UID == 'auto':
     SENSOR_UID = socket.gethostname()
 
@@ -134,7 +160,7 @@ except Exception, e:
 if TCPDUMP_BINARY == 'auto':
     TCPDUMP_BINARY = find_file('tcpdump')
 if not TCPDUMP_BINARY or not os.path.exists(TCPDUMP_BINARY):
-        print "Could not find 'tcpdump' binary."
+        logger.warn("Could not find 'tcpdump' binary.")
         TCPDUMP_BINARY = ''
 
 IDS_BINARY = 'auto'
@@ -145,14 +171,14 @@ except Exception, e:
 if IDS_BINARY == 'auto':
     IDS_BINARY = find_file('suricata')
 if not IDS_BINARY or not os.path.exists(IDS_BINARY):
-        print "Could not find 'suricata' binary, going to look for Snort."
+        logger.info("Could not find 'suricata' binary, going to look for Snort.")
         IDS_BINARY = None
 if IDS_BINARY is None:
     # look for Snort
     IDS_BINARY = find_file('snort')
     if not IDS_BINARY or not os.path.exists(IDS_BINARY):
-        print "Could not find 'snort' binary."
-        print "ERROR: No IDS binary specified or found.  Cannot continue."
+        logger.info("Could not find 'snort' binary.")
+        logger.critical("No IDS binary specified or found.  Cannot continue.")
         sys.exit(1)
 
 if SENSOR_TECHNOLOGY == 'auto':
@@ -160,12 +186,12 @@ if SENSOR_TECHNOLOGY == 'auto':
     version = get_engine_version(IDS_BINARY)
     SENSOR_TECHNOLOGY = "%s-%s" % (base, version)
 
-print "\n*******************"
-print "Starting Dalton Agent:"
-print "\tSENSOR_UID: %s" % SENSOR_UID
-print "\tSENSOR_TECHNOLOGY: %s" % SENSOR_TECHNOLOGY
-print "\tIDS_BINARY: %s" % IDS_BINARY
-print "\tTCPDUMP_BINARY: %s" % TCPDUMP_BINARY
+logger.info("\n*******************")
+logger.info("Starting Dalton Agent version %s:"% AGENT_VERSION)
+logger.info("\tSENSOR_UID: %s" % SENSOR_UID)
+logger.info("\tSENSOR_TECHNOLOGY: %s" % SENSOR_TECHNOLOGY)
+logger.info("\tIDS_BINARY: %s" % IDS_BINARY)
+logger.info("\tTCPDUMP_BINARY: %s" % TCPDUMP_BINARY)
 
 #************************
 #*** Global Variables ***
@@ -414,8 +440,7 @@ def print_error(msg):
         fh.write("%s\n" % msg)
         fh.close()
     else:
-        if DEBUG:
-            print "print_error() called but no JOB_ERROR_LOG exists"
+        logger.debug("print_error() called but no JOB_ERROR_LOG exists")
     print_msg("ERROR!")
     print_debug("ERROR:\n%s" % msg)
     # throw error
@@ -424,8 +449,7 @@ def print_error(msg):
 def print_msg(msg):
     print_debug(msg)
     # send message
-    if DEBUG:
-        print msg
+    logger.debug(msg)
     send_update(msg, JOB_ID)
 
 def print_debug(msg):
@@ -435,8 +459,7 @@ def print_debug(msg):
         fh.write("*****\n%s\n" % msg)
         fh.close()
     else:
-        if DEBUG:
-            print "print_debug() called but no JOB_DEBUG_LOG exists"
+        logger.debug("print_debug() called but no JOB_DEBUG_LOG exists")
 
 
 # process alert output from Snort
@@ -459,19 +482,19 @@ def check_pcaps():
     Check of the pcaps and alert on potential issues.
     Add other checks here as needed.
     """
-    global PCAP_FILES, tcpdump_binary, JOB_ALERT_LOG, SENSOR_TECHNOLOGY, JOB_ERROR_LOG
+    global PCAP_FILES, TCPDUMP_BINARY, JOB_ALERT_LOG, SENSOR_TECHNOLOGY, JOB_ERROR_LOG
     print_debug("check_pcaps() called")
 
     # Check of the pcaps to make sure none were submitted with TCP packets but no TCP packets have the SYN flag
     # only call if no alerts fired
     if os.path.getsize(JOB_ALERT_LOG) == 0:
         try:
-            if os.path.exists(tcpdump_binary):
+            if os.path.exists(TCPDUMP_BINARY):
                 for pcap in PCAP_FILES:
                     # check for TCP packets
-                    if len(subprocess.Popen("%s -nn -q -c 1 -r %s -p tcp 2>/dev/null" % (tcpdump_binary, pcap), shell=True, stdout=subprocess.PIPE).stdout.read()) > 0:
+                    if len(subprocess.Popen("%s -nn -q -c 1 -r %s -p tcp 2>/dev/null" % (TCPDUMP_BINARY, pcap), shell=True, stdout=subprocess.PIPE).stdout.read()) > 0:
                         # check for SYN packets
-                        if len(subprocess.Popen("%s -nn -q -c 1 -r %s \"tcp[tcpflags] & tcp-syn != 0\" 2>/dev/null" % (tcpdump_binary, pcap), shell=True, stdout=subprocess.PIPE).stdout.read()) == 0:
+                        if len(subprocess.Popen("%s -nn -q -c 1 -r %s \"tcp[tcpflags] & tcp-syn != 0\" 2>/dev/null" % (TCPDUMP_BINARY, pcap), shell=True, stdout=subprocess.PIPE).stdout.read()) == 0:
                             print_error("As Dalton says, \"pain don\'t hurt.\" But an incomplete pcap sure can."
                                         "\n\n"
                                         "The pcap file \'%s\' contains TCP traffic but does not "
@@ -486,7 +509,7 @@ def check_pcaps():
                                         "\n\n"
                                         "And, \"there's always barber college....\"" % os.path.basename(pcap))
             else:
-                print_debug("In check_pcaps() -- no tcpdump binary found at %s" % tcpdump_binary)
+                print_debug("In check_pcaps() -- no tcpdump binary found at %s" % TCPDUMP_BINARY)
         except Exception, e:
             if not str(e).startswith("As Dalton says"):
                 print_debug("Error doing TCP SYN check in check_pcaps():\n%s" % e)
@@ -892,8 +915,7 @@ def submit_job(job_id, job_directory):
 
 
     # parse job dir for configs and pcaps
-    if DEBUG:
-        print "Parsing job directory: %s" % JOB_DIRECTORY
+    logger.debug("Parsing job directory: %s" % JOB_DIRECTORY)
     for file in glob.glob(os.path.join(JOB_DIRECTORY, "*")):
         if not os.path.isfile(file):
             continue
@@ -1043,13 +1065,10 @@ while True:
         if (job != None):
             start_time = int(time.time())
             JOB_ID = job['id']
-            if DEBUG:
-                print datetime.datetime.now().strftime("%b %d %Y %H:%M:%S")
-                print "Job %s Accepted by %s" % (JOB_ID, SENSOR_UID)
+            logger.debug("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID))
             send_update("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID), JOB_ID)
             zf_path = request_zip(JOB_ID)
-            if DEBUG:
-                print "Downloaded zip for %s successfully. Extracting file %s" % (JOB_ID, zf_path)
+            logger.debug("Downloaded zip for %s successfully. Extracting file %s" % (JOB_ID, zf_path))
             send_update("Downloaded zip for %s successfully; extracting..." % JOB_ID, JOB_ID)
             # JOB_DEBUG_LOG not defined yet so can't call print_debug() here
             #print_debug("Extracting zip file for job id %s" % JOB_ID)
@@ -1058,22 +1077,19 @@ while True:
             zf = zipfile.ZipFile(zf_path, 'r')
             filenames = zf.namelist()
             for filename in filenames:
-                if DEBUG:
-                    print "extracting file, %s" % filename
+                logger.debug("extracting file, %s" % filename)
                 fh = open("%s/%s" % (JOB_DIRECTORY, filename), "wb")
                 fh.write(zf.read(filename))
                 fh.close()
             zf.close()
-            if DEBUG:
-                print "Done extracting zipped files."
+            logger.debug("Done extracting zipped files.")
 
             # submit the job!
             try:
                 submit_job(JOB_ID, JOB_DIRECTORY)
             except DaltonError, e:
                 # dalton errors should already be written to JOB_ERROR_LOG and sent back
-                if DEBUG:
-                    print "DaltonError caught:\n%s" % e
+                logger.debug("DaltonError caught:\n%s" % e)
             except Exception, e:
                 # not a DaltonError, perhaps a code bug? Try to write to JOB_ERROR_LOG
                 if JOB_ERROR_LOG:
@@ -1085,8 +1101,7 @@ while True:
                     print_debug("ERROR:\n%s" % msg)
                 else:
                     error_post_results("Dalton Agent Error in sensor \'%s\' while processing job %s. Error:\n%s" % (SENSOR_UID, JOB_ID, e))
-                if DEBUG:
-                    print "Non DaltonError Exception caught:\n%s" % e
+                logger.debug("Non DaltonError Exception caught:\n%s" % e)
 
             TOTAL_PROCESSING_TIME = int(int(time.time())-start_time)
             print_debug("Total Processing Time (includes job download time): %d seconds" % TOTAL_PROCESSING_TIME)
@@ -1104,28 +1119,22 @@ while True:
         else:
             time.sleep(POLL_INTERVAL)
     except KeyboardInterrupt:
-        print "Keyboard Interrupt caught, exiting...."
+        logger.info("Keyboard Interrupt caught, exiting....")
         sys.exit(0)
     except DaltonError, e:
-        if DEBUG:
-            print "DaltonError caught (in while True loop):\n%s" % e
+        logger.debug("DaltonError caught (in while True loop):\n%s" % e)
     except Exception, e:
-        if DEBUG:
-            print "General Dalton Agent exeption caught. Error:\n%s\n" % e
-            traceback.print_exc()
+        logger.debug("General Dalton Agent exeption caught. Error:\n%s\n%s" % (e, traceback.format_exc()))
         if JOB_ID:
             # unexpected error happened on agent when trying to process a job but there may not be job data so compile an empty response with the exception error message and try to send it
-            if DEBUG:
-                print "Possible communication error processing jobid %s.  Attempting to send error message to controller." % JOB_ID
+            logger.warn("Possible communication error processing jobid %s.  Attempting to send error message to controller." % JOB_ID)
             try:
                 error_post_results(e)
-                if DEBUG:
-                    print "Successfully sent error message to controller for jobid %s" % JOB_ID
+                logger.info("Successfully sent error message to controller for jobid %s" % JOB_ID)
             except Exception, e:
-                if DEBUG:
-                    print "Could not communicate with controller to send error info for jobid %s; is the Dalton Controller accepting network communications? Error:\n%s" % (JOB_ID, e)
+                logger.error("Could not communicate with controller to send error info for jobid %s; is the Dalton Controller accepting network communications? Error:\n%s" % (JOB_ID, e))
                 time.sleep(ERROR_SLEEP_TIME)
         else:
-            print "Agent Error -- Is the Dalton Controller accepting network communications?"
+            logger.error("Agent Error -- Is the Dalton Controller accepting network communications?")
             sys.stdout.flush()
             time.sleep(ERROR_SLEEP_TIME)
