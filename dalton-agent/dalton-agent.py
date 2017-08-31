@@ -118,6 +118,7 @@ try:
     API_KEY = config.get('dalton', 'API_KEY')
     POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
     U2_ANALYZER_BINARY = config.get('dalton', 'U2_ANALYZER_BINARY')
+    KEEP_JOB_FILES = config.get('dalton', 'KEEP_JOB_FILES')
 except Exception, e:
     print "Error parsing config file, \'%s\':\n\n%s\n\nexiting." % (dalton_config_file, e)
     sys.exit(1)
@@ -1093,10 +1094,12 @@ while True:
             # send results back to server
             status = send_results()
 
-            #clean up
+            # clean up
+            # remove zip file
             os.unlink(zf_path)
-            # comment out below line to keep files if you are testing/debugging
-            #shutil.rmtree(JOB_DIRECTORY)
+            # remove job directory and contained files
+            if not KEEP_JOB_FILES:
+                shutil.rmtree(JOB_DIRECTORY)
             JOB_ID = None
         else:
             time.sleep(POLL_INTERVAL)
