@@ -110,7 +110,7 @@ except Exception, e:
     sys.exit(1)
 
 try:
-    DEBUG = config.get('dalton', 'DEBUG')
+    DEBUG = config.getboolean('dalton', 'DEBUG')
     STORAGE_PATH = config.get('dalton', 'STORAGE_PATH')
     SENSOR_TECHNOLOGY = config.get('dalton', 'SENSOR_TECHNOLOGY').lower()
     SENSOR_UID = config.get('dalton', 'SENSOR_UID')
@@ -118,7 +118,7 @@ try:
     API_KEY = config.get('dalton', 'API_KEY')
     POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
     U2_ANALYZER_BINARY = config.get('dalton', 'U2_ANALYZER_BINARY')
-    KEEP_JOB_FILES = config.get('dalton', 'KEEP_JOB_FILES')
+    KEEP_JOB_FILES = config.getboolean('dalton', 'KEEP_JOB_FILES')
 except Exception, e:
     print "Error parsing config file, \'%s\':\n\n%s\n\nexiting." % (dalton_config_file, e)
     sys.exit(1)
@@ -444,7 +444,7 @@ def process_snort_alerts():
     global IDS_LOG_DIRECTORY, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, SENSOR_TECHNOLOGY
     print_debug("process_snort_alerts() called")
     print_msg("Processing alerts")
-    os.system("sudo chmod -R 755 %s" % IDS_LOG_DIRECTORY)
+    os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
 
     job_alert_log_fh = open(JOB_ALERT_LOG, "wb")
     for alert_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "alert*")):
@@ -736,7 +736,7 @@ def process_performance_logs():
     global IDS_LOG_DIRECTORY, JOB_PERFORMANCE_LOG, SENSOR_TECHNOLOGY
     print_debug("process_performance_logs() called")
     print_msg("Processing performance logs")
-    os.system("sudo chmod -R 755 %s" % IDS_LOG_DIRECTORY)
+    os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
     job_performance_log_fh = open(JOB_PERFORMANCE_LOG, "wb")
     if SENSOR_TECHNOLOGY.startswith('is'):
         if len(glob.glob(os.path.join(IDS_LOG_DIRECTORY, "rules_stats*"))) > 0:
@@ -876,7 +876,7 @@ def submit_job(job_id, job_directory):
         shutil.rmtree(IDS_LOG_DIRECTORY)
     os.makedirs(IDS_LOG_DIRECTORY)
     # not secure
-    os.system("sudo chmod -R 777 %s" % IDS_LOG_DIRECTORY)
+    os.system("chmod -R 777 %s" % IDS_LOG_DIRECTORY)
 
     # pcaps and config should be in manifest
     IDS_CONFIG_FILE = None
