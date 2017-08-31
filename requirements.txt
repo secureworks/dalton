@@ -6,3 +6,4 @@ Flask-Compress==1.4.0
 redis==2.10.6
 eventlet==0.21.0
 supervisor==3.3.3
+PyYAML==3.12

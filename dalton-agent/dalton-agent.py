@@ -662,6 +662,11 @@ def process_other_logs(other_logs):
     if len(other_logs) > 0:
         all_other_logs = {}
         for log_name in other_logs:
+            if not os.path.exists("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name])):
+                log_name_new = other_logs[log_name].replace("-", "_")
+                if log_name_new != other_logs[log_name]:
+                    print_debug("Log file \'%s\' not present, trying \'%s\'..." % (other_logs[log_name], log_name_new))
+                    other_logs[log_name] = log_name_new
             if os.path.exists("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name])):
                 log_fh = open("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name]), "rb")
                 all_other_logs[log_name] = log_fh.read()
@@ -772,7 +777,11 @@ def process_performance_logs():
         else:
             print_debug("No Snort performance log(s) found.")
     elif SENSOR_TECHNOLOGY.startswith('suri'):
-        perf_file = "%s/rule-perf.log" % IDS_LOG_DIRECTORY
+        perf_file = os.path.join(IDS_LOG_DIRECTORY, "rule-perf.log")
+        if not os.path.exists(perf_file):
+            perf_file_new = os.path.join(IDS_LOG_DIRECTORY, os.path.basename(perf_file).replace("-", "_"))
+            print_debug("Performance log file \'%s\' not present, trying \'%s\'..." % (os.path.basename(perf_file), os.path.basename(perf_file_new)))
+            perf_file = perf_file_new
         if os.path.exists(perf_file):
             perf_filehandle = open(perf_file, "rb")
             print_debug("Processing Suricata performance file %s" % perf_file)
