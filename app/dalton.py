@@ -25,35 +25,19 @@ import subprocess
 import yaml
 import base64
 
-DEBUG = True
-
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
 
 # logging
 file_handler = RotatingFileHandler('/var/log/dalton.log', 'a', 1 * 1024 * 1024, 10)
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
 #file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
 logger = logging.getLogger("dalton")
 logger.addHandler(file_handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
-# just wraps logger
-def critical(msg):
-    logger.critical("%s" % msg)
-    sys.exit(1)
-def error(msg):
-    logger.error("%s" % msg)
-def print_error(msg):
-    logger.error("%s" % msg)
-def debug(msg):
-    logger.debug("%s" % msg)
-def warn(msg):
-    logger.warn("%s" % msg)
-def log(msg):
-    logger.info("%s" % msg)
-log("Logging started")
+logger.info("Logging started")
 
 try:
     dalton_config_filename = 'dalton.conf'
@@ -72,15 +56,21 @@ try:
     API_KEYS = dalton_config.get('dalton', 'api_keys')
     MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
     U2_ANALYZER = dalton_config.get('dalton', 'u2_analyzer')
+    DEBUG = dalton_config.getboolean('dalton', 'debug')
 except Exception as e:
-    critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
+    logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
+
+if DEBUG:
+    file_handler.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG)
+
 
 if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
-    error("mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap." % MERGECAP_BINARY)
+    logger.error("mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap." % MERGECAP_BINARY)
     MERGECAP_BINARY = None
 
 if not os.path.exists(U2_ANALYZER):
-    error("U2 Analyzer '%s' not found.  Cannot process alert details." % U2_ANALYZER)
+    logger.error("U2 Analyzer '%s' not found.  Cannot process alert details." % U2_ANALYZER)
     U2_ANALYZER = None
 if  U2_ANALYZER.endswith(".py"):
     # assumes 'python' binary in path
@@ -90,7 +80,7 @@ if  U2_ANALYZER.endswith(".py"):
 try:
     r = redis.Redis(REDIS_HOST)
 except Exception as e:
-    critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
+    logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
 
 sensor_tech_re = re.compile(r"^[a-zA-Z0-9\x2D\x2E\x5F]+$")
 
@@ -105,7 +95,7 @@ STAT_CODE_DONE = 2
 STAT_CODE_INTERRUPTED = 3
 STAT_CODE_TIMEOUT = 4
 
-log("Dalton Started.")
+logger.info("Dalton Started.")
 
 def delete_temp_files(job_id):
     """ deletes temp files for given job ID"""
@@ -132,14 +122,14 @@ def get_rulesets(engine=''):
     """ return a list of locally stored ruleset for jobs to use """
     global RULESET_STORAGE_PATH
     ruleset_list = []
-    debug("in get_rulesets(engine=%s)" % engine)
+    logger.debug("in get_rulesets(engine=%s)" % engine)
     # engine var should already be validated but just in case
     if not re.match("^[a-zA-Z0-9\_\-\.]*$", engine):
-        error("Invalid engine value '%s' in get_rulesets()" % engine)
+        logger.error("Invalid engine value '%s' in get_rulesets()" % engine)
         return ruleset_list
     ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
     if not os.path.isdir(ruleset_dir):
-        error("Could not find ruleset directory '%s'" % ruleset_dir)
+        logger.error("Could not find ruleset directory '%s'" % ruleset_dir)
         return ruleset_list
     file_list = os.listdir(ruleset_dir)
     # do we want to descend into directories?
@@ -210,7 +200,7 @@ def expire_all_keys(jid):
     # using the redis keys function ('r.keys("%s-*" % jid)') searches thru all keys which is not
     #   efficient for large key sets so we are deleting each one individually
     global r
-    debug("Dalton calling expire_all_keys() on job %s" % jid)
+    logger.debug("Dalton calling expire_all_keys() on job %s" % jid)
     keys_to_delete = ["ids", "perf", "alert", "alert_detailed", "other_logs", "error", "debug", "time", "statcode", "status", "start_time", "user", "tech", "submission_time", "teapotjob"]
     try:
         for cur_key in keys_to_delete:
@@ -226,10 +216,10 @@ def check_for_timeout(jobid):
         start_time = int(r.get("%s-start_time" % jobid))
     except:
         start_time = int(time.time()) - (JOB_RUN_TIMEOUT + 1)
-    #debug("Dalton in check_for_timeout(): job %s start time: %d" % (jobid, start_time))
+    #logger.debug("Dalton in check_for_timeout(): job %s start time: %d" % (jobid, start_time))
     if not start_time or ((int(time.time()) - start_time) > JOB_RUN_TIMEOUT):
         if int(get_job_status(jobid)) == STAT_CODE_RUNNING:
-            log("Dalton in check_for_timeout(): job %s timed out.  Start time: %d, now: %d" % (jobid, start_time, int(time.time())))
+            logger.info("Dalton in check_for_timeout(): job %s timed out.  Start time: %d, now: %d" % (jobid, start_time, int(time.time())))
             set_job_status(jobid, STAT_CODE_TIMEOUT)
             set_job_status_msg(jobid, "Job %s has timed out, please try submitting the job again." % jobid)
             set_keys_timeout(jobid)
@@ -341,14 +331,14 @@ def get_engine_conf_file(sensor):
                 engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
                 variables = ''
         else:
-            warn("No configuration file for sensor '%s'." % sensor)
+            logger.warn("No configuration file for sensor '%s'." % sensor)
             engine_config = "# No configuration file for sensor '%s'." % sensor
             variables = "# No variables in config for sensor '%s'." % sensor
         results = {'conf': engine_config, 'variables': variables}
         return json.dumps(results)
 
     except Exception, e:
-        error("Problem getting configuration file for sensor '%s'.  Error: %s" % (sensor, e))
+        logger.error("Problem getting configuration file for sensor '%s'.  Error: %s" % (sensor, e))
         engine_config = "# Exception getting configuration file for sensor '%s'." % sensor
         variables = engine_config
         results = {'conf': engine_config, 'variables': variables}
@@ -369,7 +359,7 @@ def sensor_update():
     if int(get_job_status(job)) != STAT_CODE_DONE:
         set_job_status_msg(job, msg)
 
-    debug("Dalton Agent %s sent update for job %s; msg: %s" % (uid, job, msg))
+    logger.debug("Dalton Agent %s sent update for job %s; msg: %s" % (uid, job, msg))
 
     return "OK"
 
@@ -425,7 +415,7 @@ def sensor_request_job(sensor_tech):
         #  job then that means the sensor was interrupted while processing a job and could
         #  did not communicate back with the controller.
         existing_job = r.get("%s-current_job" % SENSOR_HASH)
-        #debug("Dalton in sensor_request_job(): job requested, sensor hash %s, new job: %s, existing job: %s" % (SENSOR_HASH, new_jobid, existing_job))
+        #logger.debug("Dalton in sensor_request_job(): job requested, sensor hash %s, new job: %s, existing job: %s" % (SENSOR_HASH, new_jobid, existing_job))
         if existing_job and existing_job != new_jobid:
             set_job_status(existing_job, STAT_CODE_INTERRUPTED)
             set_job_status_msg(existing_job, "Job %s was unexpectedly interrupted while running on the agent; please try submitting the job again." % existing_job)
@@ -476,7 +466,6 @@ def post_job_results(jobid):
     r.set("%s-current_job" % SENSOR_HASH, None)
     r.expire("%s-current_job" % SENSOR_HASH, REDIS_EXPIRE)
 
-    # calling function debug() will cause issues with variable 'debug' below 
     logger.debug("Dalton agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
 
     #save results to db
@@ -525,7 +514,7 @@ def post_job_results(jobid):
             # delete u2 file?
             #os.unlink(u2_file)
         except Exception as e:
-            print_error("Problem parsing unified2 data from Agent.  Error: %s" % e)
+            logger.error("Problem parsing unified2 data from Agent.  Error: %s" % e)
             alert_detailed = ""
     else:
         alert_detailed = ""
@@ -594,14 +583,14 @@ def sensor_get_job(id):
     # user or agent requesting a job zip file
     global JOB_STORAGE_PATH
     # get the user (for logging)
-    debug("Dalton in sensor_get_job(): request for job zip file %s" % (id))
+    logger.debug("Dalton in sensor_get_job(): request for job zip file %s" % (id))
     path = "%s/%s.zip" % (JOB_STORAGE_PATH, id)
     if os.path.exists(path):
         filedata = open(path,'r').read()
-        debug("Dalton in sensor_get_job(): sending job zip file %s" % (id))
+        logger.debug("Dalton in sensor_get_job(): sending job zip file %s" % (id))
         return Response(filedata,mimetype="application/zip", headers={"Content-Disposition":"attachment;filename=%s.zip" % id})
     else:
-        error("Dalton in sensor_get_job(): could not find job %s at %s." % (id, path))
+        logger.error("Dalton in sensor_get_job(): could not find job %s at %s." % (id, path))
         return render_template('/dalton/error.html', jid=id, msg="Job %s does not exist on disk.  It is either invalid or has been deleted." % id)
 
 
@@ -694,11 +683,11 @@ def page_coverage_default(sensor_tech, error=None):
     if len(sensors) > 0:
         try:
             configs = json.loads(get_engine_conf_file(sensors[0]))
-            #debug("CONfigs:\n%s" % configs)
+            #logger.debug("CONfigs:\n%s" % configs)
             engine_conf = configs['conf']
             variables = configs['variables']
         except Exception as e:
-            print_error("Could not process JSON from get_engine_conf_file: %s" % e)
+            logger.error("Could not process JSON from get_engine_conf_file: %s" % e)
             engine_conf = "# not found"
             variables = "# not found"
     else:
@@ -737,7 +726,7 @@ def page_show_job(jid):
         except Exception, e:
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
-            #error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
+            #logger.error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
 
         # parse out custom rules option and pass it?
         custom_rules = False
@@ -760,7 +749,7 @@ def page_show_job(jid):
 #  abstracting the job submission method away from the HTTP POST and creating this
 #   function so that it can be called easier (e.g. from an API)
 def submit_job():
-    debug("submit_job() called")
+    logger.debug("submit_job() called")
     # never finished coding this...
 
 @dalton_blueprint.route('/dalton/coverage/summary', methods=['POST'])
@@ -814,7 +803,7 @@ def page_coverage_summary():
                     valid_sensor_tech = True
                     break
         if not valid_sensor_tech:
-            error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, \'%s\'" % (user, sensor_tech))
+            logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, \'%s\'" % (user, sensor_tech))
             return render_template('/dalton/error.html', jid="<not_defined>", msg="There are no sensors that support sensor technology \'%s\'." % sensor_tech)
 
         #generate job_id based of pcap filenames and timestamp
@@ -858,21 +847,21 @@ def page_coverage_summary():
         #  Suricata can only read one file.
         if len(pcap_files) > 1:
             if not MERGECAP_BINARY:
-                error("No mergecap binary; unable to merge pcaps for Suricata job.")
+                logger.error("No mergecap binary; unable to merge pcaps for Suricata job.")
                 return render_template('/dalton/error.html', jid="<not_defined>", msg="No mergecap binary found on Dalton Controller.  Unable to process multiple pcaps for this Suricata job.")
             combined_file = "%s/combined-%s.pcap" % (os.path.join(TEMP_STORAGE_PATH, job_id), job_id)
             mergecap_command = "%s -w %s -F pcap %s" % (MERGECAP_BINARY, combined_file, ' '.join([p['pcappath'] for p in pcap_files]))
-            debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s" % ', '.join([p['filename'] for p in pcap_files]))
+            logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s" % ', '.join([p['filename'] for p in pcap_files]))
             try:
                 # validation on pcap filenames done above; otherwise OS command injeciton here
                 mergecap_output = subprocess.Popen(mergecap_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
                 if len(mergecap_output) > 0:
                     # return error?
-                    error("Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
+                    logger.error("Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
                     return render_template('/dalton/error.html', jid="<not_defined>", msg="Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
                 pcap_files = [{'filename': os.path.basename(combined_file), 'pcappath': combined_file}]
             except Exception as e:
-                error("Could not merge pcaps.  Error: %s" % e)
+                logger.error("Could not merge pcaps.  Error: %s" % e)
                 return render_template('/dalton/error.html', jid="<not_defined>", msg="Could not merge pcaps.  Error: %s" % e)
 
         # get enable all rules option
@@ -1075,8 +1064,8 @@ def page_coverage_summary():
                 prod_ruleset_name = os.path.basename(ruleset_path)
                 if not prod_ruleset_name.endswith(".rules"):
                     prod_ruleset_name = "%s.rules" % prod_ruleset_name
-                debug("ruleset_path = %s" % ruleset_path)
-                debug("Dalton in page_coverage_summary():\n    prod_ruleset_name: %s" % (prod_ruleset_name))
+                logger.debug("ruleset_path = %s" % ruleset_path)
+                logger.debug("Dalton in page_coverage_summary():\n    prod_ruleset_name: %s" % (prod_ruleset_name))
                 if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
                     delete_temp_files(job_id)
                     return render_template('/dalton/error.html', jid=jid, msg="Invalid ruleset submitted: '%s'. Path/name invalid." % prod_ruleset_name)
@@ -1223,7 +1212,7 @@ def page_coverage_summary():
         finally:
             zf.close()
 
-        debug("Dalton in page_coverage_summary(): created job zip file %s for user %s" % (zf_path, user))
+        logger.debug("Dalton in page_coverage_summary(): created job zip file %s for user %s" % (zf_path, user))
 
         #remove the temp files from local storage now that everything has been written to the zip file
         delete_temp_files(job_id)
@@ -1247,7 +1236,7 @@ def page_coverage_summary():
         # set job as queued and write to the Redis queue
         set_job_status(jid, STAT_CODE_QUEUED)
         set_job_status_msg(jid, "Queued")
-        log("Dalton user '%s' submitted Job %s to queue %s" % (user, jid, sensor_tech))
+        logger.info("Dalton user '%s' submitted Job %s to queue %s" % (user, jid, sensor_tech))
         r.rpush(sensor_tech, str_job)
 
         # add to list for queue web page
@@ -1290,14 +1279,14 @@ def page_queue_default():
             # after a job is requested/sent to a sensor so we won't clear out queued jobs.
             if not r.exists("%s-submission_time" % jid) or not r.exists("%s-status" % jid):
                 # job has expired
-                debug("Dalton in page_queue_default(): removing job: %s" % jid)
+                logger.debug("Dalton in page_queue_default(): removing job: %s" % jid)
                 r.lrem("recent_jobs", jid)
                 # just in case, expire all keys associated with jid
                 expire_all_keys(jid)
             else:
                 status = int(get_job_status(jid))
                 # ^^ have to cast as an int since it gets stored as a string (everything in redis is a string apparently....)
-                #debug("Dalton in page_queue_default(): Job %s, stat code: %d" % (jid, status))
+                #logger.debug("Dalton in page_queue_default(): Job %s, stat code: %d" % (jid, status))
                 status_msg = "Unknown"
                 if status == STAT_CODE_QUEUED:
                     status_msg = "Queued"
