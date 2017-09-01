@@ -307,6 +307,7 @@ def get_engine_conf_file(sensor):
                     except StopIteration:
                         break
             elif engine.lower().startswith('suri'):
+                #AAAA
                 # I suppose we could use some yaml python libs to parse the suri config and
                 #  extract the vars but this works fine for now
                 lines = iter(contents)

@@ -143,7 +143,7 @@ outputs:
               # than one IP address is present, the last IP address will be the
               # one taken into consideration.
               header: X-Forwarded-For
-              header: Original-Client-IP
+              #header: Original-Client-IP
         - http:
             extended: yes     # enable this for extended logging information
             # custom allows additional http fields to be included in eve-log
