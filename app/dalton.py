@@ -25,6 +25,8 @@ import subprocess
 import yaml
 import base64
 
+DEBUG = True
+
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
 
@@ -518,7 +520,7 @@ def post_job_results(jobid):
             u2_fh.write(base64.b64decode(result_obj['alert_detailed']))
             u2_fh.close()
             u2spewfoo_command = "%s %s" % (U2_ANALYZER, u2_file)
-            debug("Processing unified2 data with command: '%s'" % u2spewfoo_command)
+            logger.debug("Processing unified2 data with command: '%s'" % u2spewfoo_command)
             alert_detailed = subprocess.Popen(u2spewfoo_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
             # delete u2 file?
             #os.unlink(u2_file)
