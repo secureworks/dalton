@@ -18,8 +18,11 @@ RUN mkdir -p /opt/dalton/ && \
 
 WORKDIR /opt/dalton
 
+# getting whole lib for now but just use u2spewfoo.py
 COPY requirements.txt /opt/dalton/requirements.txt
 RUN pip install -r requirements.txt
+RUN pip install https://github.com/jasonish/py-idstools/archive/master.zip
+RUN ln -s /usr/local/lib/python2.7/dist-packages/idstools/scripts/u2spewfoo.py /usr/local/bin/u2spewfoo.py
 
 COPY app /opt/dalton/app
 COPY run.py /opt/dalton/run.py

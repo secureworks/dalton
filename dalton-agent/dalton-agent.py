@@ -16,6 +16,7 @@ import time
 import datetime
 import glob
 import shutil
+import base64
 try:
     # for Python v2.6
     import json
@@ -69,7 +70,6 @@ try:
     DALTON_API = config.get('dalton', 'DALTON_API')
     API_KEY = config.get('dalton', 'API_KEY')
     POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
-    U2_ANALYZER_BINARY = config.get('dalton', 'U2_ANALYZER_BINARY')
     KEEP_JOB_FILES = config.getboolean('dalton', 'KEEP_JOB_FILES')
 except Exception, e:
     # just print to stdout; logging hasn't started yet
@@ -363,12 +363,7 @@ def send_results():
     if not results: # or error identified in results?
         results_dict['alert_detailed'] = ""
     else:
-        # sometimes u2spewfoo will output non-utf8 data. This happens in
-        # ExtraData records, usually when the sensor incorrectly parses/identifies
-        # HTTP traffic.  Attempt to convert.
-        results_dict['alert_detailed'] = ""
-        for line in results:
-            results_dict['alert_detailed'] += nonprintable_re.sub(hexescape, line)
+        results_dict['alert_detailed'] = results
 
     # populate performance
     fh = open(JOB_PERFORMANCE_LOG, 'rb')
@@ -395,6 +390,8 @@ def send_results():
 
     # convert the dictionary to json
     json_results_dict = json.dumps(results_dict)
+
+    #comment this out for prod
     #if DEBUG:
     #    fh = open('/tmp/dictionary.txt', 'wb')
     #    fh.write(json_results_dict)
@@ -407,6 +404,7 @@ def send_results():
 
 def post_results(json_data):
     global DALTON_API, SENSOR_UID, HTTP_HEADERS, API_KEY
+    #logger.debug("json_data:\n%s" % json_data)
     url = "%s/results/%s?SENSOR_UID=%s&apikey=%s" % (DALTON_API, JOB_ID, SENSOR_UID, API_KEY)
     req = urllib2.Request(url, urllib.urlencode(json_data), HTTP_HEADERS)
     try:
@@ -470,7 +468,7 @@ def process_snort_alerts():
     os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
 
     job_alert_log_fh = open(JOB_ALERT_LOG, "wb")
-    for alert_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "alert*")):
+    for alert_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "alert-full_dalton-agent*")):
         alert_filehandle = open(alert_file, "rb")
         print_debug("Processing snort alert file %s" % alert_file)
         job_alert_log_fh.write(alert_filehandle.read())
@@ -711,53 +709,61 @@ def check_for_errors(tech):
         print_error("Error message(s) found in IDS output. See \"IDS Engine\" tab for more details and/or context:\n\n%s" % '\n'.join(error_lines))
 
 # process unified2 data and populate JOB_ALERT_DETAILED_LOG (only for sensors that generate unified2 logs such as Snort and Suricata)
+# instead of decoding on the agent and sending it back (would require u2spewfoo or something like python idstools), just concatenate the
+# files and send them back.  Because we use urllib2 and not something more featured like Requests, we have to send the data as
+# www-form-urlencoded which means we have to base64 to for the transfer which means bloat.  Mixed part MIME would be better but at least
+# we won't get as much URI encoding bloat as we would if we sent the text from decoded unified2.
+
 def process_unified2_logs():
-    global IDS_LOG_DIRECTORY, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, SENSOR_TECHNOLOGY, U2_ANALYZER_BINARY
+    global IDS_LOG_DIRECTORY, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, SENSOR_TECHNOLOGY
     print_debug("process_unified2_logs() called")
     print_msg("Processing unified2 logs")
-    u2_binary_exists = True
-    # check to make sure U2_ANALYZER_BINARY exists (note that the U2_ANALYZER_BINARY variable is set in the conf file)
-    for myitem in U2_ANALYZER_BINARY.split(' '):
-        #print_debug("checking %s" % myitem)
-        if not os.path.exists(myitem):
-            print_debug("Error: the file \'%s\' referenced in U2_ANALYZER_BINARY (\'%s\') does not exist on this sensor, not processing unified2 logs." % (myitem, U2_ANALYZER_BINARY))
-            #print_error("Error processing unified2 files.  Files needed to perform analysis not found.  This sensor may not support detailed alert data yet.  See debug log for details.")
-            u2_binary_exists = False
 
-    if u2_binary_exists:
-        # see if unified2 logs exist and process them; add to JOB_ALERT_DETAILED_LOG
-        print_debug("Identifying unified2 log files...")
+    print_debug("Identifying unified2 log files...")
+    # in some cases the unified2.alert filenames are prepended with a period but
+    #  this isn't normal behavior; it should be file, 'unified2.alert.<timestamp>'.
+    #  glob treats files with leading period differently (won't match '*')
+    #  glob thru ".unified2.alert*" and "unified2.alert*", put in a list, and then iterate thru that
+    unified2_files = set([])
+    #for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, ".unified2.alert*")):
+    #    print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
+    #    unified2_files.add(u2_file)
+    #for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "unified2.alert*")):
+    #    print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
+    #    unified2_files.add(u2_file)
+    for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "unified2.dalton.alert*")):
+        print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
+        unified2_files.add(u2_file)
+    if len(unified2_files) == 0:
+        print_debug("No unified2 files found.")
+        return
+    # convert set to list so we can access indexes
+    unified2_files = list(unified2_files)
+    # now, cat all the files together, base64 encode them, and write to JOB_ALERT_DETAILED_LOG
+    # copy first file instead of catting to it to preserve original on agent if needed
+    u2_combined_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-unified2-combined.alerts")
+    shutil.copyfile(unified2_files[0], u2_combined_file)
+    try:
+        combined_fh = open(u2_combined_file, "ab")
+        for i in range(1, len(unified2_files)):
+            add_fh = open(unified2_files[i], "rb")
+            combined_fh.write(add_fh.read())
+            add_fh.close()
+        combined_fh.close()
+    except Exception, e:
+        print_debug("Error processing unified2 files, bailing: %s" % e)
+        return
+
+    # b64 it and write!
+    try:
         job_alert_detailed_log_fh = open(JOB_ALERT_DETAILED_LOG, "wb")
-        # in some cases the unified2.alert filenames are prepended with a period but
-        #  this isn't normal behavior; it should be file, 'unified2.alert.<timestamp>'.
-        #  glob treats files with leading period differently (won't match '*')
-        #  glob thru ".unified2.alert*" and "unified2.alert*", put in a list, and then iterate thru that
-        unified2_files = []
-        for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, ".unified2.alert*")):
-            print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
-            unified2_files.append(u2_file)
-        for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "unified2.alert*")):
-            print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
-            unified2_files.append(u2_file)
-        # below print line use for testing; comment it out when not debugging
-        # print "unified2_files for processing: %s" % unified2_files
-        if len(unified2_files) <= 0:
-            print_debug("No unified2 files found.")
-        for unified2_file in unified2_files:
-            # call to u2spewfoo.py here, populate JOB_ALERT_DETAILED_LOG
-            # filename validation to prevent OS command injection; will need to update if future sensor versions use different file names
-            if not re.match('\.?unified2\.alert\.?\d*', os.path.basename(unified2_file)):
-                print_debug("Invalid unified2 filename found, not processing: %s" % unified2_file)
-            else:
-                # call to process unified2 alerts
-                u2processing_command = "%s %s" % (U2_ANALYZER_BINARY, unified2_file)
-                print_debug("Processing unified2 file, %s\n\tunified2 file processing command:\n\t%s" % (unified2_file, u2processing_command))
-                #below two lines used for debugging, not for use in prod
-                #u2spewfoo_response = subprocess.Popen(u2processing_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
-                #print "RESPONSE: %s" % u2spewfoo_response
-                subprocess.call(u2processing_command, shell=True, stderr=subprocess.STDOUT, stdout=job_alert_detailed_log_fh)
-                #maybe add a newline to job_alert_detailed_log_fh here??
+        u2_fh = open(u2_combined_file, "rb")
+        job_alert_detailed_log_fh.write(base64.b64encode(u2_fh.read()))
+        u2_fh.close()
         job_alert_detailed_log_fh.close()
+    except Exception, e:
+        print_debug("Error processing unified2 files and base64 encoding them for transmission ... bailing. Error: %s" % e)
+        return
 
 # process performance output (Snort and Suricata)
 def process_performance_logs():
@@ -982,6 +988,16 @@ def submit_job(job_id, job_directory):
         for rules_file in IDS_RULES_FILES:
             snort_conf_fh.write("\ninclude %s\n" % rules_file)
         snort_conf_fh.write("\ninclude %s\n" % VARIABLES_FILE)
+        
+        # set these output filenames explicitly so there is no guess where/what they are
+        # NOTE: when MULTIPLE "output unified2:" directives are defined, Snort will
+        #  write to both but only writes ExtraData records to one of them -- the last
+        #  one defined. (The 'extra_data_config' (void pointer) variable used to log
+        #  ExtraData is a global variable and thus only points to one config and thus
+        #  one log file.).  This one is defined last so we get ExtraData which we want. 
+        snort_conf_fh.write("\noutput alert_full: alert-full_dalton-agent\n")
+        snort_conf_fh.write("\noutput unified2: filename unified2.dalton.alert\n")
+
         snort_conf_fh.close()
 
     if SENSOR_TECHNOLOGY.startswith('suri'):

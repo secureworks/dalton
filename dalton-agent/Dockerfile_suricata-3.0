@@ -8,11 +8,10 @@ RUN apt-get update -y && apt-get install -y \
     python=2.7.11-1 \
     tcpdump=4.9.0-1ubuntu1~ubuntu16.04.1
 
-RUN apt-get install -y suricata=3.0-1
+# for debugging agent
+RUN apt-get install less
 
-#RUN apt-get install -y python-pip
-#RUN pip install -U pip
-#RUN pip install https://github.com/jasonish/py-idstools/archive/master.zip
+RUN apt-get install -y suricata=3.0-1
 
 RUN mkdir -p /opt/dalton-agent/
 
