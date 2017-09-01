@@ -23,6 +23,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import subprocess
 import yaml
+import base64
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -68,12 +69,20 @@ try:
     REDIS_HOST = dalton_config.get('dalton', 'redis_host')
     API_KEYS = dalton_config.get('dalton', 'api_keys')
     MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
+    U2_ANALYZER = dalton_config.get('dalton', 'u2_analyzer')
 except Exception as e:
     critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
 if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
     error("mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap." % MERGECAP_BINARY)
     MERGECAP_BINARY = None
+
+if not os.path.exists(U2_ANALYZER):
+    error("U2 Analyzer '%s' not found.  Cannot process alert details." % U2_ANALYZER)
+    U2_ANALYZER = None
+if  U2_ANALYZER.endswith(".py"):
+    # assumes 'python' binary in path
+    U2_ANALYZER = "%s %s" % ("python", U2_ANALYZER)
 
 #connect to the datastore
 try:
@@ -444,7 +453,7 @@ def sensor_request_job(sensor_tech):
 #@auth_required('write')
 def post_job_results(jobid):
     """ called by Dalton Agent sending job results """
-    global STAT_CODE_DONE, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE
+    global STAT_CODE_DONE, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, TEMP_STORAGE_PATH
     global r
 
     jsons = request.form.get('json_data')
@@ -495,10 +504,27 @@ def post_job_results(jobid):
         time = result_obj['total_time']
     else:
         time = ""
-    # alert_detailed currently is (for the most part) output from u2spewfoo and should contain packet details from alerts.
+    # alert_detailed is base64 encoded unified2 binary data
     alert_detailed = ""
     if 'alert_detailed' in result_obj:
-        alert_detailed = result_obj['alert_detailed']
+        try:
+            # write to disk and pass to u2spewfoo.py; we could do
+            #  myriad other things here like modify or import that
+            #  code but this works and should be compatible and
+            #  incorporate any future changes/improvements to the
+            #  script
+            u2_file = os.path.join(TEMP_STORAGE_PATH, "unified2_%s_%s" % (jobid, SENSOR_HASH))
+            u2_fh = open(u2_file, "wb")
+            u2_fh.write(base64.b64decode(result_obj['alert_detailed']))
+            u2_fh.close()
+            u2spewfoo_command = "%s %s" % (U2_ANALYZER, u2_file)
+            debug("Processing unified2 data with command: '%s'" % u2spewfoo_command)
+            alert_detailed = subprocess.Popen(u2spewfoo_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
+            # delete u2 file?
+            #os.unlink(u2_file)
+        except Exception as e:
+            print_error("Problem parsing unified2 data from Agent.  Error: %s" % e)
+            alert_detailed = ""
     else:
         alert_detailed = ""
     # other_logs only supported on Suricata for now
