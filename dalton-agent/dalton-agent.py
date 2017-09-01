@@ -363,12 +363,7 @@ def send_results():
     if not results: # or error identified in results?
         results_dict['alert_detailed'] = ""
     else:
-        # sometimes u2spewfoo will output non-utf8 data. This happens in
-        # ExtraData records, usually when the sensor incorrectly parses/identifies
-        # HTTP traffic.  Attempt to convert.
-        results_dict['alert_detailed'] = ""
-        for line in results:
-            results_dict['alert_detailed'] += nonprintable_re.sub(hexescape, line)
+        results_dict['alert_detailed'] = results
 
     # populate performance
     fh = open(JOB_PERFORMANCE_LOG, 'rb')
@@ -395,6 +390,8 @@ def send_results():
 
     # convert the dictionary to json
     json_results_dict = json.dumps(results_dict)
+
+    #comment this out for prod
     #if DEBUG:
     #    fh = open('/tmp/dictionary.txt', 'wb')
     #    fh.write(json_results_dict)
@@ -407,6 +404,7 @@ def send_results():
 
 def post_results(json_data):
     global DALTON_API, SENSOR_UID, HTTP_HEADERS, API_KEY
+    #logger.debug("json_data:\n%s" % json_data)
     url = "%s/results/%s?SENSOR_UID=%s&apikey=%s" % (DALTON_API, JOB_ID, SENSOR_UID, API_KEY)
     req = urllib2.Request(url, urllib.urlencode(json_data), HTTP_HEADERS)
     try:
@@ -714,7 +712,7 @@ def check_for_errors(tech):
 # instead of decoding on the agent and sending it back (would require u2spewfoo or something like python idstools), just concatenate the
 # files and send them back.  Because we use urllib2 and not something more featured like Requests, we have to send the data as
 # www-form-urlencoded which means we have to base64 to for the transfer which means bloat.  Mixed part MIME would be better but at least
-# we won't get URI encoding bloat.
+# we won't get as much URI encoding bloat as we would if we sent the text from decoded unified2.
 
 def process_unified2_logs():
     global IDS_LOG_DIRECTORY, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, SENSOR_TECHNOLOGY

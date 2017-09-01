@@ -8,16 +8,15 @@ RUN apt-get update -y && apt-get install -y \
     python=2.7.11-1 \
     tcpdump=4.9.0-1ubuntu1~ubuntu16.04.1
 
+# for debugging agent
+RUN apt-get install less
+
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y snort=2.9.7.0-5
 
 # the ubuntu snort package uses /usr/lib but the default config uses /usr/local/lib
 RUN ln -s /usr/lib/snort_dynamicpreprocessor /usr/local/lib/snort_dynamicpreprocessor
 RUN ln -s /usr/lib/snort_dynamicengine /usr/local/lib/snort_dynamicengine
 RUN ln -s /usr/lib/snort_dynamicrules /usr/local/lib/snort_dynamicrules
-
-#RUN apt-get install -y python-pip
-#RUN pip install -U pip
-#RUN pip install https://github.com/jasonish/py-idstools/archive/master.zip
 
 RUN mkdir -p /opt/dalton-agent/
 
