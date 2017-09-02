@@ -22,8 +22,9 @@ import ConfigParser
 import logging
 from logging.handlers import RotatingFileHandler
 import subprocess
-import yaml
+from ruamel import yaml
 import base64
+import  cStringIO
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -281,7 +282,12 @@ def get_engine_conf_file(sensor):
             # Unix newline is \n but for display on web page, \r\n is desired in some
             #  browsers/OSes.  Note: currently not converted back on job submit.
             fh = open(conf_file, 'rb')
-            contents = fh.readlines()
+            if engine.lower().startswith('suri'):
+                # need the read() method to load the yaml
+                contents = fh.read()
+            else:
+                # want to parse each line so put it in to a list
+                contents = fh.readlines()
             fh.close()
             #  extract out variables
             #AAAAAAAa
@@ -307,7 +313,32 @@ def get_engine_conf_file(sensor):
                     except StopIteration:
                         break
             elif engine.lower().startswith('suri'):
-                #AAAA
+                # read in yaml with ruamel python lib, extract out vars
+                # doing it like this adds a little load time but preserves
+                # comments (for the most part).
+                logger.debug("Loading YAML for %s" % conf_file)
+                yamlobj = yaml.YAML()
+                yamlobj.version = "1.1"
+                config = yamlobj.load(contents)
+                # pull out vars and dump
+                vars = {'vars': config.pop('vars', None)}
+                vars_fh = cStringIO.StringIO()
+                yamlobj.dump(vars, vars_fh) 
+                variables = vars_fh.getvalue()
+                vars_fh.close()
+                # YAML verison gets added back in when YAML of just vars is dumped
+                #  This data is concatenated with the rest of the config and there
+                #  can't bu multiple version directives
+                if variables.startswith("%YAML 1.1\n---\n"):
+                    variables = variables[14:]
+
+                # dump engine_config
+                config_fh = cStringIO.StringIO()
+                yamlobj.dump(config, config_fh) 
+                engine_config = config_fh.getvalue()
+                config_fh.close()
+                #AAA
+            elif False or engine.lower().startswith('suri'):
                 # I suppose we could use some yaml python libs to parse the suri config and
                 #  extract the vars but this works fine for now
                 lines = iter(contents)
