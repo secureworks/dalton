@@ -315,29 +315,22 @@ def get_engine_conf_file(sensor):
             elif engine.lower().startswith('suri'):
                 # read in yaml with ruamel python lib, extract out vars
                 # doing it like this adds a little load time but preserves
-                # comments (for the most part).
+                # comments (for the most part). Can't use ruamel >= 0.15.x
+                # b/c it won't preserve the inputted YAML 1.1 on dump (e.g.
+                # quoted sexagesimals, unquoted 'yes', 'no', etc.
                 logger.debug("Loading YAML for %s" % conf_file)
-                yamlobj = yaml.YAML()
-                yamlobj.version = "1.1"
-                config = yamlobj.load(contents)
+                # suri uses YAML 1.1 ... should we specify?
+                config = yaml.round_trip_load(contents, version=(1,1), preserve_quotes=True)
                 # pull out vars and dump
-                vars = {'vars': config.pop('vars', None)}
-                vars_fh = cStringIO.StringIO()
-                yamlobj.dump(vars, vars_fh) 
-                variables = vars_fh.getvalue()
-                vars_fh.close()
-                # YAML verison gets added back in when YAML of just vars is dumped
+                variables = yaml.round_trip_dump({'vars': config.pop('vars', None)})
+                # (depending on how you do it) the YAML verison gets added back
+                # in when YAML of just vars is dumped.
                 #  This data is concatenated with the rest of the config and there
-                #  can't bu multiple version directives
+                #  can't be multiple version directives. So just in case, strip it out.
                 if variables.startswith("%YAML 1.1\n---\n"):
                     variables = variables[14:]
-
                 # dump engine_config
-                config_fh = cStringIO.StringIO()
-                yamlobj.dump(config, config_fh) 
-                engine_config = config_fh.getvalue()
-                config_fh.close()
-                #AAA
+                engine_config = yaml.round_trip_dump(config, version=(1,1), explicit_start=True)
             elif False or engine.lower().startswith('suri'):
                 # I suppose we could use some yaml python libs to parse the suri config and
                 #  extract the vars but this works fine for now
