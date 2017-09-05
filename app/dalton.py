@@ -319,7 +319,14 @@ def get_engine_conf_file(sensor):
                 # b/c it won't preserve the inputted YAML 1.1 on dump (e.g.
                 # quoted sexagesimals, unquoted 'yes', 'no', etc.
                 logger.debug("Loading YAML for %s" % conf_file)
-                # suri uses YAML 1.1 ... should we specify?
+                # so apparently the default Suri config has what are interpreted
+                #  as (unquoted) booleans and it uses yes/no. But if you change from
+                #  yes/no to true/false, Suri will throw an error when parsing the YAML
+                #  even though true/false are valid boolean valued for YAML 1.1.  ruamel.yaml
+                #  will normalize unquoted booleans to true/false so quoting them here to
+                #  preserve the yes/no.  This could/should? also be done on submission.
+                contents = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', contents)
+                # suri uses YAML 1.1
                 config = yaml.round_trip_load(contents, version=(1,1), preserve_quotes=True)
                 # pull out vars and dump
                 variables = yaml.round_trip_dump({'vars': config.pop('vars', None)})
