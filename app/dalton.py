@@ -22,8 +22,9 @@ import ConfigParser
 import logging
 from logging.handlers import RotatingFileHandler
 import subprocess
-import yaml
+from ruamel import yaml
 import base64
+import  cStringIO
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -281,10 +282,14 @@ def get_engine_conf_file(sensor):
             # Unix newline is \n but for display on web page, \r\n is desired in some
             #  browsers/OSes.  Note: currently not converted back on job submit.
             fh = open(conf_file, 'rb')
-            contents = fh.readlines()
+            if engine.lower().startswith('suri'):
+                # need the read() method to load the yaml
+                contents = fh.read()
+            else:
+                # want to parse each line so put it in to a list
+                contents = fh.readlines()
             fh.close()
             #  extract out variables
-            #AAAAAAAa
             if engine.lower().startswith('snort'):
                 ignore_vars = ("RULE_PATH", "SO_RULE_PATH", "PREPROC_RULE_PATH", "WHITE_LIST_PATH", "BLACK_LIST_PATH")
                 lines = iter(contents)
@@ -307,26 +312,31 @@ def get_engine_conf_file(sensor):
                     except StopIteration:
                         break
             elif engine.lower().startswith('suri'):
-                # I suppose we could use some yaml python libs to parse the suri config and
-                #  extract the vars but this works fine for now
-                lines = iter(contents)
-                while True:
-                    try:
-                        line = next(lines).rstrip('\r\n')
-                        if not line.startswith("vars:"):
-                            engine_config += "%s\r\n" % line
-                        else:
-                            engine_config += "# NOTE: variables have been removed from this section of the file and can be found elsewhere.\r\n"
-                            variables += "%s\r\n" % line
-                            line = next(lines).rstrip('\r\n')
-                            # assumes relevant comments are indented too!!!
-                            while len(line) == 0 or line.startswith(' '):
-                                if len(line) != 0:
-                                    variables += "%s\r\n" % line
-                                line = next(lines).rstrip('\r\n')
-                            engine_config += "%s\r\n" % line
-                    except StopIteration:
-                        break
+                # read in yaml with ruamel python lib, extract out vars
+                # doing it like this adds a little load time but preserves
+                # comments (for the most part). Can't use ruamel >= 0.15.x
+                # b/c it won't preserve the inputted YAML 1.1 on dump (e.g.
+                # quoted sexagesimals, unquoted 'yes', 'no', etc.
+                logger.debug("Loading YAML for %s" % conf_file)
+                # so apparently the default Suri config has what are interpreted
+                #  as (unquoted) booleans and it uses yes/no. But if you change from
+                #  yes/no to true/false, Suri will throw an error when parsing the YAML
+                #  even though true/false are valid boolean valued for YAML 1.1.  ruamel.yaml
+                #  will normalize unquoted booleans to true/false so quoting them here to
+                #  preserve the yes/no.  This could/should? also be done on submission.
+                contents = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', contents)
+                # suri uses YAML 1.1
+                config = yaml.round_trip_load(contents, version=(1,1), preserve_quotes=True)
+                # pull out vars and dump
+                variables = yaml.round_trip_dump({'vars': config.pop('vars', None)})
+                # (depending on how you do it) the YAML verison gets added back
+                # in when YAML of just vars is dumped.
+                #  This data is concatenated with the rest of the config and there
+                #  can't be multiple version directives. So just in case, strip it out.
+                if variables.startswith("%YAML 1.1\n---\n"):
+                    variables = variables[14:]
+                # dump engine_config
+                engine_config = yaml.round_trip_dump(config, version=(1,1), explicit_start=True)
             else:
                 engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
                 variables = ''
