@@ -708,29 +708,23 @@ def check_for_errors(tech):
     if len(error_lines) > 0:
         print_error("Error message(s) found in IDS output. See \"IDS Engine\" tab for more details and/or context:\n\n%s" % '\n'.join(error_lines))
 
-# process unified2 data and populate JOB_ALERT_DETAILED_LOG (only for sensors that generate unified2 logs such as Snort and Suricata)
-# instead of decoding on the agent and sending it back (would require u2spewfoo or something like python idstools), just concatenate the
-# files and send them back.  Because we use urllib2 and not something more featured like Requests, we have to send the data as
-# www-form-urlencoded which means we have to base64 to for the transfer which means bloat.  Mixed part MIME would be better but at least
+# process unified2 data and populate JOB_ALERT_DETAILED_LOG (only for sensors
+# that generate unified2 logs such as Snort and Suricata)
+# instead of decoding on the agent and sending it back (would
+# require u2spewfoo or something like python idstools), just concatenate the
+# files and send them back.  Because we use urllib2 and not something more
+# full-featured like Requests, we have to send the data as
+# www-form-urlencoded which means we have to base64 to for the transfer
+# which means bloat.  Mixed part MIME would be better but at least
 # we won't get as much URI encoding bloat as we would if we sent the text from decoded unified2.
-
 def process_unified2_logs():
     global IDS_LOG_DIRECTORY, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, SENSOR_TECHNOLOGY
     print_debug("process_unified2_logs() called")
     print_msg("Processing unified2 logs")
 
     print_debug("Identifying unified2 log files...")
-    # in some cases the unified2.alert filenames are prepended with a period but
-    #  this isn't normal behavior; it should be file, 'unified2.alert.<timestamp>'.
-    #  glob treats files with leading period differently (won't match '*')
-    #  glob thru ".unified2.alert*" and "unified2.alert*", put in a list, and then iterate thru that
     unified2_files = set([])
-    #for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, ".unified2.alert*")):
-    #    print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
-    #    unified2_files.add(u2_file)
-    #for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "unified2.alert*")):
-    #    print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
-    #    unified2_files.add(u2_file)
+    # unified2 filename set in config on submission
     for u2_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "unified2.dalton.alert*")):
         print_debug("Adding unified2 alert file to processing list: %s" % u2_file)
         unified2_files.add(u2_file)
@@ -772,7 +766,7 @@ def process_performance_logs():
     print_msg("Processing performance logs")
     os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
     job_performance_log_fh = open(JOB_PERFORMANCE_LOG, "wb")
-    if SENSOR_TECHNOLOGY.startswith('is'):
+    if SENSOR_TECHNOLOGY.startswith('snort'):
         if len(glob.glob(os.path.join(IDS_LOG_DIRECTORY, "rules_stats*"))) > 0:
             for perf_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "rules_stats*")):
                 perf_filehandle = open(perf_file, "rb")
