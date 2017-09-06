@@ -290,7 +290,6 @@ def get_engine_conf_file(sensor):
                 contents = fh.readlines()
             fh.close()
             #  extract out variables
-            #AAAAAAAa
             if engine.lower().startswith('snort'):
                 ignore_vars = ("RULE_PATH", "SO_RULE_PATH", "PREPROC_RULE_PATH", "WHITE_LIST_PATH", "BLACK_LIST_PATH")
                 lines = iter(contents)
@@ -338,27 +337,6 @@ def get_engine_conf_file(sensor):
                     variables = variables[14:]
                 # dump engine_config
                 engine_config = yaml.round_trip_dump(config, version=(1,1), explicit_start=True)
-            elif False or engine.lower().startswith('suri'):
-                # I suppose we could use some yaml python libs to parse the suri config and
-                #  extract the vars but this works fine for now
-                lines = iter(contents)
-                while True:
-                    try:
-                        line = next(lines).rstrip('\r\n')
-                        if not line.startswith("vars:"):
-                            engine_config += "%s\r\n" % line
-                        else:
-                            engine_config += "# NOTE: variables have been removed from this section of the file and can be found elsewhere.\r\n"
-                            variables += "%s\r\n" % line
-                            line = next(lines).rstrip('\r\n')
-                            # assumes relevant comments are indented too!!!
-                            while len(line) == 0 or line.startswith(' '):
-                                if len(line) != 0:
-                                    variables += "%s\r\n" % line
-                                line = next(lines).rstrip('\r\n')
-                            engine_config += "%s\r\n" % line
-                    except StopIteration:
-                        break
             else:
                 engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
                 variables = ''
