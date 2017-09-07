@@ -1004,16 +1004,55 @@ def page_coverage_summary():
             return render_template('/dalton/error.html', jid="<not_defined>", msg="Variable \'sensor_tech\' not specified.  Please reload the submission page and try again.")
 
         # get and write variables
-        vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
-        vars_fh = open(vars_file, "wb")
         vars = request.form.get('custom_vars')
         if not vars:
-            # try to populate default variables based on sensor_tech??
-            pass
+            delete_temp_files(job_id)
+            return page_coverage_default(request.form.get('sensor_tech'),"No variables defined.")
 
-        if vars:
-            for line in vars.split('\n'):
-                if sensor_tech.startswith('snort'):
+        conf_file = request.form.get('custom_engineconf')
+        if not conf_file:
+            delete_temp_files(job_id)
+            return page_coverage_default(request.form.get('sensor_tech'),"No configuration file provided.")
+
+        if sensor_tech.startswith('suri'):
+            #yaml-punch!
+            # combine engine conf and variables
+            #ruamel!
+            # set fast.log name?
+
+            # set u2 naming
+
+            # set filenes for output if other logs
+        #  other_logs['Engine Stats'] = 'stats.log'
+        #other_logs['Packet Stats'] = 'packet-stats.log'
+        #if getOtherLogs:
+        #    other_logs['Alert Debug'] = 'alert-debug.log'
+        #    other_logs['HTTP Log'] = 'http.log'
+        #    other_logs['TLS Log'] = 'tls.log'
+        #    other_logs['DNS Log'] = 'dns.log'
+        #    other_logs['EVE JSON'] = 'eve.json'
+        #if getFastPattern:
+        #    other_logs['Fast Pattern'] = 'rules_fast_pattern.txt'
+        #if trackPerformance:
+        #    other_logs['Keyword Perf'] = 'keyword-perf.log'
+
+            # rules (default-rule-path and includes)
+            # set suri_yaml_fh.write("default-rule-path: %s\n" % JOB_DIRECTORY) ?
+            #suri_yaml_fh.write("rule-files:\n")
+#        for rules_file in IDS_RULES_FILES:
+#            suri_yaml_fh.write(" - %s\n" % rules_file)
+#        suri_yaml_fh.close()
+# include custom.rules
+
+            # output to:
+            #engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
+        else:
+            engine_conf_file = None
+            if sensor_tech.startswith('snort'):
+                vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
+                vars_fh = open(vars_file, "wb")
+
+                for line in vars.split('\n'):
                     # strip out trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
                     line = line.rstrip()
                     # strip out leading whitespace to make subsequent matching easier (snort won't complain about leading whitespace though)
@@ -1025,22 +1064,8 @@ def page_coverage_summary():
                         vars_fh.close()
                         delete_temp_files(job_id)
                         return page_coverage_default(request.form.get('sensor_tech'),"Invalid variable definition. Must be 'var', 'portvar', or 'ipvar': %s" % line)
-                #elif sensor_tech.startswith('suri'):
-                #    suri variable validation here; a little more complicated since it is yaml but for now we will just pass and let the agent throw the error
-                vars_fh.write("%s\n" % line)
-        else:
-            vars_fh.close()
-            delete_temp_files(job_id)
-            return page_coverage_default(request.form.get('sensor_tech'),"No variables defined.")
-        vars_fh.close()
-
-        # get and write engine configuration file
-        engine_conf_file = None
-        if request.form.get('custom_engineconf'):
-            if sensor_tech.startswith('snort'):
+                    vars_fh.write("%s\n" % line)
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_snort.conf" % job_id)
-            elif sensor_tech.startswith('suri'):
-                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
             else:
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_engine.conf" % job_id)
             engine_conf_fh = open(engine_conf_file, "wb")

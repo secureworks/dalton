@@ -945,38 +945,13 @@ def submit_job(job_id, job_directory):
         print_error("No pcap files found")
     if not IDS_RULES_FILES:
         print_error("No rules files found")
-    if not VARIABLES_FILE or not os.path.exists(VARIABLES_FILE):
-        print_error("variables file %s does not exist" % VARIABLES_FILE)
     if not JOB_ID:
         print_error("job id not defined")
 
     if SENSOR_TECHNOLOGY.startswith('snort'):
-#        # Create snort.conf from MASTER_CONFIG_FILE and update it to include
-#        # the ENGINE_CONF_FILE (if it is submitted with the job) along with
-#        # the VARIABLE_FILE and IDS_RULES_FILES
-#        # this behavior has changed
-#        if not os.path.exists(MASTER_CONFIG_FILE):
-#            print_error("master config file %s does not exist" % MASTER_CONFIG_FILE)
-#        regex = re.compile(r"^(?P<start>include\:?\s).*engine\.conf")
-#        master_conf_fh = open(MASTER_CONFIG_FILE, "rb")
-#        master_conf_file = master_conf_fh.readlines()
-#        master_conf_fh.close()
+        if not VARIABLES_FILE or not os.path.exists(VARIABLES_FILE):
+            print_error("variables file %s does not exist" % VARIABLES_FILE)
         snort_conf_fh = open(IDS_CONFIG_FILE, "a")
-#        replaced_engine_conf_line = False
-#        for line in master_conf_file:
-#            # if engine.conf included in job, use that
-#            if ENGINE_CONF_FILE:
-#                result = regex.search(line)
-#                if result:
-#                    snort_conf_fh.write("%s%s" % (result.group('start'), ENGINE_CONF_FILE))
-#                    replaced_engine_conf_line = True
-#                else:
-#                    snort_conf_fh.write("%s" % line)
-#            else:
-#                snort_conf_fh.write("%s" % line)
-#
-#        if ENGINE_CONF_FILE and not replaced_engine_conf_line:
-#            snort_conf_fh.write("\ninclude %s\n" % ENGINE_CONF_FILE)
 
         # include rules and vars files in config file
         for rules_file in IDS_RULES_FILES:
@@ -988,7 +963,7 @@ def submit_job(job_id, job_directory):
         #  write to both but only writes ExtraData records to one of them -- the last
         #  one defined. (The 'extra_data_config' (void pointer) variable used to log
         #  ExtraData is a global variable and thus only points to one config and thus
-        #  one log file.).  This one is defined last so we get ExtraData which we want. 
+        #  one log file.).  This one is defined last so we get ExtraData which we want.
         snort_conf_fh.write("\noutput alert_full: alert-full_dalton-agent\n")
         snort_conf_fh.write("\noutput unified2: filename unified2.dalton.alert\n")
 
@@ -1014,8 +989,10 @@ def submit_job(job_id, job_directory):
         for rules_file in IDS_RULES_FILES:
             suri_yaml_fh.write(" - %s\n" % rules_file)
         suri_yaml_fh.close()
+
         if len(PCAP_FILES) > 1:
             print_error("Multiple pcap files were submitted to the Dalton Agent for a Suricata job.\n\nSuricata can only read a single pcap file so multiple pcaps submitted to the Dalton Controller should have been combined by the Controller when packaging the job.\n\nIf you see this, something went wrong on the Controller or you are doing something untoward.")
+
     if SENSOR_TECHNOLOGY.startswith('snort'):
         # this section applies only to Snort sensors
         # Snort uses DAQ dump and pcap read mode
