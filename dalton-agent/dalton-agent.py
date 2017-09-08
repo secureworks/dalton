@@ -777,11 +777,7 @@ def process_performance_logs():
         else:
             print_debug("No Snort performance log(s) found.")
     elif SENSOR_TECHNOLOGY.startswith('suri'):
-        perf_file = os.path.join(IDS_LOG_DIRECTORY, "rule-perf.log")
-        if not os.path.exists(perf_file):
-            perf_file_new = os.path.join(IDS_LOG_DIRECTORY, os.path.basename(perf_file).replace("-", "_"))
-            print_debug("Performance log file \'%s\' not present, trying \'%s\'..." % (os.path.basename(perf_file), os.path.basename(perf_file_new)))
-            perf_file = perf_file_new
+        perf_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-rule-perf.log")
         if os.path.exists(perf_file):
             perf_filehandle = open(perf_file, "rb")
             print_debug("Processing Suricata performance file %s" % perf_file)
@@ -984,11 +980,11 @@ def submit_job(job_id, job_directory):
         # is this desired? Do we only want rulesets from the controller or can
         # other rules files be included in the config? If the latter we will need
         # to parse the YAML and insert the rules includes appropriately.
-        print_debug("adding rules files(s) to yaml:\n%s\n" % '\n'.join(IDS_RULES_FILES))
+        print_debug("adding default-rule-path to yaml:\n%s\n" % '\n'.join(IDS_RULES_FILES))
         suri_yaml_fh.write("default-rule-path: %s\n" % JOB_DIRECTORY)
-        suri_yaml_fh.write("rule-files:\n")
-        for rules_file in IDS_RULES_FILES:
-            suri_yaml_fh.write(" - %s\n" % rules_file)
+        #suri_yaml_fh.write("rule-files:\n")
+        #for rules_file in IDS_RULES_FILES:
+        #    suri_yaml_fh.write(" - %s\n" % rules_file)
         suri_yaml_fh.close()
 
         if len(PCAP_FILES) > 1:

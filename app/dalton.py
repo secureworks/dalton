@@ -1018,19 +1018,45 @@ def page_coverage_summary():
             #yaml-punch!
             # combine engine conf and variables
 
-            # so no attempt to include it later will happen
+            # set to NULL so no attempt to include it later will happen
             vars_file = None
 
             # just in case someone edited and didn't quote a boolean
             conf_file = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', conf_file)
-            # read in yaml
             try:
+                # read in yaml
                 config = yaml.round_trip_load(conf_file, version=(1,1), preserve_quotes=True)
                 # add in vars
                 vars_config = yaml.safe_load(vars, version=(1,1))
                 config.update(vars_config)
                 # edit!
-
+                # first, do rule includes
+                if not 'rule-files' in config:
+                    config['rule-files'] = []
+                if request.form.get('optionProdRuleset'):
+                    # some code re-use here
+                    prod_ruleset_name = os.path.basename(request.form.get('prod_ruleset'))
+                    if not prod_ruleset_name.endswith(".rules"):
+                        prod_ruleset_name = "%s.rules" % prod_ruleset_name
+                    config['rule-files'].append("%s" % prod_ruleset_name)
+                if bCustomRules:
+                    config['rule-files'].append("dalton-custom.rules")
+                if bGetOtherLogs:
+                    # TODO
+                    pass
+                if bTrackPerformance:
+                    if not "profiling" in config:
+                        config['profiling'] = {}
+                    if not "rules" in config['profiling']:
+                        config['profiling']['rules'] = {'enabled': True, \
+                                                        'filename': "dalton-rule_perf.log", \
+                                                        'append': True, \
+                                                        'sort': "avgticks", \
+                                                        'limit': 100, \
+                                                        'json': True}
+                    else:
+                        config['profiling']['rules']['enabled'] = True
+                        config['profiling']['rules']['filename'] = "dalton-rule_perf.log"
                 # write out
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
                 engine_conf_fh = open(engine_conf_file, "wb")
@@ -1120,9 +1146,10 @@ def page_coverage_summary():
                 ruleset_path = request.form.get('prod_ruleset')
                 if not ruleset_path:
                     return render_template('/dalton/error.html', jid=jid, msg="No defined ruleset provided.")
-                prod_ruleset_name = os.path.basename(ruleset_path)
-                if not prod_ruleset_name.endswith(".rules"):
-                    prod_ruleset_name = "%s.rules" % prod_ruleset_name
+                if not prod_ruleset_name: # if Suri job, this is already set above
+                    prod_ruleset_name = os.path.basename(ruleset_path)
+                    if not prod_ruleset_name.endswith(".rules"):
+                        prod_ruleset_name = "%s.rules" % prod_ruleset_name
                 logger.debug("ruleset_path = %s" % ruleset_path)
                 logger.debug("Dalton in page_coverage_summary():\n    prod_ruleset_name: %s" % (prod_ruleset_name))
                 if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
@@ -1232,7 +1259,7 @@ def page_coverage_summary():
                     zf.write(ruleset_path, arcname=prod_ruleset_name)
             try:
                 if request.form.get('optionCustomRuleset') and request.form.get('custom_ruleset'):
-                    zf.write(custom_rules_file, arcname='custom.rules')
+                    zf.write(custom_rules_file, arcname='dalton-custom.rules')
             except:
                 pass
             if vars_file:
