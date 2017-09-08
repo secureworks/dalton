@@ -1017,6 +1017,29 @@ def page_coverage_summary():
         if sensor_tech.startswith('suri'):
             #yaml-punch!
             # combine engine conf and variables
+
+            # so no attempt to include it later will happen
+            vars_file = None
+
+            # just in case someone edited and didn't quote a boolean
+            conf_file = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', conf_file)
+            # read in yaml
+            try:
+                config = yaml.round_trip_load(conf_file, version=(1,1), preserve_quotes=True)
+                # add in vars
+                vars_config = yaml.safe_load(vars, version=(1,1))
+                config.update(vars_config)
+                # edit!
+
+                # write out
+                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
+                engine_conf_fh = open(engine_conf_file, "wb")
+                engine_conf_fh.write(yaml.round_trip_dump(config, version=(1,1), explicit_start=True))
+                engine_conf_fh.close()
+            except Exception as e:
+                logger.error("Problem processing YAML file(s): %s" % e)
+                delete_temp_files(job_id)
+                return page_coverage_default(request.form.get('sensor_tech'),"Error processing YAML file(s):\n%s" % e)
             #ruamel!
             # set fast.log name?
 
@@ -1048,10 +1071,9 @@ def page_coverage_summary():
             #engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
         else:
             engine_conf_file = None
+            vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
+            vars_fh = open(vars_file, "wb")
             if sensor_tech.startswith('snort'):
-                vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
-                vars_fh = open(vars_file, "wb")
-
                 for line in vars.split('\n'):
                     # strip out trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
                     line = line.rstrip()
@@ -1067,9 +1089,11 @@ def page_coverage_summary():
                     vars_fh.write("%s\n" % line)
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_snort.conf" % job_id)
             else:
+                vars_fh.write(vars)
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_engine.conf" % job_id)
+            vars_fh.close()
             engine_conf_fh = open(engine_conf_file, "wb")
-            engine_conf_fh.write("%s" % request.form.get('custom_engineconf'))
+            engine_conf_fh.write(conf_file)
             engine_conf_fh.close()
 
         # create jid (job identifier) value
@@ -1211,7 +1235,8 @@ def page_coverage_summary():
                     zf.write(custom_rules_file, arcname='custom.rules')
             except:
                 pass
-            zf.write(vars_file, arcname='variables.conf')
+            if vars_file:
+                zf.write(vars_file, arcname='variables.conf')
             if engine_conf_file:
                 zf.write(engine_conf_file, arcname=os.path.basename(engine_conf_file))
 
