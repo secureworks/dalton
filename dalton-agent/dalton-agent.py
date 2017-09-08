@@ -957,7 +957,7 @@ def submit_job(job_id, job_directory):
         for rules_file in IDS_RULES_FILES:
             snort_conf_fh.write("\ninclude %s\n" % rules_file)
         snort_conf_fh.write("\ninclude %s\n" % VARIABLES_FILE)
-        
+
         # set these output filenames explicitly so there is no guess where/what they are
         # NOTE: when MULTIPLE "output unified2:" directives are defined, Snort will
         #  write to both but only writes ExtraData records to one of them -- the last
@@ -970,14 +970,15 @@ def submit_job(job_id, job_directory):
         snort_conf_fh.close()
 
     if SENSOR_TECHNOLOGY.startswith('suri'):
+        # config/YAML should already be build on the controller
         # add variables and rules to Suricata's .yaml file
         suri_yaml_fh = open(IDS_CONFIG_FILE, "a")
         suri_yaml_fh.write("\n")
         # add variables
-        suri_vars_fh = open(VARIABLES_FILE, "rb")
-        suri_yaml_fh.write(suri_vars_fh.read())
-        suri_yaml_fh.write("\n")
-        suri_vars_fh.close()
+#        suri_vars_fh = open(VARIABLES_FILE, "rb")
+#        suri_yaml_fh.write(suri_vars_fh.read())
+#        suri_yaml_fh.write("\n")
+#        suri_vars_fh.close()
         # add rules
         #TODO: this will redefine the default-rule-path and rules-file config nodes
         # is this desired? Do we only want rulesets from the controller or can
@@ -1085,7 +1086,8 @@ while True:
                 submit_job(JOB_ID, JOB_DIRECTORY)
             except DaltonError, e:
                 # dalton errors should already be written to JOB_ERROR_LOG and sent back
-                logger.debug("DaltonError caught:\n%s" % e)
+                logger.error("DaltonError caught:\n%s" % e)
+                logger.debug("%s" % traceback.format_exc())
             except Exception, e:
                 # not a DaltonError, perhaps a code bug? Try to write to JOB_ERROR_LOG
                 if JOB_ERROR_LOG:
@@ -1097,7 +1099,8 @@ while True:
                     print_debug("ERROR:\n%s" % msg)
                 else:
                     error_post_results("Dalton Agent Error in sensor \'%s\' while processing job %s. Error:\n%s" % (SENSOR_UID, JOB_ID, e))
-                logger.debug("Non DaltonError Exception caught:\n%s" % e)
+                logger.error("Non DaltonError Exception caught:\n%s" % e)
+                logger.debug("%s" % traceback.format_exc())
 
             TOTAL_PROCESSING_TIME = int(int(time.time())-start_time)
             print_debug("Total Processing Time (includes job download time): %d seconds" % TOTAL_PROCESSING_TIME)
