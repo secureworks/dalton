@@ -636,7 +636,7 @@ def process_suri_alerts():
     global JOB_ALERT_LOG, IDS_LOG_DIRECTORY
     print_debug("process_suri_alerts() called")
     print_msg("Processing alerts")
-    alerts_file = "%s/fast.log" % IDS_LOG_DIRECTORY
+    alerts_file = "%s/dalton-fast.log" % IDS_LOG_DIRECTORY
     if os.path.exists(alerts_file):
         job_alert_log_fh = open(JOB_ALERT_LOG, "wb")
         alert_filehandle = open(alerts_file, "rb")
@@ -777,7 +777,7 @@ def process_performance_logs():
         else:
             print_debug("No Snort performance log(s) found.")
     elif SENSOR_TECHNOLOGY.startswith('suri'):
-        perf_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-rule-perf.log")
+        perf_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf.log")
         if os.path.exists(perf_file):
             perf_filehandle = open(perf_file, "rb")
             print_debug("Processing Suricata performance file %s" % perf_file)
@@ -966,27 +966,14 @@ def submit_job(job_id, job_directory):
         snort_conf_fh.close()
 
     if SENSOR_TECHNOLOGY.startswith('suri'):
-        # config/YAML should already be build on the controller
-        # add variables and rules to Suricata's .yaml file
+        # config/YAML should already be built on the controller
         suri_yaml_fh = open(IDS_CONFIG_FILE, "a")
         suri_yaml_fh.write("\n")
-        # add variables
-#        suri_vars_fh = open(VARIABLES_FILE, "rb")
-#        suri_yaml_fh.write(suri_vars_fh.read())
-#        suri_yaml_fh.write("\n")
-#        suri_vars_fh.close()
-        # add rules
-        #TODO: this will redefine the default-rule-path and rules-file config nodes
-        # is this desired? Do we only want rulesets from the controller or can
-        # other rules files be included in the config? If the latter we will need
-        # to parse the YAML and insert the rules includes appropriately.
+        # set default-rule-path; this is stripped out when the controller built
+        # the job with the expectation that it be added here.
         print_debug("adding default-rule-path to yaml:\n%s\n" % '\n'.join(IDS_RULES_FILES))
         suri_yaml_fh.write("default-rule-path: %s\n" % JOB_DIRECTORY)
-        #suri_yaml_fh.write("rule-files:\n")
-        #for rules_file in IDS_RULES_FILES:
-        #    suri_yaml_fh.write(" - %s\n" % rules_file)
         suri_yaml_fh.close()
-
         if len(PCAP_FILES) > 1:
             print_error("Multiple pcap files were submitted to the Dalton Agent for a Suricata job.\n\nSuricata can only read a single pcap file so multiple pcaps submitted to the Dalton Controller should have been combined by the Controller when packaging the job.\n\nIf you see this, something went wrong on the Controller or you are doing something untoward.")
 
@@ -1013,10 +1000,10 @@ def submit_job(job_id, job_directory):
     other_logs = {}
     if SENSOR_TECHNOLOGY.startswith('suri'):
         # always return Engine and Packet Stats for Suri
-        other_logs['Engine Stats'] = 'stats.log'
-        other_logs['Packet Stats'] = 'packet-stats.log'
+        other_logs['Engine Stats'] = 'dalton-stats.log'
+        other_logs['Packet Stats'] = 'dalton-packet_stats.log'
         if getOtherLogs:
-            other_logs['Alert Debug'] = 'alert-debug.log'
+            other_logs['Alert Debug'] = 'dalton-alert_debug.log'
             other_logs['HTTP Log'] = 'http.log'
             other_logs['TLS Log'] = 'tls.log'
             other_logs['DNS Log'] = 'dns.log'
@@ -1024,7 +1011,7 @@ def submit_job(job_id, job_directory):
         if getFastPattern:
             other_logs['Fast Pattern'] = 'rules_fast_pattern.txt'
         if trackPerformance:
-            other_logs['Keyword Perf'] = 'keyword-perf.log'
+            other_logs['Keyword Perf'] = 'dalton-keyword_perf.log'
     # elif ... can add processing of logs from other engines here
     if len(other_logs) > 0:
         process_other_logs(other_logs)
