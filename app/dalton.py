@@ -25,6 +25,7 @@ import subprocess
 from ruamel import yaml
 import base64
 import  cStringIO
+import traceback
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -1018,7 +1019,7 @@ def page_coverage_summary():
             #yaml-punch!
             # combine engine conf and variables
 
-            # set to NULL so no attempt to include it later will happen
+            # set to NULL so no attempt to include it will happen later
             vars_file = None
 
             # just in case someone edited and didn't quote a boolean
@@ -1029,7 +1030,7 @@ def page_coverage_summary():
                 # add in vars
                 vars_config = yaml.safe_load(vars, version=(1,1))
                 config.update(vars_config)
-                # edit!
+
                 # first, do rule includes
                 if not 'rule-files' in config:
                     config['rule-files'] = []
@@ -1041,14 +1042,78 @@ def page_coverage_summary():
                     config['rule-files'].append("%s" % prod_ruleset_name)
                 if bCustomRules:
                     config['rule-files'].append("dalton-custom.rules")
+
+                # remove default rule path; added back on agent
+                if 'default-rule-path' in config:
+                    config.pop('default-rule-path', None)
+
+                # set outputs
+                if 'outputs' not in config:
+                    logger.warn("No 'outputs' seciton in Suricata YAML. This may be a problem....")
+                    # going to try to build this from scratch but Suri still may not like it
+                    config['outputs'] = {}
+
+                # fast.log
+                config['outputs']['fast'] = {'enabled': True, \
+                                             'filename': "dalton-fast.log", \
+                                             'append': True}
+
+                # unified2 logging
+                try:
+                    deployment = config['outputs']['unified2-alert']['xff']['deplyment']
+                    header = config['outputs']['unified2-alert']['xff']['header']
+                except exception as e:
+                    logger.debug("Could not get 'deployment' and/or 'header' values for outputs->unified2-alert->xff->")
+                    deployment = "reverse"
+                    header = "X-Forwarded-For"
+                config['outputs']['unified2-alert'] = {'enabled': True, \
+                                                       'filename': "unified2.dalton.alert", \
+                                                       'xff': {'enabled': True, 'mode': 'extra-data', \
+                                                               'deployment': deployment, 'header': header}}
+                #stats
+                config['outputs']['stats'] = {'enabled': True, \
+                                                'filename': "dalton-stats.log", \
+                                                'totals': True, \
+                                                'threads': False}
+
+                if not "profiling" in config:
+                    config['profiling'] = {}
+
+                # always return Engine stats for Suri
+                config['profiling']['packets'] = {'enabled': True, \
+                                                'filename': "dalton-packet_stats.log", \
+                                                'append': True}
+
                 if bGetOtherLogs:
-                    # TODO
+                    # alert-debug
+                    config['outputs']['alert-debug'] = {'enabled': True, \
+                                                'filename': "dalton-alert_debug.log", \
+                                                'append': True}
+                    # http
+                    config['outputs']['http-log'] = {'enabled': True, \
+                                                'filename': "dalton-http.log", \
+                                                'append': True}
+                    # tls
+                    config['outputs']['tls-log'] = {'enabled': True, \
+                                                'filename': "dalton-tls.log", \
+                                                'append': True}
+                    # dns
+                    config['outputs']['dns-log'] = {'enabled': True, \
+                                                'filename': "dalton-dns.log", \
+                                                'append': True}
+                    try:
+                        config['outputs']['eve-log']['filename'] = "dalton-eve.json"
+                        # can't have tls log to file AND be included in EVE log
+                        config['outputs']['eve-log']['types']['alert']['tls'] = False
+                    except Exception as e:
+                        pass
                     pass
+
+                # set filename for rule and keyword profiling
                 if bTrackPerformance:
-                    if not "profiling" in config:
-                        config['profiling'] = {}
+                    # rule profiling
                     if not "rules" in config['profiling']:
-                        config['profiling']['rules'] = {'enabled': True, \
+                        config['profiling']['keywords'] = {'enabled': True, \
                                                         'filename': "dalton-rule_perf.log", \
                                                         'append': True, \
                                                         'sort': "avgticks", \
@@ -1056,7 +1121,13 @@ def page_coverage_summary():
                                                         'json': True}
                     else:
                         config['profiling']['rules']['enabled'] = True
-                        config['profiling']['rules']['filename'] = "dalton-rule_perf.log"
+                        config['profiling']['rules']['filename'] = "dalton-keyword_perf.log"
+                    # keyword profiling
+                    # is this supported by older Suri versions?
+                    if 'keywords' in config['profiling']:
+                        config['profiling']['keywords'] = {'enabled': True, \
+                                                           'filename': "dalton-keyword_perf.log", \
+                                                           'append': True}
                 # write out
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
                 engine_conf_fh = open(engine_conf_file, "wb")
@@ -1064,37 +1135,9 @@ def page_coverage_summary():
                 engine_conf_fh.close()
             except Exception as e:
                 logger.error("Problem processing YAML file(s): %s" % e)
+		logger.debug("%s" % traceback.format_exc())
                 delete_temp_files(job_id)
                 return page_coverage_default(request.form.get('sensor_tech'),"Error processing YAML file(s):\n%s" % e)
-            #ruamel!
-            # set fast.log name?
-
-            # set u2 naming
-
-            # set filenes for output if other logs
-        #  other_logs['Engine Stats'] = 'stats.log'
-        #other_logs['Packet Stats'] = 'packet-stats.log'
-        #if getOtherLogs:
-        #    other_logs['Alert Debug'] = 'alert-debug.log'
-        #    other_logs['HTTP Log'] = 'http.log'
-        #    other_logs['TLS Log'] = 'tls.log'
-        #    other_logs['DNS Log'] = 'dns.log'
-        #    other_logs['EVE JSON'] = 'eve.json'
-        #if getFastPattern:
-        #    other_logs['Fast Pattern'] = 'rules_fast_pattern.txt'
-        #if trackPerformance:
-        #    other_logs['Keyword Perf'] = 'keyword-perf.log'
-
-            # rules (default-rule-path and includes)
-            # set suri_yaml_fh.write("default-rule-path: %s\n" % JOB_DIRECTORY) ?
-            #suri_yaml_fh.write("rule-files:\n")
-#        for rules_file in IDS_RULES_FILES:
-#            suri_yaml_fh.write(" - %s\n" % rules_file)
-#        suri_yaml_fh.close()
-# include custom.rules
-
-            # output to:
-            #engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
         else:
             engine_conf_file = None
             vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
