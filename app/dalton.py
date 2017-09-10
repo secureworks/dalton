@@ -1051,30 +1051,51 @@ def page_coverage_summary():
                 if 'outputs' not in config:
                     logger.warn("No 'outputs' seciton in Suricata YAML. This may be a problem....")
                     # going to try to build this from scratch but Suri still may not like it
-                    config['outputs'] = {}
+                    config['outputs'] = []
+
+                # apparently with this version of ruamel.yaml and the round trip load, outputs isn't
+                #  and ordered dict but a list...
+                olist = []
+                for i in range(0, len(config['outputs'])):
+                    olist.append(config['outputs'][i].keys()[0])
 
                 # fast.log
-                config['outputs']['fast'] = {'enabled': True, \
+                fast_config = {'fast': {'enabled': True, \
                                              'filename': "dalton-fast.log", \
-                                             'append': True}
+                                             'append': True}}
+                if 'fast' in olist:
+                    config['outputs'][olist.index('fast')] = fast_config
+                else:
+                    config['outputs'].append(fast_config)
 
                 # unified2 logging
-                try:
-                    deployment = config['outputs']['unified2-alert']['xff']['deplyment']
-                    header = config['outputs']['unified2-alert']['xff']['header']
-                except exception as e:
-                    logger.debug("Could not get 'deployment' and/or 'header' values for outputs->unified2-alert->xff->")
-                    deployment = "reverse"
-                    header = "X-Forwarded-For"
-                config['outputs']['unified2-alert'] = {'enabled': True, \
-                                                       'filename': "unified2.dalton.alert", \
-                                                       'xff': {'enabled': True, 'mode': 'extra-data', \
-                                                               'deployment': deployment, 'header': header}}
+                deployment = "reverse"
+                header = "X-Forwarded-For"
+                if 'unified2-alert' in olist:
+                    try:
+                        deployment = config['outputs'][olist.index('unified2-alert')]['unified2-alert']['xff']['deployment']
+                        header = config['outputs'][olist.index('unified2-alert')]['unified2-alert']['xff']['header']
+                    except Exception as e:
+                        logger.debug("Could not get 'deployment' and/or 'header' values for outputs->unified2-alert->xff->")
+                u2_config = {'unified2-alert': {'enabled': True, \
+                             'filename': "unified2.dalton.alert", \
+                             'xff': {'enabled': True, 'mode': 'extra-data', \
+                                     'deployment': deployment, 'header': header}}}
+                if 'unified2-alert' in olist:
+                    config['outputs'][olist.index('unified2-alert')] = u2_config
+                else:
+                    config['outputs'].append(u2_config)
+
                 #stats
-                config['outputs']['stats'] = {'enabled': True, \
+                stats_config = {'stats': {'enabled': True, \
                                                 'filename': "dalton-stats.log", \
                                                 'totals': True, \
-                                                'threads': False}
+                                                'threads': False}}
+                if 'stats' in olist:
+                    config['outputs'][olist.index('stats')] = stats_config
+                else:
+                    config['outputs'].append(stats_config)
+
 
                 if not "profiling" in config:
                     config['profiling'] = {}
@@ -1101,6 +1122,7 @@ def page_coverage_summary():
                     config['outputs']['dns-log'] = {'enabled': True, \
                                                 'filename': "dalton-dns.log", \
                                                 'append': True}
+                    #TODO: this
                     try:
                         config['outputs']['eve-log']['filename'] = "dalton-eve.json"
                         # can't have tls log to file AND be included in EVE log
