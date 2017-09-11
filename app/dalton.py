@@ -1032,7 +1032,9 @@ def page_coverage_summary():
                 config.update(vars_config)
 
                 # first, do rule includes
-                if not 'rule-files' in config:
+                # should references to other rule files be removed?
+                removeOtherRuleFiles = True
+                if not 'rule-files' in config or removeOtherRuleFiles:
                     config['rule-files'] = []
                 if request.form.get('optionProdRuleset'):
                     # some code re-use here
@@ -1055,9 +1057,7 @@ def page_coverage_summary():
 
                 # apparently with this version of ruamel.yaml and the round trip load, outputs isn't
                 #  and ordered dict but a list...
-                olist = []
-                for i in range(0, len(config['outputs'])):
-                    olist.append(config['outputs'][i].keys()[0])
+                olist =[config['outputs'][i].keys()[0] for i in range(0, len(config['outputs']))]
 
                 # fast.log
                 fast_config = {'fast': {'enabled': True, \
@@ -1107,29 +1107,59 @@ def page_coverage_summary():
 
                 if bGetOtherLogs:
                     # alert-debug
-                    config['outputs']['alert-debug'] = {'enabled': True, \
+                    alert_debug_config = {'alert-debug': {'enabled': True, \
                                                 'filename': "dalton-alert_debug.log", \
-                                                'append': True}
+                                                'append': True}}
+                    if 'alert-debug' in olist:
+                        config['outputs'][olist.index('alert-debug')] = alert_debug_config
+                    else:
+                        config['outputs'].append(alert_debug_config)
+
                     # http
-                    config['outputs']['http-log'] = {'enabled': True, \
+                    http_config = {'http-log': {'enabled': True, \
                                                 'filename': "dalton-http.log", \
-                                                'append': True}
+                                                'append': True}}
+                    if 'http-log' in olist:
+                        config['outputs'][olist.index('http-log')] = http_config
+                    else:
+                        config['outputs'].append(http_config)
+
                     # tls
-                    config['outputs']['tls-log'] = {'enabled': True, \
+                    tls_config = {'tls-log': {'enabled': True, \
                                                 'filename': "dalton-tls.log", \
-                                                'append': True}
+                                                'append': True}}
+                    if 'tls-log' in olist:
+                        config['outputs'][olist.index('tls-log')] = tls_config
+                    else:
+                        config['outputs'].append(tls_config)
+
                     # dns
-                    config['outputs']['dns-log'] = {'enabled': True, \
+                    dns_config = {'dns-log': {'enabled': True, \
                                                 'filename': "dalton-dns.log", \
-                                                'append': True}
-                    #TODO: this
+                                                'append': True}}
+                    if 'dns-log' in olist:
+                        config['outputs'][olist.index('dns-log')] = dns_config
+                    else:
+                        config['outputs'].append(dns_config)
+
+                    # Don't try to enable eve-log since it is unformatted and redundant in many cases
+                    # But in case it is enabled, set the filename and disable EVE tls since you
+                    # can't have tls log to file AND be included in the EVE log.
+                    # NOTE: I'm not even sure this Suri config is valid YAML 1.1 ....
                     try:
-                        config['outputs']['eve-log']['filename'] = "dalton-eve.json"
-                        # can't have tls log to file AND be included in EVE log
-                        config['outputs']['eve-log']['types']['alert']['tls'] = False
+                        # set filename
+                        config['outputs'][olist.index('eve-log')]['eve-log']['filename'] = "dalton-eve.json"
+                        # disable EVE TLS logging. This mixing of dicts and lists is onerous to no end....
+                        for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
+                            try:
+                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'alert':
+                                    config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert']['tls'] = "no"
+                                    break
+                            except Exception as e:
+                                pass
                     except Exception as e:
+                        logger.debug("Problem editing eve-log section of config: %s" % e)
                         pass
-                    pass
 
                 # set filename for rule and keyword profiling
                 if bTrackPerformance:

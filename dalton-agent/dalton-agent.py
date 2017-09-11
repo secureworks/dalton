@@ -1004,10 +1004,10 @@ def submit_job(job_id, job_directory):
         other_logs['Packet Stats'] = 'dalton-packet_stats.log'
         if getOtherLogs:
             other_logs['Alert Debug'] = 'dalton-alert_debug.log'
-            other_logs['HTTP Log'] = 'http.log'
-            other_logs['TLS Log'] = 'tls.log'
-            other_logs['DNS Log'] = 'dns.log'
-            other_logs['EVE JSON'] = 'eve.json'
+            other_logs['HTTP Log'] = 'dalton-http.log'
+            other_logs['TLS Log'] = 'dalton-tls.log'
+            other_logs['DNS Log'] = 'dalton-dns.log'
+            other_logs['EVE JSON'] = 'dalton-eve.json'
         if getFastPattern:
             other_logs['Fast Pattern'] = 'rules_fast_pattern.txt'
         if trackPerformance:
