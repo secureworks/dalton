@@ -1153,9 +1153,13 @@ def page_coverage_summary():
                         for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
                             try:
                                 if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'alert':
-                                    config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert']['tls'] = "no"
-                                    break
+                                    logger.debug("Removing outputs->eve-log->types->alert->tls")
+                                    config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
+#                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
+ #                                   logger.debug("Removing outputs->eve-log->types->tls")
+  #                                  del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
                             except Exception as e:
+                                logger.debug("Could not disable EVE TLS log. Error: %s" % e)
                                 pass
                     except Exception as e:
                         logger.debug("Problem editing eve-log section of config: %s" % e)
