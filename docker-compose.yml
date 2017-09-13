@@ -31,6 +31,14 @@ services:
     container_name: suricata-3.0-stock
     restart: always
 
+  agent-suricata-4.0.0:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfile_suricata-4.0.0
+    image: agent-suricata:4.0.0
+    container_name: suricata-4.0.0
+#    restart: always
+
   agent-snort:
     build:
       context: ./dalton-agent
