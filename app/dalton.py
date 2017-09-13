@@ -1155,9 +1155,9 @@ def page_coverage_summary():
                                 if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'alert':
                                     logger.debug("Removing outputs->eve-log->types->alert->tls")
                                     config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
-#                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
- #                                   logger.debug("Removing outputs->eve-log->types->tls")
-  #                                  del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
+                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
+                                    logger.debug("Removing outputs->eve-log->types->tls")
+                                    del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
                             except Exception as e:
                                 logger.debug("Could not disable EVE TLS log. Error: %s" % e)
                                 pass
@@ -1169,15 +1169,16 @@ def page_coverage_summary():
                 if bTrackPerformance:
                     # rule profiling
                     if not "rules" in config['profiling']:
-                        config['profiling']['keywords'] = {'enabled': True, \
+                        config['profiling']['rules'] = {'enabled': True, \
                                                         'filename': "dalton-rule_perf.log", \
                                                         'append': True, \
                                                         'sort': "avgticks", \
                                                         'limit': 100, \
-                                                        'json': True}
+                                                        'json': False}
                     else:
                         config['profiling']['rules']['enabled'] = True
-                        config['profiling']['rules']['filename'] = "dalton-keyword_perf.log"
+                        config['profiling']['rules']['filename'] = "dalton-rule_perf.log"
+                        config['profiling']['rules']['json'] = False
                     # keyword profiling
                     # is this supported by older Suri versions?
                     if 'keywords' in config['profiling']:
