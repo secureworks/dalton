@@ -6,7 +6,7 @@ MAINTAINER David Wharton
 #  the agent but nice to have....
 RUN apt-get update -y && apt-get install -y \
     python=2.7.11-1 \
-    tcpdump=4.9.0-1ubuntu1~ubuntu16.04.1
+    tcpdump
 
 # for debugging agent
 RUN apt-get install less

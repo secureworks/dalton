@@ -37,7 +37,15 @@ services:
       dockerfile: Dockerfile_suricata-4.0.0
     image: agent-suricata:4.0.0
     container_name: suricata-4.0.0
-#    restart: always
+    restart: always
+
+  agent-suricata-1.3.6:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfile_suricata-1.3.6
+    image: agent-suricata:1.3.6
+    container_name: suricata-1.3.6
+    restart: always
 
   agent-snort:
     build:

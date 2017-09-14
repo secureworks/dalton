@@ -6,22 +6,23 @@ MAINTAINER David Wharton
 #  the agent but nice to have....
 RUN apt-get update -y && apt-get install -y \
     python=2.7.11-1 \
-    tcpdump=4.9.0-1ubuntu1~ubuntu16.04.1 \
+    tcpdump \
     libpcre3 libpcre3-dbg libpcre3-dev \
     build-essential autoconf automake libtool libpcap-dev libnet1-dev \
     libyaml-0-2 libyaml-dev zlib1g zlib1g-dev libcap-ng-dev libcap-ng0 \
-    make libmagic-dev libjansson-dev libjansson4 pkg-config wget
+    make libmagic-dev libjansson-dev libjansson4 pkg-config
 
 # for debugging agent
 RUN apt-get install -y less nano
 
+# download and install Suricata 4.0.0
 RUN mkdir /src
 WORKDIR /src
-RUN wget https://www.openinfosecfoundation.org/download/suricata-4.0.0.tar.gz
+ADD https://www.openinfosecfoundation.org/download/suricata-4.0.0.tar.gz suricata-4.0.0.tar.gz
 RUN tar -xzf suricata-4.0.0.tar.gz
 WORKDIR /src/suricata-4.0.0
-RUN /bin/bash configure --enable-profiling
-RUN make && make install && make install-conf && ldconfig
+RUN ./configure --enable-profiling
+RUN make -j $(nproc) && make install && make install-conf && ldconfig
 
 RUN mkdir -p /opt/dalton-agent/
 WORKDIR /opt/dalton-agent
