@@ -636,7 +636,7 @@ def process_suri_alerts():
     global JOB_ALERT_LOG, IDS_LOG_DIRECTORY
     print_debug("process_suri_alerts() called")
     print_msg("Processing alerts")
-    alerts_file = "%s/fast.log" % IDS_LOG_DIRECTORY
+    alerts_file = "%s/dalton-fast.log" % IDS_LOG_DIRECTORY
     if os.path.exists(alerts_file):
         job_alert_log_fh = open(JOB_ALERT_LOG, "wb")
         alert_filehandle = open(alerts_file, "rb")
@@ -777,11 +777,7 @@ def process_performance_logs():
         else:
             print_debug("No Snort performance log(s) found.")
     elif SENSOR_TECHNOLOGY.startswith('suri'):
-        perf_file = os.path.join(IDS_LOG_DIRECTORY, "rule-perf.log")
-        if not os.path.exists(perf_file):
-            perf_file_new = os.path.join(IDS_LOG_DIRECTORY, os.path.basename(perf_file).replace("-", "_"))
-            print_debug("Performance log file \'%s\' not present, trying \'%s\'..." % (os.path.basename(perf_file), os.path.basename(perf_file_new)))
-            perf_file = perf_file_new
+        perf_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf.log")
         if os.path.exists(perf_file):
             perf_filehandle = open(perf_file, "rb")
             print_debug("Processing Suricata performance file %s" % perf_file)
@@ -945,77 +941,42 @@ def submit_job(job_id, job_directory):
         print_error("No pcap files found")
     if not IDS_RULES_FILES:
         print_error("No rules files found")
-    if not VARIABLES_FILE or not os.path.exists(VARIABLES_FILE):
-        print_error("variables file %s does not exist" % VARIABLES_FILE)
     if not JOB_ID:
         print_error("job id not defined")
 
     if SENSOR_TECHNOLOGY.startswith('snort'):
-#        # Create snort.conf from MASTER_CONFIG_FILE and update it to include
-#        # the ENGINE_CONF_FILE (if it is submitted with the job) along with
-#        # the VARIABLE_FILE and IDS_RULES_FILES
-#        # this behavior has changed
-#        if not os.path.exists(MASTER_CONFIG_FILE):
-#            print_error("master config file %s does not exist" % MASTER_CONFIG_FILE)
-#        regex = re.compile(r"^(?P<start>include\:?\s).*engine\.conf")
-#        master_conf_fh = open(MASTER_CONFIG_FILE, "rb")
-#        master_conf_file = master_conf_fh.readlines()
-#        master_conf_fh.close()
+        if not VARIABLES_FILE or not os.path.exists(VARIABLES_FILE):
+            print_error("variables file %s does not exist" % VARIABLES_FILE)
         snort_conf_fh = open(IDS_CONFIG_FILE, "a")
-#        replaced_engine_conf_line = False
-#        for line in master_conf_file:
-#            # if engine.conf included in job, use that
-#            if ENGINE_CONF_FILE:
-#                result = regex.search(line)
-#                if result:
-#                    snort_conf_fh.write("%s%s" % (result.group('start'), ENGINE_CONF_FILE))
-#                    replaced_engine_conf_line = True
-#                else:
-#                    snort_conf_fh.write("%s" % line)
-#            else:
-#                snort_conf_fh.write("%s" % line)
-#
-#        if ENGINE_CONF_FILE and not replaced_engine_conf_line:
-#            snort_conf_fh.write("\ninclude %s\n" % ENGINE_CONF_FILE)
 
         # include rules and vars files in config file
         for rules_file in IDS_RULES_FILES:
             snort_conf_fh.write("\ninclude %s\n" % rules_file)
         snort_conf_fh.write("\ninclude %s\n" % VARIABLES_FILE)
-        
+
         # set these output filenames explicitly so there is no guess where/what they are
         # NOTE: when MULTIPLE "output unified2:" directives are defined, Snort will
         #  write to both but only writes ExtraData records to one of them -- the last
         #  one defined. (The 'extra_data_config' (void pointer) variable used to log
         #  ExtraData is a global variable and thus only points to one config and thus
-        #  one log file.).  This one is defined last so we get ExtraData which we want. 
+        #  one log file.).  This one is defined last so we get ExtraData which we want.
         snort_conf_fh.write("\noutput alert_full: alert-full_dalton-agent\n")
         snort_conf_fh.write("\noutput unified2: filename unified2.dalton.alert\n")
 
         snort_conf_fh.close()
 
     if SENSOR_TECHNOLOGY.startswith('suri'):
-        # add variables and rules to Suricata's .yaml file
+        # config/YAML should already be built on the controller
         suri_yaml_fh = open(IDS_CONFIG_FILE, "a")
         suri_yaml_fh.write("\n")
-        # add variables
-        suri_vars_fh = open(VARIABLES_FILE, "rb")
-        suri_yaml_fh.write(suri_vars_fh.read())
-        suri_yaml_fh.write("\n")
-        suri_vars_fh.close()
-        # add rules
-        #TODO: this will redefine the default-rule-path and rules-file config nodes
-        # is this desired? Do we only want rulesets from the controller or can
-        # other rules files be included in the config? If the latter we will need
-        # to parse the YAML and insert the rules includes appropriately.
-        print_debug("adding rules files(s) to yaml:\n%s\n" % '\n'.join(IDS_RULES_FILES))
+        # set default-rule-path; this is stripped out when the controller built
+        # the job with the expectation that it be added here.
+        print_debug("adding default-rule-path to yaml:\n%s\n" % '\n'.join(IDS_RULES_FILES))
         suri_yaml_fh.write("default-rule-path: %s\n" % JOB_DIRECTORY)
-        suri_yaml_fh.write("rule-files:\n")
-        for rules_file in IDS_RULES_FILES:
-            suri_yaml_fh.write(" - %s\n" % rules_file)
         suri_yaml_fh.close()
         if len(PCAP_FILES) > 1:
             print_error("Multiple pcap files were submitted to the Dalton Agent for a Suricata job.\n\nSuricata can only read a single pcap file so multiple pcaps submitted to the Dalton Controller should have been combined by the Controller when packaging the job.\n\nIf you see this, something went wrong on the Controller or you are doing something untoward.")
+
     if SENSOR_TECHNOLOGY.startswith('snort'):
         # this section applies only to Snort sensors
         # Snort uses DAQ dump and pcap read mode
@@ -1039,18 +1000,18 @@ def submit_job(job_id, job_directory):
     other_logs = {}
     if SENSOR_TECHNOLOGY.startswith('suri'):
         # always return Engine and Packet Stats for Suri
-        other_logs['Engine Stats'] = 'stats.log'
-        other_logs['Packet Stats'] = 'packet-stats.log'
+        other_logs['Engine Stats'] = 'dalton-stats.log'
+        other_logs['Packet Stats'] = 'dalton-packet_stats.log'
         if getOtherLogs:
-            other_logs['Alert Debug'] = 'alert-debug.log'
-            other_logs['HTTP Log'] = 'http.log'
-            other_logs['TLS Log'] = 'tls.log'
-            other_logs['DNS Log'] = 'dns.log'
-            other_logs['EVE JSON'] = 'eve.json'
+            other_logs['Alert Debug'] = 'dalton-alert_debug.log'
+            other_logs['HTTP Log'] = 'dalton-http.log'
+            other_logs['TLS Log'] = 'dalton-tls.log'
+            other_logs['DNS Log'] = 'dalton-dns.log'
+            other_logs['EVE JSON'] = 'dalton-eve.json'
         if getFastPattern:
             other_logs['Fast Pattern'] = 'rules_fast_pattern.txt'
         if trackPerformance:
-            other_logs['Keyword Perf'] = 'keyword-perf.log'
+            other_logs['Keyword Perf'] = 'dalton-keyword_perf.log'
     # elif ... can add processing of logs from other engines here
     if len(other_logs) > 0:
         process_other_logs(other_logs)
@@ -1108,7 +1069,8 @@ while True:
                 submit_job(JOB_ID, JOB_DIRECTORY)
             except DaltonError, e:
                 # dalton errors should already be written to JOB_ERROR_LOG and sent back
-                logger.debug("DaltonError caught:\n%s" % e)
+                logger.error("DaltonError caught:\n%s" % e)
+                logger.debug("%s" % traceback.format_exc())
             except Exception, e:
                 # not a DaltonError, perhaps a code bug? Try to write to JOB_ERROR_LOG
                 if JOB_ERROR_LOG:
@@ -1120,7 +1082,8 @@ while True:
                     print_debug("ERROR:\n%s" % msg)
                 else:
                     error_post_results("Dalton Agent Error in sensor \'%s\' while processing job %s. Error:\n%s" % (SENSOR_UID, JOB_ID, e))
-                logger.debug("Non DaltonError Exception caught:\n%s" % e)
+                logger.error("Non DaltonError Exception caught:\n%s" % e)
+                logger.debug("%s" % traceback.format_exc())
 
             TOTAL_PROCESSING_TIME = int(int(time.time())-start_time)
             print_debug("Total Processing Time (includes job download time): %d seconds" % TOTAL_PROCESSING_TIME)
