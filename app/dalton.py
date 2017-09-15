@@ -25,6 +25,7 @@ import subprocess
 from ruamel import yaml
 import base64
 import  cStringIO
+import traceback
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -1004,16 +1005,202 @@ def page_coverage_summary():
             return render_template('/dalton/error.html', jid="<not_defined>", msg="Variable \'sensor_tech\' not specified.  Please reload the submission page and try again.")
 
         # get and write variables
-        vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
-        vars_fh = open(vars_file, "wb")
         vars = request.form.get('custom_vars')
         if not vars:
-            # try to populate default variables based on sensor_tech??
-            pass
+            delete_temp_files(job_id)
+            return page_coverage_default(request.form.get('sensor_tech'),"No variables defined.")
 
-        if vars:
-            for line in vars.split('\n'):
-                if sensor_tech.startswith('snort'):
+        conf_file = request.form.get('custom_engineconf')
+        if not conf_file:
+            delete_temp_files(job_id)
+            return page_coverage_default(request.form.get('sensor_tech'),"No configuration file provided.")
+
+        if sensor_tech.startswith('suri'):
+            #yaml-punch!
+            # combine engine conf and variables
+
+            # set to NULL so no attempt to include it will happen later
+            vars_file = None
+
+            # just in case someone edited and didn't quote a boolean
+            conf_file = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', conf_file)
+            try:
+                # read in yaml
+                config = yaml.round_trip_load(conf_file, version=(1,1), preserve_quotes=True)
+                # add in vars
+                vars_config = yaml.safe_load(vars, version=(1,1))
+                config.update(vars_config)
+
+                # first, do rule includes
+                # should references to other rule files be removed?
+                removeOtherRuleFiles = True
+                if not 'rule-files' in config or removeOtherRuleFiles:
+                    config['rule-files'] = []
+                if request.form.get('optionProdRuleset'):
+                    # some code re-use here
+                    prod_ruleset_name = os.path.basename(request.form.get('prod_ruleset'))
+                    if not prod_ruleset_name.endswith(".rules"):
+                        prod_ruleset_name = "%s.rules" % prod_ruleset_name
+                    config['rule-files'].append("%s" % prod_ruleset_name)
+                if bCustomRules:
+                    config['rule-files'].append("dalton-custom.rules")
+
+                # remove default rule path; added back on agent
+                if 'default-rule-path' in config:
+                    config.pop('default-rule-path', None)
+
+                # set outputs
+                if 'outputs' not in config:
+                    logger.warn("No 'outputs' seciton in Suricata YAML. This may be a problem....")
+                    # going to try to build this from scratch but Suri still may not like it
+                    config['outputs'] = []
+
+                # apparently with this version of ruamel.yaml and the round trip load, outputs isn't
+                #  and ordered dict but a list...
+                olist =[config['outputs'][i].keys()[0] for i in range(0, len(config['outputs']))]
+
+                # fast.log
+                fast_config = {'fast': {'enabled': True, \
+                                             'filename': "dalton-fast.log", \
+                                             'append': True}}
+                if 'fast' in olist:
+                    config['outputs'][olist.index('fast')] = fast_config
+                else:
+                    config['outputs'].append(fast_config)
+
+                # unified2 logging
+                deployment = "reverse"
+                header = "X-Forwarded-For"
+                if 'unified2-alert' in olist:
+                    try:
+                        deployment = config['outputs'][olist.index('unified2-alert')]['unified2-alert']['xff']['deployment']
+                        header = config['outputs'][olist.index('unified2-alert')]['unified2-alert']['xff']['header']
+                    except Exception as e:
+                        logger.debug("Could not get 'deployment' and/or 'header' values for outputs->unified2-alert->xff->")
+                u2_config = {'unified2-alert': {'enabled': True, \
+                             'filename': "unified2.dalton.alert", \
+                             'xff': {'enabled': True, 'mode': 'extra-data', \
+                                     'deployment': deployment, 'header': header}}}
+                if 'unified2-alert' in olist:
+                    config['outputs'][olist.index('unified2-alert')] = u2_config
+                else:
+                    config['outputs'].append(u2_config)
+
+                #stats
+                stats_config = {'stats': {'enabled': True, \
+                                                'filename': "dalton-stats.log", \
+                                                'totals': True, \
+                                                'threads': False}}
+                if 'stats' in olist:
+                    config['outputs'][olist.index('stats')] = stats_config
+                else:
+                    config['outputs'].append(stats_config)
+
+
+                if not "profiling" in config:
+                    config['profiling'] = {}
+
+                # always return Engine stats for Suri
+                config['profiling']['packets'] = {'enabled': True, \
+                                                'filename': "dalton-packet_stats.log", \
+                                                'append': True}
+
+                if bGetOtherLogs:
+                    # alert-debug
+                    alert_debug_config = {'alert-debug': {'enabled': True, \
+                                                'filename': "dalton-alert_debug.log", \
+                                                'append': True}}
+                    if 'alert-debug' in olist:
+                        config['outputs'][olist.index('alert-debug')] = alert_debug_config
+                    else:
+                        config['outputs'].append(alert_debug_config)
+
+                    # http
+                    http_config = {'http-log': {'enabled': True, \
+                                                'filename': "dalton-http.log", \
+                                                'append': True}}
+                    if 'http-log' in olist:
+                        config['outputs'][olist.index('http-log')] = http_config
+                    else:
+                        config['outputs'].append(http_config)
+
+                    # tls
+                    tls_config = {'tls-log': {'enabled': True, \
+                                                'filename': "dalton-tls.log", \
+                                                'append': True}}
+                    if 'tls-log' in olist:
+                        config['outputs'][olist.index('tls-log')] = tls_config
+                    else:
+                        config['outputs'].append(tls_config)
+
+                    # dns
+                    dns_config = {'dns-log': {'enabled': True, \
+                                                'filename': "dalton-dns.log", \
+                                                'append': True}}
+                    if 'dns-log' in olist:
+                        config['outputs'][olist.index('dns-log')] = dns_config
+                    else:
+                        config['outputs'].append(dns_config)
+
+                    # Don't try to enable eve-log since it is unformatted and redundant in many cases
+                    # But in case it is enabled, set the filename and disable EVE tls since you
+                    # can't have tls log to file AND be included in the EVE log.
+                    # NOTE: I'm not even sure this Suri config is valid YAML 1.1 ....
+                    try:
+                        # set filename
+                        config['outputs'][olist.index('eve-log')]['eve-log']['filename'] = "dalton-eve.json"
+                        # disable EVE TLS logging. This mixing of dicts and lists is onerous to no end....
+                        for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
+                            try:
+                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'alert':
+                                    logger.debug("Removing outputs->eve-log->types->alert->tls")
+                                    config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
+                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
+                                    logger.debug("Removing outputs->eve-log->types->tls")
+                                    del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
+                            except Exception as e:
+                                logger.debug("Could not disable EVE TLS log. Error: %s" % e)
+                                pass
+                    except Exception as e:
+                        logger.debug("Problem editing eve-log section of config: %s" % e)
+                        pass
+
+                # set filename for rule and keyword profiling
+                if bTrackPerformance:
+                    # rule profiling
+                    if not "rules" in config['profiling']:
+                        config['profiling']['rules'] = {'enabled': True, \
+                                                        'filename': "dalton-rule_perf.log", \
+                                                        'append': True, \
+                                                        'sort': "avgticks", \
+                                                        'limit': 100, \
+                                                        'json': False}
+                    else:
+                        config['profiling']['rules']['enabled'] = True
+                        config['profiling']['rules']['filename'] = "dalton-rule_perf.log"
+                        config['profiling']['rules']['json'] = False
+                    # keyword profiling
+                    # is this supported by older Suri versions?
+                    if 'keywords' in config['profiling']:
+                        config['profiling']['keywords'] = {'enabled': True, \
+                                                           'filename': "dalton-keyword_perf.log", \
+                                                           'append': True}
+                # write out
+                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
+                engine_conf_fh = open(engine_conf_file, "wb")
+                engine_conf_fh.write(yaml.round_trip_dump(config, version=(1,1), explicit_start=True))
+                engine_conf_fh.close()
+            except Exception as e:
+                logger.error("Problem processing YAML file(s): %s" % e)
+		logger.debug("%s" % traceback.format_exc())
+                delete_temp_files(job_id)
+                return page_coverage_default(request.form.get('sensor_tech'),"Error processing YAML file(s):\n%s" % e)
+        else:
+            engine_conf_file = None
+            vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
+            vars_fh = open(vars_file, "wb")
+            if sensor_tech.startswith('snort'):
+                for line in vars.split('\n'):
                     # strip out trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
                     line = line.rstrip()
                     # strip out leading whitespace to make subsequent matching easier (snort won't complain about leading whitespace though)
@@ -1025,26 +1212,14 @@ def page_coverage_summary():
                         vars_fh.close()
                         delete_temp_files(job_id)
                         return page_coverage_default(request.form.get('sensor_tech'),"Invalid variable definition. Must be 'var', 'portvar', or 'ipvar': %s" % line)
-                #elif sensor_tech.startswith('suri'):
-                #    suri variable validation here; a little more complicated since it is yaml but for now we will just pass and let the agent throw the error
-                vars_fh.write("%s\n" % line)
-        else:
-            vars_fh.close()
-            delete_temp_files(job_id)
-            return page_coverage_default(request.form.get('sensor_tech'),"No variables defined.")
-        vars_fh.close()
-
-        # get and write engine configuration file
-        engine_conf_file = None
-        if request.form.get('custom_engineconf'):
-            if sensor_tech.startswith('snort'):
+                    vars_fh.write("%s\n" % line)
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_snort.conf" % job_id)
-            elif sensor_tech.startswith('suri'):
-                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
             else:
+                vars_fh.write(vars)
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_engine.conf" % job_id)
+            vars_fh.close()
             engine_conf_fh = open(engine_conf_file, "wb")
-            engine_conf_fh.write("%s" % request.form.get('custom_engineconf'))
+            engine_conf_fh.write(conf_file)
             engine_conf_fh.close()
 
         # create jid (job identifier) value
@@ -1071,9 +1246,10 @@ def page_coverage_summary():
                 ruleset_path = request.form.get('prod_ruleset')
                 if not ruleset_path:
                     return render_template('/dalton/error.html', jid=jid, msg="No defined ruleset provided.")
-                prod_ruleset_name = os.path.basename(ruleset_path)
-                if not prod_ruleset_name.endswith(".rules"):
-                    prod_ruleset_name = "%s.rules" % prod_ruleset_name
+                if not prod_ruleset_name: # if Suri job, this is already set above
+                    prod_ruleset_name = os.path.basename(ruleset_path)
+                    if not prod_ruleset_name.endswith(".rules"):
+                        prod_ruleset_name = "%s.rules" % prod_ruleset_name
                 logger.debug("ruleset_path = %s" % ruleset_path)
                 logger.debug("Dalton in page_coverage_summary():\n    prod_ruleset_name: %s" % (prod_ruleset_name))
                 if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
@@ -1183,10 +1359,11 @@ def page_coverage_summary():
                     zf.write(ruleset_path, arcname=prod_ruleset_name)
             try:
                 if request.form.get('optionCustomRuleset') and request.form.get('custom_ruleset'):
-                    zf.write(custom_rules_file, arcname='custom.rules')
+                    zf.write(custom_rules_file, arcname='dalton-custom.rules')
             except:
                 pass
-            zf.write(vars_file, arcname='variables.conf')
+            if vars_file:
+                zf.write(vars_file, arcname='variables.conf')
             if engine_conf_file:
                 zf.write(engine_conf_file, arcname=os.path.basename(engine_conf_file))
 
