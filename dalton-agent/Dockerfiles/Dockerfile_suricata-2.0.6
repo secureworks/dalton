@@ -1,4 +1,4 @@
-# Builds Suricata 4.0.0 Dalton agent using Suricata source tarball
+# Builds Suricata 2.0.6 Dalton agent using Suricata source tarball
 FROM ubuntu:16.04
 MAINTAINER David Wharton
 
@@ -12,10 +12,7 @@ RUN apt-get update -y && apt-get install -y \
     libyaml-0-2 libyaml-dev zlib1g zlib1g-dev libcap-ng-dev libcap-ng0 \
     make libmagic-dev libjansson-dev libjansson4 pkg-config
 
-# for debugging agent
-RUN apt-get install -y less nano
-
-# download and install Suricata 4.0.0
+# download and install Suricata 2.0.6
 RUN mkdir /src
 WORKDIR /src
 ADD http://downloads.suricata-ids.org/suricata-2.0.6.tar.gz suricata-2.0.6.tar.gz
