@@ -31,6 +31,7 @@ import struct
 import socket
 import logging
 from logging.handlers import RotatingFileHandler
+from distutils.version import LooseVersion
 
 # urllib2 in Python < 2.6 doesn't support setting a timeout so doing it like this
 socket.setdefaulttimeout(30)
@@ -181,10 +182,12 @@ if IDS_BINARY is None:
         logger.critical("No IDS binary specified or found.  Cannot continue.")
         sys.exit(1)
 
+# if Suricata version 4.0.0, this value would be "4.0.0"
+SENSOR_VERSION = get_engine_version(IDS_BINARY)
+
 if SENSOR_TECHNOLOGY == 'auto':
     base = os.path.basename(IDS_BINARY)
-    version = get_engine_version(IDS_BINARY)
-    SENSOR_TECHNOLOGY = "%s-%s" % (base, version)
+    SENSOR_TECHNOLOGY = "%s-%s" % (base, SENSOR_VERSION)
 
 logger.info("\n*******************")
 logger.info("Starting Dalton Agent version %s:"% AGENT_VERSION)
@@ -610,7 +613,15 @@ def run_suricata():
     if not IDS_BINARY:
         print_error("No Suricata binary found on system.")
     print_msg("Running pcap(s) thru Suricata")
-    suricata_command = "%s -c %s -l %s -k none -r %s" % (IDS_BINARY, IDS_CONFIG_FILE, IDS_LOG_DIRECTORY, PCAP_FILES[0])
+    # some Suri versions don't support all modern options like '-k' so try to deal with that here
+    add_options = ""
+    try:
+        if LooseVersion(SENSOR_VERSION) > LooseVersion(2.0):
+            # not sure if the '-k' option was added is Suri 2.0 or some other time but setting it to this for now
+            add_options = "-k none"
+    except Exception, e:
+        add_options = ""
+    suricata_command = "%s -c %s -l %s %s -r %s" % (IDS_BINARY, IDS_CONFIG_FILE, IDS_LOG_DIRECTORY, add_options, PCAP_FILES[0])
     print_debug("Running suricata with the following command:\n%s" % suricata_command)
     suri_output_fh = open(JOB_IDS_LOG, "wb")
     subprocess.call(suricata_command, shell = True, stderr=subprocess.STDOUT, stdout=suri_output_fh)
@@ -817,7 +828,7 @@ def reset_globals():
     TOTAL_PROCESSING_TIME = ''
     JOB_OTHER_LOGS = None
 
-# main function
+# primary function
 # gets passed directory of submitted files (rules file, pcap file(s), variables file) and job ID
 def submit_job(job_id, job_directory):
     global JOB_ID, SENSOR_TECHNOLOGY, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, VARIABLES_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY
