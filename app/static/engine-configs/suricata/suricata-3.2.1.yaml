@@ -41,8 +41,6 @@ vars:
     SSH_PORTS: 22
     DNP3_PORTS: 20000
     MODBUS_PORTS: 502
-    FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
-    FTP_PORTS: 21
 
 
 ##
@@ -105,7 +103,6 @@ rule-files:
 # - modbus-events.rules  # available in suricata sources under rules dir
 # - app-layer-events.rules  # available in suricata sources under rules dir
 # - dnp3-events.rules       # available in suricata sources under rules dir
-# - ntp-events.rules       # available in suricata sources under rules dir
 
 classification-file: /usr/local/etc/suricata/classification.config
 reference-config-file: /usr/local/etc/suricata/reference.config
@@ -151,7 +148,6 @@ outputs:
       #redis:
       #  server: 127.0.0.1
       #  port: 6379
-      #  async: true ## if redis replies are read asynchronously
       #  mode: list ## possible values: list (default), channel
       #  key: suricata ## key or channel to use (default to suricata)
       # Redis pipelining set up. This will enable to only do a query every
@@ -167,9 +163,11 @@ outputs:
             # payload-buffer-size: 4kb # max size of payload buffer to output in eve-log
             # payload-printable: yes   # enable dumping payload in printable (lossy) format
             # packet: yes              # enable dumping of packet (without stream segments)
-            # http-body: yes           # enable dumping of http body in Base64
-            # http-body-printable: yes # enable dumping of http body in printable format
-            metadata: yes              # add L7/applayer fields, flowbit and other vars to the alert
+            http: yes                # enable dumping of http fields
+            tls: yes                 # enable dumping of tls fields
+            ssh: yes                 # enable dumping of ssh fields
+            smtp: yes                # enable dumping of smtp fields
+            dnp3: yes                # enable dumping of DNP3 fields
 
             # Enable the logging of tagged packets for rules using the
             # "tag" keyword.
@@ -207,12 +205,6 @@ outputs:
             #custom: [a, aaaa, cname, mx, ns, ptr, txt]
         - tls:
             extended: yes     # enable this for extended logging information
-            # output TLS transaction where the session is resumed using a
-            # session id
-            #session-resumption: no
-            # custom allows to control which tls fields that are included
-            # in eve-log
-            #custom: [subject, issuer, session_resumed, serial, fingerprint, sni, version, not_before, not_after, certificate, chain]
         - files:
             force-magic: no   # force logging magic on all logged files
             # force logging of checksums, available hash functions are md5,
@@ -235,8 +227,6 @@ outputs:
             # to yes
             #md5: [body, subject]
 
-        #- dnp3
-        #- nfs
         - ssh
         - stats:
             totals: yes       # stats for all threads merged together
@@ -246,8 +236,7 @@ outputs:
         - flow
         # uni-directional flows
         #- netflow
-        # Vars log flowbits and other packet and flow vars
-        #- vars
+        #- dnp3
 
   # alert output for use with Barnyard2
   - unified2-alert:
@@ -257,11 +246,6 @@ outputs:
       # File size limit.  Can be specified in kb, mb, gb.  Just a number
       # is parsed as bytes.
       #limit: 32mb
-
-      # By default unified2 log files have the file creation time (in
-      # unix epoch format) appended to the filename. Set this to yes to
-      # disable this behaviour.
-      #nostamp: no
 
       # Sensor ID field of unified2 alerts.
       #sensor-id: 0
@@ -306,13 +290,8 @@ outputs:
       enabled: no  # Log TLS connections.
       filename: tls.log # File to store TLS logs.
       append: yes
-      #extended: yes     # Log extended information like fingerprint
-      #custom: yes       # enabled the custom logging format (defined by customformat)
-      #customformat: "%{%D-%H:%M:%S}t.%z %a:%p -> %A:%P %v %n %d %D"
       #filetype: regular # 'regular', 'unix_stream' or 'unix_dgram'
-      # output TLS transaction where the session is resumed using a
-      # session id
-      #session-resumption: no
+      #extended: yes # Log extended information like fingerprint
 
   # output module to store certificates chain to disk
   - tls-store:
@@ -440,12 +419,6 @@ outputs:
       # perform file extraction. Set to 0 for unlimited.
       #stream-depth: 0
       #waldo: file.waldo # waldo file to store the file_id across runs
-      # uncomment to disable meta file writing
-      #write-meta: no
-      # uncomment the following variable to define how many files can
-      # remain open for filestore by Suricata. Default value is 0 which
-      # means files get closed after each write
-      #max-open-files: 1000
 
   # output module to log files tracked in a easily parsable json format
   - file-log:
@@ -573,8 +546,7 @@ af-packet:
     # Lock memory map to avoid it goes to swap. Be careful that over suscribing could lock
     # your system
     #mmap-locked: yes
-    # Use tpacket_v3 capture mode, only active if use-mmap is true
-    # Don't use it in IPS or TAP mode as it causes severe latency
+    # Use experimental tpacket_v3 capture mode, only active if use-mmap is true
     #tpacket-v3: yes
     # Ring size will be computed with respect to max_pending_packets and number
     # of threads. You can set manually the ring size in number of packets by setting
@@ -738,10 +710,6 @@ app-layer:
     # smb2 detection is disabled internally inside the engine.
     #smb2:
     #  enabled: yes
-    # Note: NFS parser depends on Rust support: pass --enable-rust
-    # to configure.
-    nfs:
-      enabled: no
     dns:
       # memcaps. Globally and per flow/state.
       #global-memcap: 16mb
@@ -898,11 +866,6 @@ app-layer:
         dp: 44818
         sp: 44818
 
-    # Note: parser depends on experimental Rust support
-    # with --enable-rust-experimental passed to configure
-    ntp:
-      enabled: no
-
 # Limit for the maximum number of asn1 frames to decode (default 256)
 asn1-max-frames: 256
 
@@ -926,9 +889,8 @@ asn1-max-frames: 256
 # value is the hostname
 #sensor-name: suricata
 
-# Default location of the pid file. The pid file is only used in
-# daemon mode (start Suricata with -D). If not running in daemon mode
-# the --pidfile command line option must be used to create a pid file.
+# Default pid file.
+# Will use this file if no --pidfile in command options.
 #pid-file: /usr/local/var/run/suricata.pid
 
 # Daemon working directory
@@ -1191,7 +1153,6 @@ flow-timeouts:
 #   midstream: false            # don't allow midstream session pickups
 #   async-oneside: false        # don't enable async stream handling
 #   inline: no                  # stream inline mode
-#   drop-invalid: yes           # in inline mode, drop packets that are invalid with regards to streaming engine
 #   max-synack-queued: 5        # Max different SYN/ACKs to queue
 #   bypass: no                  # Bypass packets when stream.depth is reached
 #
@@ -1203,9 +1164,11 @@ flow-timeouts:
 #     toserver-chunk-size: 2560 # inspect raw stream in chunks of at least
 #                               # this size.  Can be specified in kb, mb,
 #                               # gb.  Just a number indicates it's in bytes.
+#                               # The max acceptable size is 4024 bytes.
 #     toclient-chunk-size: 2560 # inspect raw stream in chunks of at least
 #                               # this size.  Can be specified in kb, mb,
 #                               # gb.  Just a number indicates it's in bytes.
+#                               # The max acceptable size is 4024 bytes.
 #     randomize-chunk-size: yes # Take a random value for chunk size around the specified value.
 #                               # This lower the risk of some evasion technics but could lead
 #                               # detection change between runs. It is set to 'yes' by default.
@@ -1219,15 +1182,17 @@ flow-timeouts:
 #                               # raw is for content inspection by detection
 #                               # engine.
 #
-#     segment-prealloc: 2048    # number of segments preallocated per thread
-#
-#     check-overlap-different-data: true|false
-#                               # check if a segment contains different data
-#                               # than what we've already seen for that
-#                               # position in the stream.
-#                               # This is enabled automatically if inline mode
-#                               # is used or when stream-event:reassembly_overlap_different_data;
-#                               # is used in a rule.
+#     chunk-prealloc: 250       # Number of preallocated stream chunks. These
+#                               # are used during stream inspection (raw).
+#     segments:                 # Settings for reassembly segment pool.
+#       - size: 4               # Size of the (data)segment for a pool
+#         prealloc: 256         # Number of segments to prealloc and keep
+#                               # in the pool.
+#     zero-copy-size: 128       # This option sets in bytes the value at
+#                               # which segment data is passed to the app
+#                               # layer API directly. Data sizes equal to
+#                               # and higher than the value set are passed
+#                               # on directly.
 #
 stream:
   memcap: 64mb
@@ -1241,8 +1206,27 @@ stream:
     randomize-chunk-size: yes
     #randomize-chunk-range: 10
     #raw: yes
-    #segment-prealloc: 2048
-    #check-overlap-different-data: true
+    #chunk-prealloc: 250
+    #segments:
+    #  - size: 4
+    #    prealloc: 256
+    #  - size: 16
+    #    prealloc: 512
+    #  - size: 112
+    #    prealloc: 512
+    #  - size: 248
+    #    prealloc: 512
+    #  - size: 512
+    #    prealloc: 512
+    #  - size: 768
+    #    prealloc: 1024
+    # 'from_mtu' means that the size is mtu - 40,
+    # or 1460 if mtu couldn't be determined.
+    #  - size: from_mtu
+    #    prealloc: 1024
+    #  - size: 65535
+    #    prealloc: 128
+    #zero-copy-size: 128
 
 # Host table:
 #
@@ -1261,14 +1245,6 @@ host:
 #  hash-size: 4096
 #  prealloc: 1000
 #  memcap: 32mb
-
-# Decoder settings
-
-decoder:
-  # Teredo decoder is known to not be completely accurate
-  # it will sometimes detect non-teredo as teredo.
-  teredo:
-    enabled: true
 
 
 ##
@@ -1438,11 +1414,10 @@ profiling:
     append: yes
 
     # Sort options: ticks, avgticks, checks, matches, maxticks
-    # If commented out all the sort options will be used.
-    #sort: avgticks
+    sort: avgticks
 
-    # Limit the number of sids for which stats are shown at exit (per sort).
-    limit: 10
+    # Limit the number of items printed at exit (ignored for json).
+    limit: 100
 
     # output to json
     json: no

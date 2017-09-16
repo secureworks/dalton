@@ -255,25 +255,14 @@ def get_engine_conf_file(sensor):
         conf_file = None
         vars_file = None
         (engine, version) = sensor.split('-', 1)
-        epath = "%s/%s" % (CONF_STORAGE_PATH, engine)
-        files = [f for f in os.listdir(epath) if os.path.isfile(os.path.join(epath, f))]
-        found_files = []
-        while len(found_files) == 0:
-            for file in files:
-                if file.startswith(sensor):
-                    found_files.append(file)
-            new_sensor = sensor.rsplit('.', 1)[0]
-            if new_sensor == sensor:
-                if sensor == engine:
-                    break
-                else:
-                    sensor = engine
-            else:
-                sensor = new_sensor
-
-        if len(found_files) > 0:
-            # if multiple matches, get the one with the longest filename as that is assumed to be more specific
-            conf_file = os.path.join(epath, sorted(found_files, key=lambda x: len(x))[0])
+        epath = os.path.join(CONF_STORAGE_PATH, engine)
+        filelist = [f for f in os.listdir(epath) if os.path.isfile(os.path.join(epath, f))]
+        # assumes an extension (e.g. '.yaml', '.conf') on engine config files
+        files = [f for f in filelist if LooseVersion(os.path.splitext(f)[0]) <= LooseVersion(sensor)]
+        if len(files) > 0:
+            files.sort(key=lambda v:LooseVersion(os.path.splitext(v)[0]), reverse=True)
+            conf_file = os.path.join(epath, files[0])
+        logger.debug("in get_engine_conf_file: passed sensor value: '%s', conf file used: '%s'" % (sensor, os.path.basename(conf_file)))
 
         engine_config = ''
         variables = ''
@@ -342,14 +331,14 @@ def get_engine_conf_file(sensor):
                 engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
                 variables = ''
         else:
-            logger.warn("No configuration file for sensor '%s'." % sensor)
-            engine_config = "# No configuration file for sensor '%s'." % sensor
+            logger.warn("No suitable configuration file found for sensor '%s'." % sensor)
+            engine_config = "# No suitable configuration file found for sensor '%s'." % sensor
             variables = "# No variables in config for sensor '%s'." % sensor
         results = {'conf': engine_config, 'variables': variables}
         return json.dumps(results)
 
     except Exception, e:
-        logger.error("Problem getting configuration file for sensor '%s'.  Error: %s" % (sensor, e))
+        logger.error("Problem getting configuration file for sensor '%s'.  Error: %s\n%s" % (sensor, e, traceback.format_exc()))
         engine_config = "# Exception getting configuration file for sensor '%s'." % sensor
         variables = engine_config
         results = {'conf': engine_config, 'variables': variables}
