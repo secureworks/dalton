@@ -1,0 +1,33 @@
+# Builds Suricata 4.0.0 Dalton agent using Suricata source tarball
+FROM ubuntu:16.04
+MAINTAINER David Wharton
+
+# tcpdump is for pcap analysis; not *required* for
+#  the agent but nice to have....
+RUN apt-get update -y && apt-get install -y \
+    python=2.7.11-1 \
+    tcpdump \
+    libpcre3 libpcre3-dbg libpcre3-dev \
+    build-essential autoconf automake libtool libpcap-dev libnet1-dev \
+    libyaml-0-2 libyaml-dev zlib1g zlib1g-dev libcap-ng-dev libcap-ng0 \
+    make libmagic-dev libjansson-dev libjansson4 pkg-config
+
+# for debugging agent
+#RUN apt-get install -y less nano
+
+# download and install suricata-current (latest)
+RUN mkdir -p /src/suricata-current
+WORKDIR /src
+ADD http://downloads.suricata-ids.org/suricata-current.tar.gz suricata-current.tar.gz
+RUN tar -zxf suricata-current.tar.gz -C suricata-current --strip-components=1
+WORKDIR /src/suricata-current
+RUN ./configure --enable-profiling
+RUN make -j $(nproc) && make install && make install-conf && ldconfig
+
+RUN mkdir -p /opt/dalton-agent/
+WORKDIR /opt/dalton-agent
+COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
+COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
+
+CMD python /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1
+
