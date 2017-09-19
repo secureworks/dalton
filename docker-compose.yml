@@ -36,6 +36,15 @@ services:
     container_name: suricata-3.0-stock
     restart: always
 
+# Suricata latest from source
+  agent-suricata-latest:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_suricata-latest
+    image: agent-suricata:latest
+    container_name: suricata-latest
+    restart: always
+
 # Suricata 4.0.0 from source
   agent-suricata-4.0.0:
     build:
