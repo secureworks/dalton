@@ -1,6 +1,8 @@
-# Builds Suricata 4.0.0 Dalton agent using Suricata source tarball
+# Builds Suricata Dalton agent using Suricata source tarball
 FROM ubuntu:16.04
 MAINTAINER David Wharton
+
+ARG SURI_VERSION
 
 # tcpdump is for pcap analysis; not *required* for
 #  the agent but nice to have....
@@ -16,11 +18,11 @@ RUN apt-get update -y && apt-get install -y \
 #RUN apt-get install -y less nano
 
 # download and install suricata-current (latest)
-RUN mkdir -p /src/suricata-current
+RUN mkdir -p /src/suricata-${SURI_VERSION}
 WORKDIR /src
-ADD http://downloads.suricata-ids.org/suricata-current.tar.gz suricata-current.tar.gz
-RUN tar -zxf suricata-current.tar.gz -C suricata-current --strip-components=1
-WORKDIR /src/suricata-current
+ADD http://downloads.suricata-ids.org/suricata-${SURI_VERSION}.tar.gz suricata-${SURI_VERSION}.tar.gz
+RUN tar -zxf suricata-${SURI_VERSION}.tar.gz -C suricata-${SURI_VERSION} --strip-components=1
+WORKDIR /src/suricata-${SURI_VERSION}
 RUN ./configure --enable-profiling
 RUN make -j $(nproc) && make install && make install-conf && ldconfig
 
