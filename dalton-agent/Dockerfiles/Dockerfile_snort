@@ -17,7 +17,7 @@ RUN apt-get update -y && apt-get install -y \
     libpcap-dev libpcre3-dev \
     libcap-ng-dev libdumbnet-dev \
     zlib1g-dev liblzma-dev openssl libssl-dev \
-    libnghttp2-dev
+    libnghttp2-dev && ldconfig
 
 # for debugging agent
 #RUN apt-get install -y less nano
@@ -25,9 +25,9 @@ RUN apt-get update -y && apt-get install -y \
 # download, build, and install Snort from source
 RUN mkdir -p /src/snort-${SNORT_VERSION}
 WORKDIR /src
-# DAQ
+# DAQ.  Apparenlty DAQ will sometime fail building with multiple make jobs.
 ADD https://www.snort.org/downloads/archive/snort/daq-${DAQ_VERSION}.tar.gz daq-${DAQ_VERSION}.tar.gz
-RUN tar -zxf daq-${DAQ_VERSION}.tar.gz && cd daq-${DAQ_VERSION} && ./configure && make -j $(nproc) && make install
+RUN tar -zxf daq-${DAQ_VERSION}.tar.gz && cd daq-${DAQ_VERSION} && ./configure && make && make install
 # Snort
 ADD https://www.snort.org/downloads/archive/snort/snort-${SNORT_VERSION}.tar.gz snort-${SNORT_VERSION}.tar.gz
 RUN tar -zxf snort-${SNORT_VERSION}.tar.gz -C snort-${SNORT_VERSION} --strip-components=1 && \
