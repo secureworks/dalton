@@ -1,6 +1,5 @@
 version: '2'
 
-
 services:
   controller:
     build:
@@ -69,24 +68,24 @@ services:
 #    restart: always
 
 # Suricata 2.0.9 from source
+  agent-suricata-2.0.9:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_suricata
+      args:
+        - SURI_VERSION=2.0.9
+    container_name: suricata-2.0.9
+    restart: always
+
+# Suricata 2.0.6 from source
 #  agent-suricata-2.0.6:
 #    build:
 #      context: ./dalton-agent
 #      dockerfile: Dockerfiles/Dockerfile_suricata
 #      args:
-#        - SURI_VERSION=2.0.9
-#    container_name: suricata-2.0.9
+#        - SURI_VERSION=2.0.6
+#    container_name: suricata-2.0.6
 #    restart: always
-
-# Suricata 2.0.6 from source
-  agent-suricata-2.0.6:
-    build:
-      context: ./dalton-agent
-      dockerfile: Dockerfiles/Dockerfile_suricata
-      args:
-        - SURI_VERSION=2.0.6
-    container_name: suricata-2.0.6
-    restart: always
 
 # Suricata 1.3.6 from source
   agent-suricata-1.3.6:
