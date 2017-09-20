@@ -17,14 +17,13 @@ RUN apt-get update -y && apt-get install -y \
 # for debugging agent
 #RUN apt-get install -y less nano
 
-# download and install suricata-current (latest)
+# download, build, and install Suricata from source
 RUN mkdir -p /src/suricata-${SURI_VERSION}
 WORKDIR /src
 ADD http://downloads.suricata-ids.org/suricata-${SURI_VERSION}.tar.gz suricata-${SURI_VERSION}.tar.gz
 RUN tar -zxf suricata-${SURI_VERSION}.tar.gz -C suricata-${SURI_VERSION} --strip-components=1
 WORKDIR /src/suricata-${SURI_VERSION}
-RUN ./configure --enable-profiling
-RUN make -j $(nproc) && make install && make install-conf && ldconfig
+RUN ./configure --enable-profiling && make -j $(nproc) && make install && make install-conf && ldconfig
 
 RUN mkdir -p /opt/dalton-agent/
 WORKDIR /opt/dalton-agent

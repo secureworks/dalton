@@ -114,6 +114,18 @@ services:
     volumes:
       - ./dalton-agent:/opt/dalton-agent
 
+# Snort 2.9.9.0 from source
+  agent-snort-2.9.9.0:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_snort
+      args:
+        - SNORT_VERSION=2.9.9.0
+        - DAQ_VERSION=2.0.6
+    container_name: snort-2.9.9.0
+    restart: always
+
+
 
 volumes:
   flask:
