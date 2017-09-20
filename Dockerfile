@@ -31,6 +31,10 @@ COPY dalton.conf /opt/dalton/dalton.conf
 COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
+#install flowsynth (REMOVE THIS ONCE IN GH)
+RUN mkdir -p /opt/flowsynth
+COPY flowsynth-gh /opt/flowsynth/
+RUN pip install -r /opt/flowsynth/requirements.txt
 
 RUN rm /etc/nginx/nginx.conf && ln -s /opt/dalton/res/etc/nginx/nginx.conf  /etc/nginx/nginx.conf && \
     rm -rf /etc/nginx/conf.d && ln -s /opt/dalton/res/etc/nginx/conf.d /etc/nginx/conf.d && \

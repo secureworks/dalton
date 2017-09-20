@@ -15,8 +15,9 @@ daltonfs = Flask(__name__, static_folder='app/static')
 #
 # dalton
 daltonfs.register_blueprint(dalton_blueprint)
+
 # flowsynth
-daltonfs.register_blueprint(flowsynth_blueprint)
+daltonfs.register_blueprint(flowsynth_blueprint, url_prefix='/flowsynth')
 
 daltonfs.debug = True
 

@@ -23,7 +23,7 @@
 		{% if buildstatus['successful'] %}
 		<legend>Build Status <span class="label label-success">Success</span></legend>
 
-		<a href="get_pcap/{{ filename }}"><img src="/images/disk-black-24.png">&nbsp;Click Here to Download PCAP</a></br>
+		<a href="get_pcap/{{ filename }}"><img src="{{ url_for('static', filename='images/disk-black.png') }}">&nbsp;Click Here to Download PCAP</a></br>
         <legend>Add Test Case</legend>
         <input type="hidden" id="filename" value="{{ filename }}">
             <label>Engine</label>
