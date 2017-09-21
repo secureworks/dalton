@@ -909,13 +909,23 @@ def submit_job(job_id, job_directory):
     except Exception:
         getOtherLogs = False
 
-    # make a directory for snort to use for alert and perf logs
+    # make a directory for engine to use for alert, perf, and other sundry logs
     IDS_LOG_DIRECTORY = '%s/raw_ids_logs' % JOB_DIRECTORY
     if os.path.isdir(IDS_LOG_DIRECTORY):
         shutil.rmtree(IDS_LOG_DIRECTORY)
     os.makedirs(IDS_LOG_DIRECTORY)
     # not secure
     os.system("chmod -R 777 %s" % IDS_LOG_DIRECTORY)
+
+    # for Snort, copy over some config files to JOB_DIRECTORY in case config references
+    #  relative path to them.  These files should be in /etc/snort for the Docker Dalton
+    #  Agents.
+    cdir = "/etc/snort"
+    if os.path.isdir(cdir):
+        file_list = ["classification.config", "file_magic.conf", "gen-msg.map", "reference.config", "threshold.conf", "unicode.map"]
+        for file in file_list:
+            if os.path.isfile(os.path.join(cdir, file)):
+                shutil.copyfile(os.path.join(cdir, file), os.path.join(JOB_DIRECTORY, file))
 
     # pcaps and config should be in manifest
     IDS_CONFIG_FILE = None
