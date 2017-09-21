@@ -72,15 +72,15 @@ services:
 #    restart: always
 
 # Suricata 2.0.9 from source
-  agent-suricata-2.0.9:
-    build:
-      context: ./dalton-agent
-      dockerfile: Dockerfiles/Dockerfile_suricata
-      args:
-        - SURI_VERSION=2.0.9
-    image: suricata-2.0.9:latest
-    container_name: suricata-2.0.9
-    restart: always
+#  agent-suricata-2.0.9:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_suricata
+#      args:
+#        - SURI_VERSION=2.0.9
+#    image: suricata-2.0.9:latest
+#    container_name: suricata-2.0.9
+#    restart: always
 
 # Suricata 2.0.6 from source
 #  agent-suricata-2.0.6:
@@ -157,6 +157,18 @@ services:
 #    image: snort-2.9.3.1:latest
 #    container_name: snort-2.9.3.1
 #    restart: always
+
+# Snort 2.9.1.1 from source
+  agent-snort-2.9.1.1:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_snort
+      args:
+        - SNORT_VERSION=2.9.1.1
+        - DAQ_VERSION=2.0.6
+    image: snort-2.9.1.1:latest
+    container_name: snort-2.9.1.1
+    restart: always
 
 volumes:
   flask:
