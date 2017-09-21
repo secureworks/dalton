@@ -27,14 +27,15 @@ services:
 ##### Suricata Agents #####
 ###########################
 
-# Suricata latest from source
-  agent-suricata-latest:
+# Suricata current (latest) from source
+  agent-suricata-current:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_suricata
       args:
-        - SURI_VERSION=4.0.0
-    container_name: suricata-latest
+        - SURI_VERSION=current
+    image: suricata-current:latest
+    container_name: suricata-current
     restart: always
 
 # Suricata 4.0.0 from source
@@ -44,6 +45,7 @@ services:
 #      dockerfile: Dockerfiles/Dockerfile_suricata
 #      args:
 #        - SURI_VERSION=4.0.0
+#    image: suricata-4.0.0:latest
 #    container_name: suricata-4.0.0
 #    restart: always
 
@@ -54,6 +56,7 @@ services:
 #      dockerfile: Dockerfiles/Dockerfile_suricata
 #      args:
 #        - SURI_VERSION=3.1.4
+#    image: suricata-3.1.4:latest
 #    container_name: suricata-3.1.4
 #    restart: always
 
@@ -64,6 +67,7 @@ services:
 #      dockerfile: Dockerfiles/Dockerfile_suricata
 #      args:
 #        - SURI_VERSION=3.2.3
+#    image: suricata-3.2.3:latest
 #    container_name: suricata-3.2.3
 #    restart: always
 
@@ -74,6 +78,7 @@ services:
       dockerfile: Dockerfiles/Dockerfile_suricata
       args:
         - SURI_VERSION=2.0.9
+    image: suricata-2.0.9:latest
     container_name: suricata-2.0.9
     restart: always
 
@@ -84,6 +89,7 @@ services:
 #      dockerfile: Dockerfiles/Dockerfile_suricata
 #      args:
 #        - SURI_VERSION=2.0.6
+#    image: suricata-2.06:latest
 #    container_name: suricata-2.0.6
 #    restart: always
 
@@ -94,20 +100,22 @@ services:
       dockerfile: Dockerfiles/Dockerfile_suricata
       args:
         - SURI_VERSION=1.3.6
+    image: suricata-1.3.6:latest
     container_name: suricata-1.3.6
     restart: always
+
 
 ###########################
 ###### Snort Agents #######
 ###########################
-
 
 # Snort 2.9.7.0 from Ubuntu Repos
   agent-snort:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_snort-2.9.7.0
-    container_name: snort-2.9.7.0-stock
+    image: snort-2.9.7.0-repo:latest
+    container_name: snort-2.9.7.0-repo
     restart: always
 
     # for debugging; can remove for prod
@@ -122,9 +130,13 @@ services:
       args:
         - SNORT_VERSION=2.9.9.0
         - DAQ_VERSION=2.0.6
+    image: snort-2.9.9.0:latest
     container_name: snort-2.9.9.0
     restart: always
 
+    # for debugging; can remove for prod
+    volumes:
+      - ./dalton-agent:/opt/dalton-agent
 
 
 volumes:
