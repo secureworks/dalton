@@ -777,25 +777,15 @@ def process_performance_logs():
     print_msg("Processing performance logs")
     os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
     job_performance_log_fh = open(JOB_PERFORMANCE_LOG, "wb")
-    if SENSOR_TECHNOLOGY.startswith('snort'):
-        if len(glob.glob(os.path.join(IDS_LOG_DIRECTORY, "rules_stats*"))) > 0:
-            for perf_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "rules_stats*")):
-                perf_filehandle = open(perf_file, "rb")
-                print_debug("Processing snort performance file %s" % perf_file)
-                job_performance_log_fh.write(perf_filehandle.read())
-                job_performance_log_fh.write("\n")
-                perf_filehandle.close()
-        else:
-            print_debug("No Snort performance log(s) found.")
-    elif SENSOR_TECHNOLOGY.startswith('suri'):
-        perf_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf.log")
-        if os.path.exists(perf_file):
+    if len(glob.glob(os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf*"))) > 0:
+        for perf_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf*")):
             perf_filehandle = open(perf_file, "rb")
-            print_debug("Processing Suricata performance file %s" % perf_file)
+            print_debug("Processing rule performance log file %s" % perf_file)
             job_performance_log_fh.write(perf_filehandle.read())
+            job_performance_log_fh.write("\n")
             perf_filehandle.close()
-        else:
-            print_debug("No performance log found. File \'%s\' does not exist." % perf_file)
+    else:
+        print_debug("No rules performance log(s) found. File \'%s\' does not exist." % "dalton-rule_perf*")
     job_performance_log_fh.close()
 
 #****************************
@@ -909,13 +899,23 @@ def submit_job(job_id, job_directory):
     except Exception:
         getOtherLogs = False
 
-    # make a directory for snort to use for alert and perf logs
+    # make a directory for engine to use for alert, perf, and other sundry logs
     IDS_LOG_DIRECTORY = '%s/raw_ids_logs' % JOB_DIRECTORY
     if os.path.isdir(IDS_LOG_DIRECTORY):
         shutil.rmtree(IDS_LOG_DIRECTORY)
     os.makedirs(IDS_LOG_DIRECTORY)
     # not secure
     os.system("chmod -R 777 %s" % IDS_LOG_DIRECTORY)
+
+    # for Snort, copy over some config files to JOB_DIRECTORY in case config references
+    #  relative path to them.  These files should be in /etc/snort for the Docker Dalton
+    #  Agents.
+    cdir = "/etc/snort"
+    if os.path.isdir(cdir):
+        file_list = ["classification.config", "file_magic.conf", "gen-msg.map", "reference.config", "threshold.conf", "unicode.map"]
+        for file in file_list:
+            if os.path.isfile(os.path.join(cdir, file)):
+                shutil.copyfile(os.path.join(cdir, file), os.path.join(JOB_DIRECTORY, file))
 
     # pcaps and config should be in manifest
     IDS_CONFIG_FILE = None

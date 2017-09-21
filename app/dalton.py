@@ -1162,7 +1162,7 @@ def page_coverage_summary():
                                                         'filename': "dalton-rule_perf.log", \
                                                         'append': True, \
                                                         'sort': "avgticks", \
-                                                        'limit': 100, \
+                                                        'limit': 1000, \
                                                         'json': False}
                     else:
                         config['profiling']['rules']['enabled'] = True
@@ -1181,7 +1181,7 @@ def page_coverage_summary():
                 engine_conf_fh.close()
             except Exception as e:
                 logger.error("Problem processing YAML file(s): %s" % e)
-		logger.debug("%s" % traceback.format_exc())
+                logger.debug("%s" % traceback.format_exc())
                 delete_temp_files(job_id)
                 return page_coverage_default(request.form.get('sensor_tech'),"Error processing YAML file(s):\n%s" % e)
         else:
@@ -1189,6 +1189,7 @@ def page_coverage_summary():
             vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
             vars_fh = open(vars_file, "wb")
             if sensor_tech.startswith('snort'):
+                # check variables
                 for line in vars.split('\n'):
                     # strip out trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
                     line = line.rstrip()
@@ -1202,6 +1203,33 @@ def page_coverage_summary():
                         delete_temp_files(job_id)
                         return page_coverage_default(request.form.get('sensor_tech'),"Invalid variable definition. Must be 'var', 'portvar', or 'ipvar': %s" % line)
                     vars_fh.write("%s\n" % line)
+
+                    # tweak Snort conf file
+                    if bTrackPerformance:
+                        new_conf = ''
+                        perf_found = False
+                        # splitlines without 'True' arg removes ending newline char(s)
+                        lines = iter(conf_file.splitlines())
+                        while True:
+                            try:
+                                line = next(lines)
+                                # might as well strip out comments
+                                if line.lstrip(' ').startswith('#') or line.lstrip(' ').rstrip(' ') == '': continue
+                                if line.startswith("config profile_rules:"):
+                                    perf_found = True
+                                    while line.endswith("\\"):
+                                        line = line.rstrip('\\') + next(lines)
+                                    if "filename " in line:
+                                        line = re.sub(r'filename\s+[^\s\x2C]+', 'filename dalton-rule_perf.log', line)
+                                    else:
+                                        line += ", filename dalton-rule_perf.log append"
+                                new_conf += "%s\n" % line
+                            except StopIteration:
+                                break
+                        if not perf_found:
+                            new_conf += "\nconfig profile_rules: print 1000, sort avg_ticks, filename dalton-rule_perf.log append"
+                        conf_file = new_conf
+
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_snort.conf" % job_id)
             else:
                 vars_fh.write(vars)
