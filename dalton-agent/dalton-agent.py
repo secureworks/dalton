@@ -777,25 +777,15 @@ def process_performance_logs():
     print_msg("Processing performance logs")
     os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
     job_performance_log_fh = open(JOB_PERFORMANCE_LOG, "wb")
-    if SENSOR_TECHNOLOGY.startswith('snort'):
-        if len(glob.glob(os.path.join(IDS_LOG_DIRECTORY, "rules_stats*"))) > 0:
-            for perf_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "rules_stats*")):
-                perf_filehandle = open(perf_file, "rb")
-                print_debug("Processing snort performance file %s" % perf_file)
-                job_performance_log_fh.write(perf_filehandle.read())
-                job_performance_log_fh.write("\n")
-                perf_filehandle.close()
-        else:
-            print_debug("No Snort performance log(s) found.")
-    elif SENSOR_TECHNOLOGY.startswith('suri'):
-        perf_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf.log")
-        if os.path.exists(perf_file):
+    if len(glob.glob(os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf*"))) > 0:
+        for perf_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf*")):
             perf_filehandle = open(perf_file, "rb")
-            print_debug("Processing Suricata performance file %s" % perf_file)
+            print_debug("Processing rule performance log file %s" % perf_file)
             job_performance_log_fh.write(perf_filehandle.read())
+            job_performance_log_fh.write("\n")
             perf_filehandle.close()
-        else:
-            print_debug("No performance log found. File \'%s\' does not exist." % perf_file)
+    else:
+        print_debug("No rules performance log(s) found. File \'%s\' does not exist." % "dalton-rule_perf*")
     job_performance_log_fh.close()
 
 #****************************
