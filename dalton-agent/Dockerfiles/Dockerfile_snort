@@ -32,10 +32,11 @@ RUN tar -zxf daq-${DAQ_VERSION}.tar.gz && cd daq-${DAQ_VERSION} && ./configure &
 ADD https://www.snort.org/downloads/archive/snort/snort-${SNORT_VERSION}.tar.gz snort-${SNORT_VERSION}.tar.gz
 RUN tar -zxf snort-${SNORT_VERSION}.tar.gz -C snort-${SNORT_VERSION} --strip-components=1 && \
     cd /src/snort-${SNORT_VERSION} && ./configure --enable-sourcefire && make -j $(nproc) && make install && \
-    mkdir /usr/local/lib/snort_dynamicrules && ldconfig && \
-    cp -t /etc/snort/ /src/snort-${SNORT_VERSION}/etc/classification.config /src/snort-${SNORT_VERSION}/etc/file_magic.conf \
+    mkdir /usr/local/lib/snort_dynamicrules && ldconfig
+
+RUN cp -t /etc/snort/ /src/snort-${SNORT_VERSION}/etc/classification.config /src/snort-${SNORT_VERSION}/etc/file_magic.conf \
     /src/snort-${SNORT_VERSION}/etc/gen-msg.map /src/snort-${SNORT_VERSION}/etc/reference.config \
-    /src/snort-${SNORT_VERSION}/etc/threshold.conf /src/snort-${SNORT_VERSION}/etc/unicode.map
+    /src/snort-${SNORT_VERSION}/etc/threshold.conf /src/snort-${SNORT_VERSION}/etc/unicode.map; exit 0
 
 RUN mkdir -p /opt/dalton-agent/
 WORKDIR /opt/dalton-agent

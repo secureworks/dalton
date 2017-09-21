@@ -110,17 +110,13 @@ services:
 ###########################
 
 # Snort 2.9.7.0 from Ubuntu Repos
-  agent-snort:
-    build:
-      context: ./dalton-agent
-      dockerfile: Dockerfiles/Dockerfile_snort-2.9.7.0
-    image: snort-2.9.7.0-repo:latest
-    container_name: snort-2.9.7.0-repo
-    restart: always
-
-    # for debugging; can remove for prod
-    volumes:
-      - ./dalton-agent:/opt/dalton-agent
+#  agent-snort:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_snort-2.9.7.0
+#    image: snort-2.9.7.0-repo:latest
+#    container_name: snort-2.9.7.0-repo
+#    restart: always
 
 # Snort 2.9.9.0 from source
   agent-snort-2.9.9.0:
@@ -138,6 +134,29 @@ services:
     volumes:
       - ./dalton-agent:/opt/dalton-agent
 
+# Snort 2.9.7.5 from source
+#  agent-snort-2.9.7.5:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_snort
+#      args:
+#        - SNORT_VERSION=2.9.7.5
+#        - DAQ_VERSION=2.0.6
+#    image: snort-2.9.7.5:latest
+#    container_name: snort-2.9.7.5
+#    restart: always
+
+# Snort 2.9.3.1 from source
+#  agent-snort-2.9.3.1:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_snort
+#      args:
+#        - SNORT_VERSION=2.9.3.1
+#        - DAQ_VERSION=2.0.6
+#    image: snort-2.9.3.1:latest
+#    container_name: snort-2.9.3.1
+#    restart: always
 
 volumes:
   flask:
