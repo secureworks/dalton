@@ -26,6 +26,7 @@ from ruamel import yaml
 import base64
 import  cStringIO
 import traceback
+import subprocess
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -58,6 +59,7 @@ try:
     API_KEYS = dalton_config.get('dalton', 'api_keys')
     MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
     U2_ANALYZER = dalton_config.get('dalton', 'u2_analyzer')
+    RULECAT_SCRIPT = dalton_config.get('dalton', 'rulecat_script')
     DEBUG = dalton_config.getboolean('dalton', 'debug')
 except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
@@ -83,6 +85,25 @@ try:
     r = redis.Redis(REDIS_HOST)
 except Exception as e:
     logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
+
+# if there are no rules, use idstools rulecat to download a set for Suri and Snort
+if os.path.exists(RULECAT_SCRIPT):
+    for engine in ['suricata', 'snort']:
+        ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
+        rules = [f for f in os.listdir(ruleset_dir) if (os.path.isfile(os.path.join(ruleset_dir, f)) and f.endswith(".rules"))]
+        if len(rules) == 0:
+            filename = "ET-%s-all-%s.rules" % (datetime.datetime.utcnow().strftime("%Y%m%d"), engine)
+            logger.info("No rulesets for %s found. Downloading the latest ET set as '%s'" % (engine, filename))
+            if engine == "suricata":
+                url = "https://rules.emergingthreats.net/open/suricata-1.3/emerging.rules.tar.gz"
+            if engine == "snort":
+                url = "https://rules.emergingthreats.net/open/snort-2.9.0/emerging.rules.tar.gz"
+            command = "python %s --url %s --merged %s" % (RULECAT_SCRIPT, url, os.path.join(ruleset_dir, filename))
+            try:
+                subprocess.call(command, stdin=None, stdout=None, stderr=None, shell=True)
+            except Exception as e:
+                logger.info("Unable to download ruleset for %s" % engine)
+                logger.debug("Exception: %s" % e)
 
 sensor_tech_re = re.compile(r"^[a-zA-Z0-9\x2D\x2E\x5F]+$")
 
