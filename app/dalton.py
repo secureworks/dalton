@@ -160,10 +160,13 @@ def get_rulesets(engine=''):
         if not os.path.isfile(os.path.join(ruleset_dir, file)):
             continue
         if  os.path.splitext(file)[1] == '.rules':
-            # add full path or base or both?
-            ruleset_list.append([file, os.path.join(ruleset_dir, file)])
-    return ruleset_list
+            # just add file (base) for now so we can sort; build 2D list on return
+            ruleset_list.append(os.path.basename(file))
+    #sort
+    ruleset_list.sort(reverse=True)
 
+    # return 2D array with base and full path
+    return [[file, os.path.join(ruleset_dir, file)] for file in ruleset_list] 
 
 def set_job_status_msg(jobid, msg):
     """set a job's status message """
