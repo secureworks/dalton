@@ -21,8 +21,6 @@ WORKDIR /opt/dalton
 # getting whole lib for now but just use u2spewfoo.py
 COPY requirements.txt /opt/dalton/requirements.txt
 RUN pip install -r requirements.txt
-RUN pip install https://github.com/jasonish/py-idstools/archive/master.zip
-RUN ln -s /usr/local/lib/python2.7/dist-packages/idstools/scripts/u2spewfoo.py /usr/local/bin/u2spewfoo.py
 
 COPY app /opt/dalton/app
 COPY run.py /opt/dalton/run.py
@@ -34,7 +32,7 @@ COPY engine-configs /opt/dalton/engine-configs
 
 RUN rm /etc/nginx/nginx.conf && ln -s /opt/dalton/res/etc/nginx/nginx.conf  /etc/nginx/nginx.conf && \
     rm -rf /etc/nginx/conf.d && ln -s /opt/dalton/res/etc/nginx/conf.d /etc/nginx/conf.d && \
-    ln -s /opt/dalton/res/etc/supervisord.conf /etc/supervisord.conf 
+    ln -s /opt/dalton/res/etc/supervisord.conf /etc/supervisord.conf
 
 
 CMD supervisord -c /etc/supervisord.conf
