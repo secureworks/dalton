@@ -1042,17 +1042,17 @@ def page_coverage_summary():
                 config = yaml.round_trip_load(conf_file, version=(1,1), preserve_quotes=True)
                 # add in vars
                 vars_config = yaml.safe_load(vars, version=(1,1))
-                # add some common
+                # add some IP vars common to some rulesets
+                v2add = {'RFC1918': "[10.0.0.0/8,192.168.0.0/16,172.16.0.0/12]"
+                        }
                 try:
-                    if 'RFC1918' not in vars_config['vars']['address-groups']:
-                        vars_config['vars']['address-groups']['RFC1918'] = '[10.0.0.0/8,192.168.0.0/16,172.16.0.0/12]'
+                    for v in v2add:
+                        if v not in vars_config['vars']['address-groups']:
+                            vars_config['vars']['address-groups'][v] = v2add[v]
                 except Exception as e:
                     logger.warn("Problem customizing variables; your YAML may be bad. %s" % e)
                     logger.debug("%s" % traceback.format_exc())
-                logger.debug("vars_config:\n%s" % vars_config)
-                #AAAA
                 config.update(vars_config)
-                logger.debug("config:\n%s" % config)
                 # first, do rule includes
                 # should references to other rule files be removed?
                 removeOtherRuleFiles = True
