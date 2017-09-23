@@ -1022,6 +1022,11 @@ def page_coverage_summary():
         if not vars:
             delete_temp_files(job_id)
             return page_coverage_default(request.form.get('sensor_tech'),"No variables defined.")
+        # pre-set IP vars to add to the config if they don't exist.
+        # this helps with some rulesets that may use these variables
+        # but the variables aren't in the default config.
+        ipv2add = {'RFC1918': "[10.0.0.0/8,192.168.0.0/16,172.16.0.0/12]"
+                  }
 
         conf_file = request.form.get('custom_engineconf')
         if not conf_file:
@@ -1042,8 +1047,15 @@ def page_coverage_summary():
                 config = yaml.round_trip_load(conf_file, version=(1,1), preserve_quotes=True)
                 # add in vars
                 vars_config = yaml.safe_load(vars, version=(1,1))
+                # add some IP vars common to some rulesets
+                try:
+                    for v in ipv2add:
+                        if v not in vars_config['vars']['address-groups']:
+                            vars_config['vars']['address-groups'][v] = ipv2add[v]
+                except Exception as e:
+                    logger.warn("(Not Fatal) Problem customizing Suricata variables; your YAML may be bad. %s" % e)
+                    logger.debug("%s" % traceback.format_exc())
                 config.update(vars_config)
-
                 # first, do rule includes
                 # should references to other rule files be removed?
                 removeOtherRuleFiles = True
@@ -1155,10 +1167,9 @@ def page_coverage_summary():
                     else:
                         config['outputs'].append(dns_config)
 
-                    # Don't try to enable eve-log since it is unformatted and redundant in many cases
+                    # Don't try to enable eve-log since it is unformatted and redundant in many cases.
                     # But in case it is enabled, set the filename and disable EVE tls since you
                     # can't have tls log to file AND be included in the EVE log.
-                    # NOTE: I'm not even sure this Suri config is valid YAML 1.1 ....
                     try:
                         # set filename
                         config['outputs'][olist.index('eve-log')]['eve-log']['filename'] = "dalton-eve.json"
@@ -1193,7 +1204,7 @@ def page_coverage_summary():
                         config['profiling']['rules']['filename'] = "dalton-rule_perf.log"
                         config['profiling']['rules']['json'] = False
                     # keyword profiling
-                    # is this supported by older Suri versions?
+                    # is this supported by older Suri versions? If not Suri will ignore when loading YAML
                     if 'keywords' in config['profiling']:
                         config['profiling']['keywords'] = {'enabled': True, \
                                                            'filename': "dalton-keyword_perf.log", \
@@ -1227,32 +1238,40 @@ def page_coverage_summary():
                         delete_temp_files(job_id)
                         return page_coverage_default(request.form.get('sensor_tech'),"Invalid variable definition. Must be 'var', 'portvar', or 'ipvar': %s" % line)
                     vars_fh.write("%s\n" % line)
+                # add some IP vars common to some rulesets
+                try:
+                    for v in ipv2add:
+                        if not "\nipvar %s" % v in vars and not vars.startswith("ipvar %s" % v):
+                            vars_fh.write("ipvar %s %s" % (v, ipv2add[v]))
+                except Exception as e:
+                    logger.warn("(Not Fatal) Problem customizing Snort variables: %s" % e)
+                    logger.debug("%s" % traceback.format_exc())
 
-                    # tweak Snort conf file
-                    if bTrackPerformance:
-                        new_conf = ''
-                        perf_found = False
-                        # splitlines without 'True' arg removes ending newline char(s)
-                        lines = iter(conf_file.splitlines())
-                        while True:
-                            try:
-                                line = next(lines)
-                                # might as well strip out comments
-                                if line.lstrip(' ').startswith('#') or line.lstrip(' ').rstrip(' ') == '': continue
-                                if line.startswith("config profile_rules:"):
-                                    perf_found = True
-                                    while line.endswith("\\"):
-                                        line = line.rstrip('\\') + next(lines)
-                                    if "filename " in line:
-                                        line = re.sub(r'filename\s+[^\s\x2C]+', 'filename dalton-rule_perf.log', line)
-                                    else:
-                                        line += ", filename dalton-rule_perf.log append"
-                                new_conf += "%s\n" % line
-                            except StopIteration:
-                                break
-                        if not perf_found:
-                            new_conf += "\nconfig profile_rules: print 1000, sort avg_ticks, filename dalton-rule_perf.log append"
-                        conf_file = new_conf
+                # tweak Snort conf file
+                if bTrackPerformance:
+                    new_conf = ''
+                    perf_found = False
+                    # splitlines without 'True' arg removes ending newline char(s)
+                    lines = iter(conf_file.splitlines())
+                    while True:
+                        try:
+                            line = next(lines)
+                            # might as well strip out comments
+                            if line.lstrip(' ').startswith('#') or line.lstrip(' ').rstrip(' ') == '': continue
+                            if line.startswith("config profile_rules:"):
+                                perf_found = True
+                                while line.endswith("\\"):
+                                    line = line.rstrip('\\') + next(lines)
+                                if "filename " in line:
+                                    line = re.sub(r'filename\s+[^\s\x2C]+', 'filename dalton-rule_perf.log', line)
+                                else:
+                                    line += ", filename dalton-rule_perf.log append"
+                            new_conf += "%s\n" % line
+                        except StopIteration:
+                            break
+                    if not perf_found:
+                        new_conf += "\nconfig profile_rules: print 1000, sort avg_ticks, filename dalton-rule_perf.log append"
+                    conf_file = new_conf
 
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_snort.conf" % job_id)
             else:
