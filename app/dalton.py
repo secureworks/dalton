@@ -15,6 +15,7 @@ import datetime
 import time
 import json
 import zipfile
+import tarfile
 import sys
 import shutil
 from distutils.version import LooseVersion
@@ -27,6 +28,7 @@ import base64
 import  cStringIO
 import traceback
 import subprocess
+import random
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -770,6 +772,75 @@ def page_show_job(jid):
 
         return render_template('/dalton/job.html', overview=overview,page = '', jobid = jid, ids=ids, perf=perf, alert=alert, error=error, debug=debug, total_time=total_time, tech=tech, custom_rules=custom_rules, alert_detailed=alert_detailed, other_logs=other_logs)
 
+# sanitize passed in filename (string) and make it POSIX (fully portable)
+def clean_filename(filename):
+    return re.sub(r"[^a-zA-Z0-9\_\-\.]", "_", filename)
+
+# extracts files from an archive and add them to the list to be
+#  included with the Dalton job
+def extract_pcaps(archivename, pcap_files, job_id):
+    global TEMP_STORAGE_PATH
+    # Note: archivename already sanitized
+    logger.debug("Attempting to extract pcaps from  file '%s'" % os.path.basename(archivename))
+    count = random.randrange(101, 16313375)
+    if archivename.lower().endswith('.zip'):
+        try:
+            zf = zipfile.ZipFile(archivename, mode='r')
+            for file in zf.namelist():
+                logger.debug("Processing file '%s' from ZIP archive" % file)
+                if file.endswith('/'):
+                    continue
+                filename = clean_filename(os.path.basename(file))
+                if os.path.splitext(filename)[1].lower() != ".pcap" and os.path.splitext(filename)[1].lower() != ".pcapng":
+                    logger.warn("Not adding file '%s' from archive '%s': '.pcap' or '.pcapng' extension required." % (file, os.path.basename(archivename)))
+                    # just skip the file, and move on (and log it)
+                    continue
+                # handle duplicate filenames (e.g. same pcap sumbitted more than once)
+                for pcap in pcap_files:
+                    if pcap['filename'] == filename:
+                        filename = "%s_%s_%d.pcap" % (os.path.splitext(filename)[0], job_id, count)
+                        break
+                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                fh = open(pcappath, 'wb')
+                fh.write(zf.read(file))
+                fh.close()
+                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                count += 1
+            zf.close()
+        except Exception as e:
+            logger.error("Issue extracting ZIP file '%s': %s" % (os.path.basename(archivename), e))
+            logger.debug("%s" % traceback.format_exc())
+    else:
+        try:
+            archive = tarfile.open(archivename, mode="r:*")
+            for file in archive.getmembers():
+                logger.debug("Processing file '%s' from archive" % file.name)
+                if not file.isfile():
+                    continue
+                filename = clean_filename(os.path.basename(file.name))
+                if os.path.splitext(filename)[1].lower() != ".pcap" and os.path.splitext(filename)[1].lower() != ".pcapng":
+                    logger.warn("Not adding file '%s' from archive '%s': '.pcap' or '.pcapng' extension required." % (file.name, os.path.basename(archivename)))
+                    # just skip the file, and move on (and log it)
+                    continue
+                # handle duplicate filenames (e.g. same pcap sumbitted more than once)
+                for pcap in pcap_files:
+                    if pcap['filename'] == filename:
+                        filename = "%s_%s_%d.pcap" % (os.path.splitext(filename)[0], job_id, count)
+                        break
+                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                fh = open(pcappath, 'wb')
+                contentsfh = archive.extractfile(file)
+                fh.write(contentsfh.read())
+                fh.close()
+                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                logger.debug("Added %s" % filename)
+                count += 1
+            archive.close()
+        except Exception as e:
+            logger.error("Issue extracting tar file '%s': %s" % (os.path.basename(archivename), e))
+            logger.debug("%s" % traceback.format_exc())
+    return
+
 #  abstracting the job submission method away from the HTTP POST and creating this
 #   function so that it can be called easier (e.g. from an API)
 def submit_job():
@@ -796,24 +867,45 @@ def page_coverage_summary():
     # get the user who submitted the job .. not implemented
     user = "undefined"
 
+    #generate job_id based of pcap filenames and timestamp
+    digest.update(str(datetime.datetime.now()))
+    job_id = digest.hexdigest()[0:16]   #this is a temporary job id for the filename
+
+    #store the pcaps offline temporarily
+    # make temp job directory so there isn't a race condition if more
+    #  than one person submits a pcap with the same filename at the same time
+    if os.path.exists(os.path.join(TEMP_STORAGE_PATH, job_id)):
+        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
+    os.makedirs(os.path.join(TEMP_STORAGE_PATH, job_id))
+
     # grab the user submitted files from the web form (max number of arbitrary files allowed on the web form is 5)
     # note that these are file handle objects? have to get filename using .filename
     MAX_PCAP_FILES = 5
+    # list of dicts that have filename: and pcappath: entries for pcap files on disk to include in job
+    pcap_files = []
     form_pcap_files = []
     for i in range(MAX_PCAP_FILES):
         try:
             pcap_file = request.files['coverage-pcap%d' % i]
             if (pcap_file != None and pcap_file.filename != None and pcap_file.filename != '<fdopen>' and (len(pcap_file.filename) > 0) ):
-                form_pcap_files.append(pcap_file)
-                digest.update(pcap_file.filename)
+                if os.path.splitext(pcap_file.filename)[1].lower() in ['.zip', '.tar', '.gz', '.tgz', '.gizp', '.bz2']:
+                    filename = clean_filename(os.path.basename(pcap_file.filename))
+                    filename = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                    pcap_file.save(filename)
+                    extract_pcaps(filename, pcap_files, job_id)
+                else:
+                    form_pcap_files.append(pcap_file)
         except:
+            logger.debug("%s" % traceback.format_exc())
             pass
 
-    if len(form_pcap_files) == 0:
+    if len(form_pcap_files) == 0 and len(pcap_files) == 0:
         #throw an error, no pcaps submitted
+        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
         return page_coverage_default(request.form.get('sensor_tech'),'You must specify a PCAP file.')
     elif (request.form.get('optionProdRuleset') == None and request.form.get('optionCustomRuleset') == None):
         #throw an error, no rules defined
+        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
         return page_coverage_default(request.form.get('sensor_tech'),'You must specify at least one ruleset.')
     else:
         #get the sensor technology and queue name
@@ -828,34 +920,16 @@ def page_coverage_summary():
                     break
         if not valid_sensor_tech:
             logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, \'%s\'" % (user, sensor_tech))
+            shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
             return render_template('/dalton/error.html', jid="<not_defined>", msg="There are no sensors that support sensor technology \'%s\'." % sensor_tech)
-
-        #generate job_id based of pcap filenames and timestamp
-        digest.update(str(datetime.datetime.now()))
-        job_id = digest.hexdigest()[0:16]   #this is a temporary job id for the filename
-
-        #store the pcaps offline temporarily
-        # make temp job directory so there isn't a race condition if more
-        #  than one person submits a pcap with the same filename at the same time
-        if os.path.exists("%s/%s" % (TEMP_STORAGE_PATH, job_id)):
-            shutil.rmtree("%s/%s" % (TEMP_STORAGE_PATH, job_id))
-        os.makedirs("%s/%s" % (TEMP_STORAGE_PATH, job_id))
-
-        pcap_files = []
 
         # process files from web form
         count = 0
         for pcap_file in form_pcap_files:
-            filename = pcap_file.filename
+            filename = os.path.basename(pcap_file.filename)
             # do some input validation on the filename and try to do some accommodation to preserve original pcap filename
-            filename = filename.replace(' ', '_')
-            filename = filename.replace('\t', '_')
-            filename = filename.replace('&', '_')
-            filename = filename.replace('~', '_')
-            if not re.match('^[a-zA-Z0-9\_\-\.]*$', filename):
-                filename = 'coverage%d_%s.pcap' % (count, job_id)
-            else:
-                if not os.path.splitext(filename)[1] == '.pcap':
+            filename = clean_filename(filename)
+            if os.path.splitext(filename)[1] != '.pcap':
                     filename = "%s.pcap" % filename
             # handle duplicate filenames (e.g. same pcap sumbitted more than once)
             for pcap in pcap_files:
@@ -869,7 +943,7 @@ def page_coverage_summary():
 
         # If multiple files submitted to Suricata, merge them here since
         #  Suricata can only read one file.
-        if len(pcap_files) > 1:
+        if len(pcap_files) > 1 and sensor_tech.startswith("suri"):
             if not MERGECAP_BINARY:
                 logger.error("No mergecap binary; unable to merge pcaps for Suricata job.")
                 return render_template('/dalton/error.html', jid="<not_defined>", msg="No mergecap binary found on Dalton Controller.  Unable to process multiple pcaps for this Suricata job.")
@@ -1311,7 +1385,7 @@ def page_coverage_summary():
                     if not prod_ruleset_name.endswith(".rules"):
                         prod_ruleset_name = "%s.rules" % prod_ruleset_name
                 logger.debug("ruleset_path = %s" % ruleset_path)
-                logger.debug("Dalton in page_coverage_summary():\n    prod_ruleset_name: %s" % (prod_ruleset_name))
+                logger.debug("Dalton in page_coverage_summary():   prod_ruleset_name: %s" % (prod_ruleset_name))
                 if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
                     delete_temp_files(job_id)
                     return render_template('/dalton/error.html', jid=jid, msg="Invalid ruleset submitted: '%s'. Path/name invalid." % prod_ruleset_name)
