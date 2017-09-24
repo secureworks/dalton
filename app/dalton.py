@@ -785,6 +785,10 @@ def extract_pcaps(archivename, pcap_files, job_id):
     count = random.randrange(101, 16313375)
     if archivename.lower().endswith('.zip'):
         try:
+            if not zipfile.is_zipfile(archivename):
+                msg = "File '%s' is not recognized as a valid zip file." % os.path.basename(archivename)
+                logger.error(msg)
+                return msg
             zf = zipfile.ZipFile(archivename, mode='r')
             for file in zf.namelist():
                 logger.debug("Processing file '%s' from ZIP archive" % file)
@@ -808,14 +812,17 @@ def extract_pcaps(archivename, pcap_files, job_id):
                 count += 1
             zf.close()
         except Exception as e:
-            logger.error("Issue extracting ZIP file '%s': %s" % (os.path.basename(archivename), e))
+            msg = "Problem extracting ZIP file '%s': %s" % (os.path.basename(archivename), e)
+            logger.error(msg)
             logger.debug("%s" % traceback.format_exc())
+            return msg
     else:
         try:
             archive = tarfile.open(archivename, mode="r:*")
             for file in archive.getmembers():
                 logger.debug("Processing file '%s' from archive" % file.name)
                 if not file.isfile():
+                    logger.warn("Not adding member '%s' from archive '%s': not a file." % (file.name, os.path.basename(archivename)))
                     continue
                 filename = clean_filename(os.path.basename(file.name))
                 if os.path.splitext(filename)[1].lower() != ".pcap" and os.path.splitext(filename)[1].lower() != ".pcapng":
@@ -837,9 +844,11 @@ def extract_pcaps(archivename, pcap_files, job_id):
                 count += 1
             archive.close()
         except Exception as e:
-            logger.error("Issue extracting tar file '%s': %s" % (os.path.basename(archivename), e))
+            msg = "Problem extracting archive file '%s': %s" % (os.path.basename(archivename), e)
+            logger.error(msg)
             logger.debug("%s" % traceback.format_exc())
-    return
+            return msg
+    return None
 
 #  abstracting the job submission method away from the HTTP POST and creating this
 #   function so that it can be called easier (e.g. from an API)
@@ -892,7 +901,10 @@ def page_coverage_summary():
                     filename = clean_filename(os.path.basename(pcap_file.filename))
                     filename = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
                     pcap_file.save(filename)
-                    extract_pcaps(filename, pcap_files, job_id)
+                    err_msg = extract_pcaps(filename, pcap_files, job_id)
+                    if err_msg:
+                        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
+                        return render_template('/dalton/error.html', jid='', msg=err_msg)
                 else:
                     form_pcap_files.append(pcap_file)
         except:
