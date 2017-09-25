@@ -16,6 +16,8 @@ import time
 import json
 import zipfile
 import tarfile
+import gzip
+import bz2
 import sys
 import shutil
 from distutils.version import LooseVersion
@@ -776,13 +778,22 @@ def page_show_job(jid):
 def clean_filename(filename):
     return re.sub(r"[^a-zA-Z0-9\_\-\.]", "_", filename)
 
+# handle duplicate filenames (e.g. same pcap sumbitted more than once)
+#  by renaming pcaps with same name
+def handle_dup_names(filename, pcap_files, job_id, dupcount):
+    for pcap in pcap_files:
+        if pcap['filename'] == filename:
+            filename = "%s_%s_%d.pcap" % (os.path.splitext(filename)[0], job_id, dupcount[0])
+            dupcount[0] += 1
+            break
+    return filename
+
 # extracts files from an archive and add them to the list to be
 #  included with the Dalton job
-def extract_pcaps(archivename, pcap_files, job_id):
+def extract_pcaps(archivename, pcap_files, job_id, dupcount):
     global TEMP_STORAGE_PATH
     # Note: archivename already sanitized
     logger.debug("Attempting to extract pcaps from  file '%s'" % os.path.basename(archivename))
-    count = random.randrange(101, 16313375)
     if archivename.lower().endswith('.zip'):
         try:
             if not zipfile.is_zipfile(archivename):
@@ -799,20 +810,53 @@ def extract_pcaps(archivename, pcap_files, job_id):
                     logger.warn("Not adding file '%s' from archive '%s': '.pcap' or '.pcapng' extension required." % (file, os.path.basename(archivename)))
                     # just skip the file, and move on (and log it)
                     continue
-                # handle duplicate filenames (e.g. same pcap sumbitted more than once)
-                for pcap in pcap_files:
-                    if pcap['filename'] == filename:
-                        filename = "%s_%s_%d.pcap" % (os.path.splitext(filename)[0], job_id, count)
-                        break
+                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
                 pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
                 fh = open(pcappath, 'wb')
                 fh.write(zf.read(file))
                 fh.close()
                 pcap_files.append({'filename': filename, 'pcappath': pcappath})
-                count += 1
             zf.close()
         except Exception as e:
             msg = "Problem extracting ZIP file '%s': %s" % (os.path.basename(archivename), e)
+            logger.error(msg)
+            logger.debug("%s" % traceback.format_exc())
+            return msg
+    elif os.path.splitext(archivename)[1].lower() in ['.gz', '.gzip'] and \
+         os.path.splitext(os.path.splitext(archivename)[0])[1].lower() not in ['.tar']:
+        # gzipped file
+        try:
+            filename =  os.path.basename(os.path.splitext(archivename)[0])
+            logger.debug("Decompressing gzipped file '%s'" % filename)
+            with gzip.open(archivename, 'rb') as gz:
+                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
+                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                fh = open(pcappath, 'wb')
+                fh.write(gz.read())
+                fh.close()
+                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                logger.debug("Added %s" % filename)
+        except Exception as e:
+            msg = "Problem extracting gzip file '%s': %s" % (os.path.basename(archivename), e)
+            logger.error(msg)
+            logger.debug("%s" % traceback.format_exc())
+            return msg
+    elif os.path.splitext(archivename)[1].lower() in ['.bz2'] and \
+         os.path.splitext(os.path.splitext(archivename)[0])[1].lower() not in ['.tar']:
+        # bzip2 file
+        try:
+            filename =  os.path.basename(os.path.splitext(archivename)[0])
+            logger.debug("Decompressing bzip2 file '%s'" % filename)
+            with bz2.BZ2File(archivename, 'rb') as bz:
+                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
+                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                fh = open(pcappath, 'wb')
+                fh.write(bz.read())
+                fh.close()
+                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                logger.debug("Added %s" % filename)
+        except Exception as e:
+            msg = "Problem extracting bzip2 file '%s': %s" % (os.path.basename(archivename), e)
             logger.error(msg)
             logger.debug("%s" % traceback.format_exc())
             return msg
@@ -829,11 +873,7 @@ def extract_pcaps(archivename, pcap_files, job_id):
                     logger.warn("Not adding file '%s' from archive '%s': '.pcap' or '.pcapng' extension required." % (file.name, os.path.basename(archivename)))
                     # just skip the file, and move on (and log it)
                     continue
-                # handle duplicate filenames (e.g. same pcap sumbitted more than once)
-                for pcap in pcap_files:
-                    if pcap['filename'] == filename:
-                        filename = "%s_%s_%d.pcap" % (os.path.splitext(filename)[0], job_id, count)
-                        break
+                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
                 pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
                 fh = open(pcappath, 'wb')
                 contentsfh = archive.extractfile(file)
@@ -841,7 +881,6 @@ def extract_pcaps(archivename, pcap_files, job_id):
                 fh.close()
                 pcap_files.append({'filename': filename, 'pcappath': pcappath})
                 logger.debug("Added %s" % filename)
-                count += 1
             archive.close()
         except Exception as e:
             msg = "Problem extracting archive file '%s': %s" % (os.path.basename(archivename), e)
@@ -855,6 +894,8 @@ def extract_pcaps(archivename, pcap_files, job_id):
 def submit_job():
     logger.debug("submit_job() called")
     # never finished coding this...
+    # TODO: API call that accepts a job zipfile and queues it up for an agent?
+    #       would have to beef up input validation on agent probably....
 
 @dalton_blueprint.route('/dalton/coverage/summary', methods=['POST'])
 #@auth_required()
@@ -878,6 +919,7 @@ def page_coverage_summary():
 
     #generate job_id based of pcap filenames and timestamp
     digest.update(str(datetime.datetime.now()))
+    digest.update(str(random.randrange(96313375)))
     job_id = digest.hexdigest()[0:16]   #this is a temporary job id for the filename
 
     #store the pcaps offline temporarily
@@ -893,15 +935,17 @@ def page_coverage_summary():
     # list of dicts that have filename: and pcappath: entries for pcap files on disk to include in job
     pcap_files = []
     form_pcap_files = []
+    # make this a list so I can pass by reference
+    dupcount = [0]
     for i in range(MAX_PCAP_FILES):
         try:
             pcap_file = request.files['coverage-pcap%d' % i]
             if (pcap_file != None and pcap_file.filename != None and pcap_file.filename != '<fdopen>' and (len(pcap_file.filename) > 0) ):
-                if os.path.splitext(pcap_file.filename)[1].lower() in ['.zip', '.tar', '.gz', '.tgz', '.gizp', '.bz2']:
+                if os.path.splitext(pcap_file.filename)[1].lower() in ['.zip', '.tar', '.gz', '.tgz', '.gzip', '.bz2']:
                     filename = clean_filename(os.path.basename(pcap_file.filename))
                     filename = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
                     pcap_file.save(filename)
-                    err_msg = extract_pcaps(filename, pcap_files, job_id)
+                    err_msg = extract_pcaps(filename, pcap_files, job_id, dupcount)
                     if err_msg:
                         shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
                         return render_template('/dalton/error.html', jid='', msg=err_msg)
@@ -936,7 +980,6 @@ def page_coverage_summary():
             return render_template('/dalton/error.html', jid="<not_defined>", msg="There are no sensors that support sensor technology \'%s\'." % sensor_tech)
 
         # process files from web form
-        count = 0
         for pcap_file in form_pcap_files:
             filename = os.path.basename(pcap_file.filename)
             # do some input validation on the filename and try to do some accommodation to preserve original pcap filename
@@ -944,12 +987,8 @@ def page_coverage_summary():
             if os.path.splitext(filename)[1] != '.pcap':
                     filename = "%s.pcap" % filename
             # handle duplicate filenames (e.g. same pcap sumbitted more than once)
-            for pcap in pcap_files:
-                if pcap['filename'] == filename:
-                    filename = "%s_%s_%d.pcap" % (os.path.splitext(filename)[0], job_id, count)
-                    break
+            filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
             pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
-            count += 1
             pcap_files.append({'filename': filename, 'pcappath': pcappath})
             pcap_file.save(pcappath)
 
