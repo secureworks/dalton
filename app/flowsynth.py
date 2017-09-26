@@ -10,10 +10,8 @@ import random
 import tempfile
 
 from flask import Blueprint, render_template, request, Response, redirect
-
-#these should be a part of the Dalton globals (TODO)
-PCAP_PATH='/tmp/pcaps/'
-BIN_PATH='/opt/flowsynth/'
+from dalton import FS_BIN_PATH as BIN_PATH
+from dalton import FS_PCAP_PATH as PCAP_PATH
 
 # setup the flowsynth blueprint
 flowsynth_blueprint = Blueprint('flowsynth_blueprint', __name__, template_folder='templates/')

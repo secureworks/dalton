@@ -59,6 +59,11 @@ try:
     MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
     U2_ANALYZER = dalton_config.get('dalton', 'u2_analyzer')
     DEBUG = dalton_config.getboolean('dalton', 'debug')
+
+    #options for flowsynth
+    FS_BIN_PATH = dalton_config.get('flowsynth-web', 'bin_path')    #Path to the flowsynth application
+    FS_PCAP_PATH = dalton_config.get('flowsynth-web', 'pcap_path')  #Path to temporarily store PCAPs
+
 except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
