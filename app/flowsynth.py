@@ -223,6 +223,10 @@ def compile_fs():
 def compile_page():
     return render_template('/pcapwg/compile.html', page='compile')
 
+@flowsynth_blueprint.route('/about')
+def about_page():
+    return render_template('/pcapwg/about.html', page='about')
+
 @flowsynth_blueprint.route('/pcap/get_pcap/<pcapid>')
 def retrieve_pcap(pcapid):
     """returns a PCAP to the user"""
