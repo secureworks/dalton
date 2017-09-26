@@ -1460,85 +1460,6 @@ def page_coverage_summary():
                     # if these options are set, modify ruleset accordingly
                     if bEnableAllRules or bShowFlowbitAlerts:
                         modified_rules_path = "%s/%s_prod_modified.rules" % (TEMP_STORAGE_PATH, job_id)
-                        ### begin superfluous code (see possible_negated_vars comment)
-                        modified_vars_file = "%s/%s_variables_modified.conf" % (TEMP_STORAGE_PATH, job_id)
-                        # not populated at the moment so most of the below code is
-                        #  unnecessary.  (Enable flowbits rules code still used.)
-                        possible_negated_vars = []
-                        RFC_1918 = '[10.0.0.0/8,192.168.0.0/16,172.16.0.0/12]'
-
-                        # load all variables into variables_dict dictionary
-                        variables_dict = {}
-                        if bEnableAllRules:
-                            if sensor_tech.startswith('suri'):
-                                # this is YAML; we could use some YAML libs to parse but probably overkill.
-                                # Assumming at least 4 spaces before variable definitions
-                                # TODO: think thru this a little more
-                                regex = re.compile(r"^\s{4,}(?P<name>[^\x3A\x23]+)\x3A\s+[\x22\x27]?(?P<value>[^\x22\x27]+)")
-                            else:
-                                # can add other sensor formats with elif clauses
-                                # this is for Snort:
-                                regex = re.compile(r"^(ip)?var\s+(?P<name>[^\s]+)\s+(?P<value>.*)")
-
-                            variables_fh = open(vars_file, 'rb')
-                            for line in variables_fh:
-                                if sensor_tech.startswith('snort'):
-                                    line = line.lstrip()
-                                result = regex.search(line)
-                                if result:
-                                    variables_dict[result.group('name')] = result.group('value')
-                            variables_fh.close()
-
-                        # disable some rules to prevent errors from !any rules;
-                        # this is a simple hack although if you wanted you could parse all
-                        # rules to identify !any situations but I don't think that is
-                        # necessary at this point.
-                        #
-                        # do variable expansion on variables_dict
-                        for var in variables_dict.keys():
-                            original_var_value = variables_dict[var]
-                            count = 0
-                            while variables_dict[var][0] == '$':
-                                newvar = variables_dict[var].lstrip('$')
-                                # check to see if referenced variable is valid
-                                if newvar in variables_dict:
-                                    variables_dict[var] = variables_dict[newvar]
-                                else:
-                                    # referenced variable does not exist; reset value back to original and let engine throw the error
-                                    variables_dict[var] = original_var_value
-                                    break
-                                count += 1
-                                if count > 100:
-                                    # variable loop (or overly long expansion) encountered; reset value back to original and let engine throw the error
-                                    variables_dict[var] = original_var_value
-                                    break
-
-                        # Sometimes there are variables that are set to 'any' by default but are used
-                        # in a negated context in the (disabled by default) ruleset.  Set those vars to RFC1918 if that is the case.
-                        # Only do this if enable all rules is selected since !any rules should not be enabled in a default ruleset.
-                        if bEnableAllRules:
-                            vars_fh = open(vars_file, 'rb')
-                            modified_vars_fh = open(modified_vars_file, 'wb')
-                            for line in vars_fh:
-                                for var in possible_negated_vars:
-                                    if var in line and var in variables_dict and variables_dict[var] == 'any':
-                                        if sensor_tech.startswith('suri'):
-                                            regex = re.compile(r"^\s{4}" + re.escape(var) + r"\s*\x3A\s+[\x22\x27]?(?P<value>[^\x22\x27]+)")
-                                        else:
-                                            regex = re.compile(r"^(ip)?var\s+" + re.escape(var) + r"\s+(?P<value>.*)")
-                                        result = regex.search(line)
-                                        if result:
-                                            value = result.group('value')
-                                            new_line = re.sub(re.escape(value), RFC_1918, line, 1)
-                                            line = new_line
-                                            break
-                                modified_vars_fh.write(line)
-                            modified_vars_fh.close()
-                            vars_fh.close()
-                            vars_file = modified_vars_file
-                        ### end superfluous code (see possible_negated_vars comment)
-
-
                         regex = re.compile(r"^#+\s*(alert|log|pass|activate|dynamic|drop|reject|sdrop)\s")
                         prod_rules_fh = open(ruleset_path, 'rb')
                         modified_rules_fh = open(modified_rules_path, 'wb')
@@ -1559,6 +1480,7 @@ def page_coverage_summary():
                 if request.form.get('optionCustomRuleset') and request.form.get('custom_ruleset'):
                     zf.write(custom_rules_file, arcname='dalton-custom.rules')
             except:
+                logger.warn("Problem adding custom rules: %s" % e)
                 pass
             if vars_file:
                 zf.write(vars_file, arcname='variables.conf')
