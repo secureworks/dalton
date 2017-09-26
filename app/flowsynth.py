@@ -34,21 +34,25 @@ def payload_raw(formobj):
 
     return synth
 
+def payload_http(request):
+    """parse and generate an http payload"""
 
-# TODO
-def payload_http(formobj):
-    """parse a http payload"""
     # the raw flowsynth we'll return
     synth = ""
+
     # we must have a request header.
-    request_header = unicode_safe(formobj['request_header']).strip("\r\n")
-    request_body = unicode_safe(formobj['request_body']).strip("\r\n")
+    request_header = unicode_safe(request.form.get('request_header')).strip("\r\n")
+    request_body = unicode_safe(request.form.get('request_body')).strip("\r\n")
     request_body_len = len(request_body) - (request_body.count("\\x") * 3)
+
+    #the start of the flowsynth
     synth = 'default > (content:"%s";' % fs_replace_badchars(request_header)
-    if 'payload_http_request_contentlength' in formobj:
+
+    if 'payload_http_request_contentlength' in request.form:
         # calculate request content length
         if (request_body != ""):
             synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, request_body_len)
+
     # add an 0d0a0d0a
     synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
     if (request_body != ""):
@@ -56,24 +60,28 @@ def payload_http(formobj):
         synth = '%s content:"%s"; );\n' % (synth, fs_replace_badchars(request_body))
     else:
         synth = '%s );\n' % synth
-    if 'payload_http_response' in formobj:
+
+    if 'payload_http_response' in request.form:
         # include http response
-        response_header = unicode_safe(formobj['response_header']).strip("\r\n")
-        response_body = unicode_safe(formobj['response_body']).strip("\r\n")
+        response_header = unicode_safe(request.form.get('response_header')).strip("\r\n")
+        response_body = unicode_safe(request.form.get('response_body')).strip("\r\n")
         response_body_len = len(response_body) - (response_body.count("\\x") * 3)
+
         synth = '%sdefault < (content:"%s";' % (synth, fs_replace_badchars(response_header))
-        if 'payload_http_response_contentlength' in formobj:
+
+        if 'payload_http_response_contentlength' in request.form:
             # calculate response content-length
             if (response_body != ""):
                 synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, response_body_len)
+
         # add an 0d0a0d0a
         synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
         if (response_body != ""):
             synth = '%s content:"%s"; );\n' % (synth, fs_replace_badchars(response_body))
         else:
             synth = '%s );\n' % synth
-    return synth
 
+    return synth
 
 # TODO
 def payload_cert(request):
