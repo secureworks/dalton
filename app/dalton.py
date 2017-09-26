@@ -144,9 +144,8 @@ def delete_temp_files(job_id):
         for file in glob.glob(os.path.join(TEMP_STORAGE_PATH, "%s*" % job_id)):
             if os.path.isfile(file):
                 os.unlink(file)
-    if os.path.exists("%s/%s" % (TEMP_STORAGE_PATH, job_id)):
-        shutil.rmtree("%s/%s" % (TEMP_STORAGE_PATH, job_id))
-
+    if os.path.exists(os.path.join(TEMP_STORAGE_PATH, job_id)):
+        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
 
 def verify_temp_storage_path():
     """verify and create if necessary the temp location where we will store files (PCAPs, configs, etc.)
@@ -545,15 +544,15 @@ def post_job_results(jobid):
             #  code but this works and should be compatible and
             #  incorporate any future changes/improvements to the
             #  script
-            u2_file = os.path.join(TEMP_STORAGE_PATH, "unified2_%s_%s" % (jobid, SENSOR_HASH))
+            u2_file = os.path.join(TEMP_STORAGE_PATH, "%s_unified2_%s" % (jobid, SENSOR_HASH))
             u2_fh = open(u2_file, "wb")
             u2_fh.write(base64.b64decode(result_obj['alert_detailed']))
             u2_fh.close()
             u2spewfoo_command = "%s %s" % (U2_ANALYZER, u2_file)
             logger.debug("Processing unified2 data with command: '%s'" % u2spewfoo_command)
             alert_detailed = subprocess.Popen(u2spewfoo_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
-            # delete u2 file?
-            #os.unlink(u2_file)
+            # delete u2 file
+            os.unlink(u2_file)
         except Exception as e:
             logger.error("Problem parsing unified2 data from Agent.  Error: %s" % e)
             alert_detailed = ""
@@ -632,7 +631,7 @@ def sensor_get_job(id):
         return Response(filedata,mimetype="application/zip", headers={"Content-Disposition":"attachment;filename=%s.zip" % id})
     else:
         logger.error("Dalton in sensor_get_job(): could not find job %s at %s." % (id, path))
-        return render_template('/dalton/error.html', jid=id, msg="Job %s does not exist on disk.  It is either invalid or has been deleted." % id)
+        return render_template('/dalton/error.html', jid=id, msg=["Job %s does not exist on disk.  It is either invalid or has been deleted." % id])
 
 
 def clear_old_agents():
@@ -683,14 +682,14 @@ def page_coverage_default(sensor_tech, error=None):
     sensor_tech = sensor_tech.split('-')[0]
     conf_dir = "%s/%s" % (CONF_STORAGE_PATH, sensor_tech)
     if sensor_tech is None:
-        return render_template('/dalton/error.html', jid='', msg="No Sensor technology selected for job.")
+        return render_template('/dalton/error.html', jid='', msg=["No Sensor technology selected for job."])
     elif not re.match("^[a-zA-Z0-9\_\-\.]+$", sensor_tech):
-        return render_template('/dalton/error.html', jid='', msg="Invalid Sensor technology requested: %s" % sensor_tech)
+        return render_template('/dalton/error.html', jid='', msg=["Invalid Sensor technology requested: %s" % sensor_tech])
     elif sensor_tech == 'summary':
-        return render_template('/dalton/error.html', jid='', msg="Page expired.  Please resubmit your job or access it from the queue.")
+        return render_template('/dalton/error.html', jid='', msg=["Page expired.  Please resubmit your job or access it from the queue."])
 
     if not os.path.isdir(conf_dir):
-        return render_template('/dalton/error.html', jid='', msg="No engine configuration directory for '%s' found (%s)." % (sensor_tech, conf_dir))
+        return render_template('/dalton/error.html', jid='', msg=["No engine configuration directory for '%s' found (%s)." % (sensor_tech, conf_dir)])
 
 
     # get list of rulesets based on engine
@@ -748,7 +747,7 @@ def page_show_job(jid):
         # job doesn't exist
         # expire (delete) all keys related to the job just in case to prevent memory leaks
         expire_all_keys(jid)
-        return render_template('/dalton/error.html', jid=jid, msg="Invalid Job ID. Job may have expired.  By default, jobs are only kept for %d seconds; teapot jobs are kept for %s seconds." % (REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE))
+        return render_template('/dalton/error.html', jid=jid, msg=["Invalid Job ID. Job may have expired.", "By default, jobs are only kept for %d seconds; teapot jobs are kept for %s seconds." % (REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE)])
     elif int(status) != STAT_CODE_DONE:
         # job is queued or running
         return render_template('/dalton/coverage-summary.html', page='', job_id=jid, tech=tech)
@@ -960,8 +959,8 @@ def page_coverage_summary():
                     pcap_file.save(filename)
                     err_msg = extract_pcaps(filename, pcap_files, job_id, dupcount)
                     if err_msg:
-                        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
-                        return render_template('/dalton/error.html', jid='', msg=err_msg)
+                        delete_temp_files(job_id)
+                        return render_template('/dalton/error.html', jid='', msg=[err_msg])
                 else:
                     form_pcap_files.append(pcap_file)
         except:
@@ -970,12 +969,12 @@ def page_coverage_summary():
 
     if len(form_pcap_files) == 0 and len(pcap_files) == 0:
         #throw an error, no pcaps submitted
-        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
-        return page_coverage_default(request.form.get('sensor_tech'),'You must specify a PCAP file.')
+        delete_temp_files(job_id)
+        return render_template('/dalton/error.html', jid='', msg=["You must specify a PCAP file."])
     elif (request.form.get('optionProdRuleset') == None and request.form.get('optionCustomRuleset') == None):
         #throw an error, no rules defined
-        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
-        return page_coverage_default(request.form.get('sensor_tech'),'You must specify at least one ruleset.')
+        delete_temp_files(job_id)
+        return render_template('/dalton/error.html', jid='', msg=["You must specify at least one ruleset."])
     else:
         #get the sensor technology and queue name
         sensor_tech = request.form.get('sensor_tech')
@@ -989,8 +988,8 @@ def page_coverage_summary():
                     break
         if not valid_sensor_tech:
             logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, \'%s\'" % (user, sensor_tech))
-            shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
-            return render_template('/dalton/error.html', jid="<not_defined>", msg="There are no sensors that support sensor technology \'%s\'." % sensor_tech)
+            delete_temp_files(job_id)
+            return render_template('/dalton/error.html', jid='', msg=["There are no sensors that support sensor technology \'%s\'." % sensor_tech])
 
         # process files from web form
         for pcap_file in form_pcap_files:
@@ -1010,7 +1009,8 @@ def page_coverage_summary():
         if len(pcap_files) > 1 and sensor_tech.startswith("suri"):
             if not MERGECAP_BINARY:
                 logger.error("No mergecap binary; unable to merge pcaps for Suricata job.")
-                return render_template('/dalton/error.html', jid="<not_defined>", msg="No mergecap binary found on Dalton Controller.  Unable to process multiple pcaps for this Suricata job.")
+                delete_temp_files(job_id)
+                return render_template('/dalton/error.html', jid=job_id, msg=["No mergecap binary found on Dalton Controller.", "Unable to process multiple pcaps for this Suricata job."])
             combined_file = "%s/combined-%s.pcap" % (os.path.join(TEMP_STORAGE_PATH, job_id), job_id)
             mergecap_command = "%s -w %s -F pcap %s" % (MERGECAP_BINARY, combined_file, ' '.join([p['pcappath'] for p in pcap_files]))
             logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s" % ', '.join([p['filename'] for p in pcap_files]))
@@ -1020,11 +1020,13 @@ def page_coverage_summary():
                 if len(mergecap_output) > 0:
                     # return error?
                     logger.error("Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
-                    return render_template('/dalton/error.html', jid="<not_defined>", msg="Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
+                    delete_temp_files(job_id)
+                    return render_template('/dalton/error.html', jid="<not_defined>", msg=["Error merging pcaps with command:", "%s" % mergecap_command, "Output:", "%s" % (mergecap_command, mergecap_output)])
                 pcap_files = [{'filename': os.path.basename(combined_file), 'pcappath': combined_file}]
             except Exception as e:
                 logger.error("Could not merge pcaps.  Error: %s" % e)
-                return render_template('/dalton/error.html', jid="<not_defined>", msg="Could not merge pcaps.  Error: %s" % e)
+                delete_temp_files(job_id)
+                return render_template('/dalton/error.html', jid='', msg=["Could not merge pcaps.  Error:", " %s" % e])
 
         # get enable all rules option
         bEnableAllRules = False
@@ -1117,34 +1119,34 @@ def page_coverage_summary():
                 if (len(line) > 0) and not re.search(r'^[\x00-\x7F]+$', line):
                     fh.close()
                     delete_temp_files(job_id)
-                    return page_coverage_default(request.form.get('sensor_tech'),"Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules. Please encode necesary non-ASCII characters appropriately.  Rule:  %s" % line)
+                    return render_template('/dalton/error.html', jid='', msg=["Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules.", "Please encode necesary non-ASCII characters appropriately.  Rule:", " %s" % line])
                 # some rule validation for Snort and Suricata
                 if sensor_tech.startswith('snort') or sensor_tech.startswith('suri'):
                     # rule must start with alert|log|pass|activate|dynamic|drop|reject|sdrop
                     if not re.search(r'^(alert|log|pass|activate|dynamic|drop|reject|sdrop|event_filter|threshold|suppress|rate_filter|detection_filter)\s', line):
                         fh.close()
                         delete_temp_files(job_id)
-                        return page_coverage_default(request.form.get('sensor_tech'),"Invalid rule, action (first word in rule) of \'%s\' not supported.  Rule: %s" % (line.split()[0], line))
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule, action (first word in rule) of \'%s\' not supported.  Rule:" % line.split()[0], "%s" % line])
 
                     # rule must end in closing parenthesis
                     if not line.endswith(')') and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         fh.close()
                         delete_temp_files(job_id)
-                        return page_coverage_default(request.form.get('sensor_tech'),"Invalid rule, does not end with closing parenthesis.  Rule: %s" % line)
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule; does not end with closing parenthesis.  Rule:", "%s" % line])
 
                     # last keyword in the rule must be terminated by a semicolon
                     if not line[:-1].rstrip().endswith(';') and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         fh.close()
                         delete_temp_files(job_id)
-                        return page_coverage_default(request.form.get('sensor_tech'),"Invalid rule, last rule option must end with semicolon.  Rule:  %s" % line)
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule, last rule option must end with semicolon.  Rule:",  "%s" % line])
 
                     # add sid if not included
                     if not re.search(r'(\s|\x3B)sid\s*\:\s*\d+\s*\x3B', line) and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         # if no sid in rule, fix automatically instead of throwing an error
-                        #return page_coverage_default(request.form.get('sensor_tech'),"\'sid\' not specified in rule, this will error.  Rule: %s" % line)
+                        #return render_template('/dalton/error.html', jid='', msg=["\'sid\' not specified in rule, this will error.  Rule:", "%s" % line])
                         line = re.sub(r'\x29$', " sid:%d;)" % (sid_base + sid_offset), line)
                         sid_offset += 1
                 # including newline because it was removed earlier with rstrip()
@@ -1153,13 +1155,13 @@ def page_coverage_summary():
 
         if not sensor_tech:
             delete_temp_files(job_id)
-            return render_template('/dalton/error.html', jid="<not_defined>", msg="Variable \'sensor_tech\' not specified.  Please reload the submission page and try again.")
+            return render_template('/dalton/error.html', jid="<not_defined>", msg=["Variable \'sensor_tech\' not specified.  Please reload the submission page and try again."])
 
         # get and write variables
         vars = request.form.get('custom_vars')
         if not vars:
             delete_temp_files(job_id)
-            return page_coverage_default(request.form.get('sensor_tech'),"No variables defined.")
+            return render_template('/dalton/error.html', jid='', msg=["No variables defined."])
         # pre-set IP vars to add to the config if they don't exist.
         # this helps with some rulesets that may use these variables
         # but the variables aren't in the default config.
@@ -1169,7 +1171,7 @@ def page_coverage_summary():
         conf_file = request.form.get('custom_engineconf')
         if not conf_file:
             delete_temp_files(job_id)
-            return page_coverage_default(request.form.get('sensor_tech'),"No configuration file provided.")
+            return render_template('/dalton/error.html', jid='', msg=["No configuration file provided."])
 
         if sensor_tech.startswith('suri'):
             #yaml-punch!
@@ -1356,7 +1358,7 @@ def page_coverage_summary():
                 logger.error("Problem processing YAML file(s): %s" % e)
                 logger.debug("%s" % traceback.format_exc())
                 delete_temp_files(job_id)
-                return page_coverage_default(request.form.get('sensor_tech'),"Error processing YAML file(s):\n%s" % e)
+                return render_template('/dalton/error.html', jid='', msg=["Error processing YAML file(s):", "%s" % e])
         else:
             engine_conf_file = None
             vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
@@ -1374,7 +1376,7 @@ def page_coverage_summary():
                     if not re.search(r'^(var|portvar|ipvar)\s', line):
                         vars_fh.close()
                         delete_temp_files(job_id)
-                        return page_coverage_default(request.form.get('sensor_tech'),"Invalid variable definition. Must be 'var', 'portvar', or 'ipvar': %s" % line)
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid variable definition. Must be 'var', 'portvar', or 'ipvar':", "%s" % line])
                     vars_fh.write("%s\n" % line)
                 # add some IP vars common to some rulesets
                 try:
@@ -1443,7 +1445,8 @@ def page_coverage_summary():
             if request.form.get('optionProdRuleset'):
                 ruleset_path = request.form.get('prod_ruleset')
                 if not ruleset_path:
-                    return render_template('/dalton/error.html', jid=jid, msg="No defined ruleset provided.")
+                    delete_temp_files(job_id)
+                    return render_template('/dalton/error.html', jid=jid, msg=["No defined ruleset provided."])
                 if not prod_ruleset_name: # if Suri job, this is already set above
                     prod_ruleset_name = os.path.basename(ruleset_path)
                     if not prod_ruleset_name.endswith(".rules"):
@@ -1452,7 +1455,7 @@ def page_coverage_summary():
                 logger.debug("Dalton in page_coverage_summary():   prod_ruleset_name: %s" % (prod_ruleset_name))
                 if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
                     delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid=jid, msg="Invalid ruleset submitted: '%s'. Path/name invalid." % prod_ruleset_name)
+                    return render_template('/dalton/error.html', jid=jid, msg=["Invalid ruleset submitted: '%s'." % prod_ruleset_name, "Path/name invalid."])
                 elif not os.path.exists(ruleset_path):
                     delete_temp_files(job_id)
                     return render_template('/dalton/error.html', jid=jid, msg="Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path))
