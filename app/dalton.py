@@ -81,10 +81,10 @@ try:
 except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
-if DEBUG:
+if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
     file_handler.setLevel(logging.DEBUG)
     logger.setLevel(logging.DEBUG)
-
+    logger.debug("DEBUG logging enabled")
 
 if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
     logger.error("mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap." % MERGECAP_BINARY)

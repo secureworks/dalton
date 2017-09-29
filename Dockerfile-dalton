@@ -22,4 +22,4 @@ COPY dalton.conf /opt/dalton/dalton.conf
 COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
-CMD python /opt/dalton/run.py
+CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf

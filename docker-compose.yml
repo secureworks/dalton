@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile-dalton
     image: dalton:latest
     container_name: dalton_controller
+    environment:
+      - CONTROLLER_DEBUG=${CONTROLLER_DEBUG}
     volumes:
       - ./app:/opt/dalton/app
       - ./run.py:/opt/dalton/run.py
@@ -18,12 +20,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-nginx
+      args:
+        - DALTON_EXTERNAL_PORT=${DALTON_EXTERNAL_PORT}
     image: nginx-dalton:latest
     container_name: dalton_web
-    # to listen on a different port externally change the first port number
-    #  to the desired value; e.g. to listen on 8080, specify "8080:80"
+    # to listen on a different port, edit the '.env' file
     ports:
-      - "80:80"
+      - "${DALTON_EXTERNAL_PORT}:80"
     restart: always
 
   redis:
@@ -44,6 +47,8 @@ services:
         - SURI_VERSION=current
     image: suricata-current:latest
     container_name: suricata-current
+    environment:
+      - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
 # Suricata 4.0.0 from source
@@ -117,15 +122,6 @@ services:
 ###### Snort Agents #######
 ###########################
 
-# Snort 2.9.7.0 from Ubuntu Repos
-#  agent-snort:
-#    build:
-#      context: ./dalton-agent
-#      dockerfile: Dockerfiles/Dockerfile_snort-2.9.7.0
-#    image: snort-2.9.7.0-repo:latest
-#    container_name: snort-2.9.7.0-repo
-#    restart: always
-
 # Snort 2.9.9.0 from source
   agent-snort-2.9.9.0:
     build:
@@ -136,6 +132,8 @@ services:
         - DAQ_VERSION=2.0.6
     image: snort-2.9.9.0:latest
     container_name: snort-2.9.9.0
+    environment:
+      - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
 #    # for debugging; can remove for prod
@@ -178,3 +176,13 @@ services:
 #    image: snort-2.9.1.1:latest
 #    container_name: snort-2.9.1.1
 #    restart: always
+
+# Snort 2.9.7.0 from Ubuntu Repos
+#  agent-snort:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_snort-2.9.7.0
+#    image: snort-2.9.7.0-repo:latest
+#    container_name: snort-2.9.7.0-repo
+#    restart: always
+
