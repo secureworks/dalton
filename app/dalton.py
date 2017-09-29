@@ -93,9 +93,11 @@ if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
 if not os.path.exists(U2_ANALYZER):
     logger.error("U2 Analyzer '%s' not found.  Cannot process alert details." % U2_ANALYZER)
     U2_ANALYZER = None
-if  U2_ANALYZER.endswith(".py"):
+elif  U2_ANALYZER.endswith(".py"):
     # assumes 'python' binary in path
     U2_ANALYZER = "%s %s" % ("python", U2_ANALYZER)
+else:
+    logger.error("U2 Analyzer '%s' does not end in .py.  Cannot process alert details." % U2_ANALYZER)
 
 #connect to the datastore
 try:
@@ -537,7 +539,7 @@ def post_job_results(jobid):
         time = ""
     # alert_detailed is base64 encoded unified2 binary data
     alert_detailed = ""
-    if 'alert_detailed' in result_obj:
+    if 'alert_detailed' in result_obj and U2_ANALYZER:
         try:
             # write to disk and pass to u2spewfoo.py; we could do
             #  myriad other things here like modify or import that
