@@ -100,17 +100,16 @@ except Exception, e:
 #***************
 
 file_handler = RotatingFileHandler('/var/log/dalton-agent.log', 'a', 1 * 1024 * 1024, 10)
-if DEBUG:
-    file_handler.setLevel(logging.DEBUG)
-else:
-    file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
 #file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
 logger = logging.getLogger("dalton-agent")
 logger.addHandler(file_handler)
-if DEBUG:
+if DEBUG or ("AGENT_DEBUG" in os.environ and int(os.getenv("AGENT_DEBUG"))):
+    file_handler.setLevel(logging.DEBUG)
     logger.setLevel(logging.DEBUG)
+    logger.debug("DEBUG logging enabled")
 else:
+    file_handler.setLevel(logging.INFO)
     logger.setLevel(logging.INFO)
 
 #************************************************
