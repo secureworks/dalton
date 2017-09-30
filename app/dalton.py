@@ -355,10 +355,17 @@ def get_engine_conf_file(sensor):
                 #  yes/no to true/false, Suri will throw an error when parsing the YAML
                 #  even though true/false are valid boolean valued for YAML 1.1.  ruamel.yaml
                 #  will normalize unquoted booleans to true/false so quoting them here to
-                #  preserve the yes/no.  This could/should? also be done on submission.
+                #  preserve the yes/no.  This also done on submission..
                 contents = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', contents)
                 # suri uses YAML 1.1
                 config = yaml.round_trip_load(contents, version=(1,1), preserve_quotes=True)
+                # usually I try not to mess with the config here since the user should set
+                # desired defaults in the yaml on disk.  But if the logging level is 'notice',
+                # that is next to useless and setting it to 'info' won't hurt anything and will
+                # provide some useful info such as number of rules loaded.
+                if "logging" in config and "default-log-level" in config['logging'] and config['logging']['default-log-level']  == "notice":
+                    config['logging']['default-log-level']  = "info"
+
                 # pull out vars and dump
                 variables = yaml.round_trip_dump({'vars': config.pop('vars', None)})
                 # (depending on how you do it) the YAML verison gets added back

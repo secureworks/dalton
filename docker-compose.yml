@@ -62,6 +62,17 @@ services:
 #    container_name: suricata-4.0.0
 #    restart: always
 
+# Suricata 3.2.3 from source
+  agent-suricata-3.2.3:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_suricata
+      args:
+        - SURI_VERSION=3.2.3
+    image: suricata-3.2.3:latest
+    container_name: suricata-3.2.3
+    restart: always
+
 # Suricata 3.1.4 from source
 #  agent-suricata-3.1.4:
 #    build:
@@ -71,17 +82,6 @@ services:
 #        - SURI_VERSION=3.1.4
 #    image: suricata-3.1.4:latest
 #    container_name: suricata-3.1.4
-#    restart: always
-
-# Suricata 3.2.3 from source
-#  agent-suricata-3.2.3:
-#    build:
-#      context: ./dalton-agent
-#      dockerfile: Dockerfiles/Dockerfile_suricata
-#      args:
-#        - SURI_VERSION=3.2.3
-#    image: suricata-3.2.3:latest
-#    container_name: suricata-3.2.3
 #    restart: always
 
 # Suricata 2.0.9 from source
