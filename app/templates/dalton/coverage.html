@@ -19,15 +19,17 @@
 		}
 		if ($('#optionCustomVars').prop('checked')) {
 			$('#custom_vars').show();
-            $('#ShowHideOptionCustomVars').find('i').removeClass('icon-chevron-right').addClass('icon-chevron-down');
+            $('#showHideOptionCustomVars').find('i').removeClass('icon-chevron-right').addClass('icon-chevron-down');
 		} else {
 			$('#custom_vars').hide();
-            $('#ShowHideOptionCustomVars').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
+            $('#showHideOptionCustomVars').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
 		}
 		if ($('#optionCustomEngineConf').prop('checked')) {
 			$('#custom_engineconf').show();
+            $('#showHideOptionCustomEngineConf').find('i').removeClass('icon-chevron-right').addClass('icon-chevron-down');
 		} else {
 			$('#custom_engineconf').hide();
+            $('#showHideOptionCustomEngineConf').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
 		}
 
 		for(i=1; i < MAX_PCAP_FILES; i++) {
@@ -63,7 +65,7 @@
 			}
 		});
 
-		$('#ShowHideOptionCustomVars').click( function() {
+		$('#showHideOptionCustomVars').click( function() {
             $(this).find('i').toggleClass('icon-chevron-right').toggleClass('icon-chevron-down');
 		    $('#custom_vars').toggle();
             if ($('#custom_vars').is(':visible')) {
@@ -73,12 +75,14 @@
             }
    		});
 
-		$('#optionCustomEngineConf').click( function() {
-			if ($('#optionCustomEngineConf').prop('checked')) {
-				$('#custom_engineconf').show();
-			} else {
-				$('#custom_engineconf').hide();
-			}
+		$('#showHideOptionCustomEngineConf').click( function() {
+            $(this).find('i').toggleClass('icon-chevron-right').toggleClass('icon-chevron-down');
+		    $('#custom_engineconf').toggle();
+            if ($('#custom_engineconf').is(':visible')) {
+                $('#optionCustomEngineConf').prop('checked', true);
+            } else {
+                $('#optionCustomEngineConf').prop('checked', false);
+            }
 		});
 
 		$('#addpcap').click( function() {
@@ -240,18 +244,18 @@
 							</span>
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Variables</div>
                                 <input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom" style="display:none;">
-								AAAModify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
-                                <br><a id="ShowHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
+								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
+                                <br><a id="showHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
                                 <p>
 							<span id="custom_vars">
 								<textarea rows='25' cols='50' style='width: 1000px;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
 							</span>
 							
-                            <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration Files</div>
-                            <label class="checkbox">
-                                <input type="checkbox" name="optionCustomEngineConf" id="optionCustomEngineConf" value="custom">
+                            <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration File</div>
+                                <input type="checkbox" name="optionCustomEngineConf" id="optionCustomEngineConf" value="custom" style="display:none;">
                                 Modify {{ sensor_tech.split('-')[0]|title }} configuration{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
-                            </label>
+                                <br><a id="showHideOptionCustomEngineConf" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
+                                <p>
                             <span id="custom_engineconf">
                                 <textarea rows='25' cols='50' style='width: 1000px;' name="custom_engineconf" id="custom_engineconf_t">{{ engine_conf }}</textarea>
                             </span>
