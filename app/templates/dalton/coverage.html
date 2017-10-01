@@ -19,8 +19,10 @@
 		}
 		if ($('#optionCustomVars').prop('checked')) {
 			$('#custom_vars').show();
+            $('#ShowHideOptionCustomVars').find('i').removeClass('icon-chevron-right').addClass('icon-chevron-down');
 		} else {
 			$('#custom_vars').hide();
+            $('#ShowHideOptionCustomVars').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
 		}
 		if ($('#optionCustomEngineConf').prop('checked')) {
 			$('#custom_engineconf').show();
@@ -61,13 +63,15 @@
 			}
 		});
 
-		$('#optionCustomVars').click( function() {
-			if ($('#optionCustomVars').prop('checked')) {
-				$('#custom_vars').show();
-			} else {
-				$('#custom_vars').hide();
-			}
-		});
+		$('#ShowHideOptionCustomVars').click( function() {
+            $(this).find('i').toggleClass('icon-chevron-right').toggleClass('icon-chevron-down');
+		    $('#custom_vars').toggle();
+            if ($('#custom_vars').is(':visible')) {
+                $('#optionCustomVars').prop('checked', true);
+            } else {
+                $('#optionCustomVars').prop('checked', false);
+            }
+   		});
 
 		$('#optionCustomEngineConf').click( function() {
 			if ($('#optionCustomEngineConf').prop('checked')) {
@@ -235,10 +239,10 @@
 								<textarea rows='10' cols='80' style='width: 1000px;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"");'></textarea>
 							</span>
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Variables</div>
-							<label class="checkbox">
-								<input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom">
-								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
-							</label>
+                                <input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom" style="display:none;">
+								AAAModify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
+                                <br><a id="ShowHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
+                                <p>
 							<span id="custom_vars">
 								<textarea rows='25' cols='50' style='width: 1000px;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
 							</span>
