@@ -232,27 +232,26 @@
 							<span id="custom_ruleset">
 								<textarea rows='10' cols='80' style='width: 1000px;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"");'></textarea>
 							</span>
-							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Performance</div>
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Logs</div>
+							<label class="checkbox">
+								<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed">
+							    Pcap records from alerts
+                            </label>
+                            {% if sensor_tech.startswith('suri') %}
+                                <label class="checkbox">
+                                    <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs">
+                                    Other logs (Alert Debug, HTTP, TLS, DNS, etc.)
+                                </label>
+                            {% endif %}
 							<label class="checkbox">
 								<input type="checkbox" name="optionPerf" id="optionPerf" value="perf">
-								Enable rule profiling
-							</label>			
+								Rule profiling
+							</label>
                             {% if sensor_tech.startswith('suri') %}
                                 <label class="checkbox">
                                     <input type="checkbox" name="optionFastPattern" id="optionFastPattern" value="optionFastPattern">
-                                    Generate fast pattern info
+                                    Fast pattern info
                                 </label>
-                            {% endif %}
-							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Other</div>
-							<label class="checkbox">
-								<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed">
-							    Include detailed alerts (unified2 data including pcap data from alerts)
-                            </label>
-                            {% if sensor_tech.startswith('suri') %}
-                            <label class="checkbox">
-                                <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs">
-                                Return all other logs
-                            </label>
                             {% endif %}
 						</div>
 
