@@ -149,12 +149,13 @@
 				<p>Test pcaps on an IDS sensor against defined and/or ad-hoc rulesets.</p>
 				<div class="tabbable tabs-left">
 					<ul class="nav nav-tabs">
-						<li class='active'><a href="#pcapdetails" data-toggle='tab'>Packet Capture</a></li>
-						<li><a href="#sensorconf" data-toggle='tab'>Sensor Configuration</a></li>
-						<li><a href="#notification" data-toggle='tab'>Notification Options</a></li>
+						<li class='active'><a href="#jobdetails" data-toggle='tab'>Job Settings</a></li>
+						<li><a href="#sensorconf" data-toggle='tab'>Config Files</a></li>
 					</ul>
 					<div class="tab-content">
-						<div class="tab-pane active" id="pcapdetails">
+
+						<div class="tab-pane active" id="jobdetails">
+							<div style="display:block;width:100%;padding:0;margin-botton:5x;font-size:21px;line-height:40px;color:#333;border:0;">Packet Catpures</div>
                             <p>Please specify a packet capture (libpcap). Depending on the engine, pcapng format may be supported as well.</p>
                             <!-- TODO: generate this dynamically via JavaScript -->
 							<input type="file" name="coverage-pcap0" id="coverage-pcap0" placeholder='Select a PCAP'><p/>
@@ -180,22 +181,11 @@
 								&nbsp;|&nbsp;
 							</div>
 							<div id="resetpcap" style="display:inline;">
-								<a href="#">Reset</a>
+								<a href="#">Reset Pcaps</a>
 							</div>
-	
-						</div>
 
-                        <!-- TODO: remove this -->
-						<div class="tab-pane" id="notification">
-							<label class="checkbox">
-								<input type="checkbox" id='notify_owner' name='send_email'> Email me results
-							</label>
-							<label>Email Address:</label>
-							<input type="text" name="email_address" value="" placeholder="james.dalton@roadhouse.oisf.net">
-						</div>
 
-						<div class="tab-pane" id="sensorconf">
-							<div style="display:block;width:100%;padding:0;margin-botton:5x;font-size:21px;line-height:40px;color:#333;border:0;">Sensor Version</div>
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Sensor Version</div>
                                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
                                     {% for sensor in sensors %}
                                         <!-- TODO: make this a grid insead of a list -->
@@ -242,24 +232,6 @@
 							<span id="custom_ruleset">
 								<textarea rows='10' cols='80' style='width: 1000px;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"");'></textarea>
 							</span>
-							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Variables</div>
-                                <input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom" style="display:none;">
-								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
-                                <br><a id="showHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
-                                <p>
-							<span id="custom_vars">
-								<textarea rows='25' cols='50' style='width: 1000px;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
-							</span>
-							
-                            <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration File</div>
-                                <input type="checkbox" name="optionCustomEngineConf" id="optionCustomEngineConf" value="custom" style="display:none;">
-                                Modify {{ sensor_tech.split('-')[0]|title }} configuration{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
-                                <br><a id="showHideOptionCustomEngineConf" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
-                                <p>
-                            <span id="custom_engineconf">
-                                <textarea rows='25' cols='50' style='width: 1000px;' name="custom_engineconf" id="custom_engineconf_t">{{ engine_conf }}</textarea>
-                            </span>
-
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Performance</div>
 							<label class="checkbox">
 								<input type="checkbox" name="optionPerf" id="optionPerf" value="perf">
@@ -283,6 +255,29 @@
                             </label>
                             {% endif %}
 						</div>
+
+						<div class="tab-pane" id="sensorconf">
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;">Variables</div>
+                                <input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom" style="display:none;">
+								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
+                                <br><a id="showHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
+                                <p>
+							<span id="custom_vars">
+								<textarea rows='25' cols='50' style='width: 1000px;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
+							</span>
+							
+                            <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration File</div>
+                                <input type="checkbox" name="optionCustomEngineConf" id="optionCustomEngineConf" value="custom" style="display:none;">
+                                Modify {{ sensor_tech.split('-')[0]|title }} configuration{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
+                                <br><a id="showHideOptionCustomEngineConf" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
+                                <p>
+                            <span id="custom_engineconf">
+                                <textarea rows='25' cols='50' style='width: 1000px;' name="custom_engineconf" id="custom_engineconf_t">{{ engine_conf }}</textarea>
+                            </span>
+
+	
+						</div>
+
 					</div>
 				</div>
 
