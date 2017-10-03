@@ -1,6 +1,22 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
 	var MAX_PCAP_FILES = 5;
+
+    function updateHeading(version) {
+        var newstr = ''
+        if (version == undefined) {
+            version = $('input[name="sensor_tech"]:checked').val();
+        }
+        version = version.charAt(0).toUpperCase() + version.slice(1);
+        mysplit = version.split('-');
+        if (mysplit.length > 1) {
+             newstr = mysplit[0] + ' ' + mysplit.slice(1,).join('-');
+        } else {
+            newstr = version;
+        }
+        document.getElementById("versionHeading").innerHTML = newstr
+    }
+
 	$(document).ready(function() {
 		$('#prod_ruleset').show();
 		if ($('#optionRuleset').prop('checked')) {
@@ -116,15 +132,17 @@
 
         <!-- called when sensor version changed.  Updates engine.conf data AND variables -->
         $('input[name="sensor_tech"]').change( function() {
-            var new_engine_conf = $.get("/dalton/sensor_api/request_engine_conf/" + $(this).attr("id"), function( data ) {
+            var version = $(this).attr("id")
+            var new_engine_conf = $.get("/dalton/sensor_api/request_engine_conf/" + version, function( data ) {
                 if (data && data != '') {
                     confs = JSON.parse(data)
                     document.getElementById('custom_engineconf_t').value = confs.conf;
                     document.getElementById('custom_vars_t').value = confs.variables;
+                    updateHeading(version);
                 }
             });
         });
-
+        updateHeading();
     });
 {% endblock %}
 
@@ -138,13 +156,18 @@
 		<div class="span12">
 			<form id='submitjob' action="/dalton/coverage/summary" method="post" enctype="multipart/form-data">
 				<h2>
-				Submit A New Job for 
-                {% set tlist = sensor_tech.split('-') %}
-                {% if tlist|length > 1 %}
-                    {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+				Submit A New Job for <b id="versionHeading">
+                {% if sensors != None and sensors != '' and sensors|length > 0 %}
+                    {% set sensor = sensors[0].split('-') %}
+                    {% if sensor|length > 1 %}
+                        {{sensor[0]|title}} {{sensor[1:]|join('-')}}
+                    {% else %}
+                        {{sensor|title}}
+                    {% endif %}
                 {% else %}
                     {{sensor_tech|title}}
                 {% endif %}
+                </b>
 				</h2>
 				<p>Test pcaps on an IDS sensor against defined and/or ad-hoc rulesets.</p>
 				<div class="tabbable tabs-left">
@@ -155,7 +178,7 @@
 					<div class="tab-content">
 
 						<div class="tab-pane active" id="jobdetails">
-							<div style="display:block;width:100%;padding:0;margin-botton:5x;font-size:21px;line-height:40px;color:#333;border:0;">Packet Catpures</div>
+							<div style="display:block;width:100%;padding:0;margin-botton:5x;font-size:21px;line-height:40px;color:#333;border:0;">Packet Captures</div>
                             <p>Please specify a packet capture (libpcap). Depending on the engine, pcapng format may be supported as well.</p>
                             <!-- TODO: generate this dynamically via JavaScript -->
 							<input type="file" name="coverage-pcap0" id="coverage-pcap0" placeholder='Select a PCAP'><p/>
@@ -192,7 +215,7 @@
                                         <input type="radio" name="sensor_tech" id="{{sensor}}" value="{{sensor}}"{% if loop.first %} checked{% endif %}><label for="{{sensor}}" class="radio inline">
                                             {% set tlist = sensor.split('-') %}
                                             {% if tlist|length > 1 %}
-                                            {{tlist[1:]|join('-')}}
+                                                {{tlist[1:]|join('-')}}
                                             {% else %}
                                                 {{sensor|title}}
                                             {% endif %}
