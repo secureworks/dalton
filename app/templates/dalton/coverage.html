@@ -176,9 +176,8 @@
 						<li><a href="#sensorconf" data-toggle='tab'>Config Files</a></li>
 					</ul>
 					<div class="tab-content">
-
 						<div class="tab-pane active" id="jobdetails">
-							<div style="display:block;width:100%;padding:0;margin-botton:5x;font-size:21px;line-height:40px;color:#333;border:0;">Packet Captures</div>
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;font-size:21px;line-height:40px;color:#333;border:0;">Packet Captures</div>
                             <p>Please specify a packet capture (libpcap). Depending on the engine, pcapng format may be supported as well.</p>
                             <!-- TODO: generate this dynamically via JavaScript -->
 							<input type="file" name="coverage-pcap0" id="coverage-pcap0" placeholder='Select a PCAP'><p/>
@@ -277,9 +276,8 @@
                                 </label>
                             {% endif %}
 						</div>
-
 						<div class="tab-pane" id="sensorconf">
-							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;">Variables</div>
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;font-size:21px;line-height:40px;color:#333;border:0;">Variables</div>
                                 <input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom" style="display:none;">
 								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
                                 <br><a id="showHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
