@@ -78,6 +78,8 @@ try:
     U2_ANALYZER = dalton_config.get('dalton', 'u2_analyzer')
     RULECAT_SCRIPT = dalton_config.get('dalton', 'rulecat_script')
     DEBUG = dalton_config.getboolean('dalton', 'debug')
+    # no validation here that this value is sane and desired
+    FS_PCAP_PATH = dalton_config.getboolean('flowsynth-web', 'pcap_path')
 except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
@@ -165,7 +167,7 @@ def get_rulesets(engine=''):
     ruleset_list = []
     logger.debug("in get_rulesets(engine=%s)" % engine)
     # engine var should already be validated but just in case
-    if not re.match("^[a-zA-Z0-9\_\-\.]*$", engine):
+    if not re.match("r^[a-zA-Z0-9\_\-\.]*$", engine):
         logger.error("Invalid engine value '%s' in get_rulesets()" % engine)
         return ruleset_list
     ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
@@ -680,19 +682,33 @@ def page_sensor_default():
             sensors[sensor]['agent_version'] = "%s" % r.get("%s-agent_version" % sensor)
     return render_template('/dalton/sensor.html', page='', sensors=sensors)
 
+# validates passed in filename (should be from Flowsynth) to verify
+# that it exists and isn't trying to do something nefarious like
+# directory traversal
+def verify_fs_pcap(fspcap):
+    global FS_PCAP_PATH
+    # require fspcap to be POSIX fully portable filename
+    if not re.match(r"^[A-Za-z0-9_\x2D\x2E]+$", fspcap):
+        return "Bad pcap filename provided: '%s'" % (fspcap)
+    fspcap_path = os.path.join(FS_PCAP_PATH, fspcap)
+    logger.debug("Flowsynth pcap file passed: %s" % fspcap_path)
+    if not os.path.isfile(fspcap_path):
+        logger.error("fspcap file '%s' not found." % fspcap_path)
+        return "File not found: '%s'" % (fspcap)
+    return None
+
 @dalton_blueprint.route('/dalton/coverage/<sensor_tech>/', methods=['GET'])
 #@login_required()
 def page_coverage_default(sensor_tech, error=None):
     """the default coverage wizard page"""
     global CONF_STORAGE_PATH
     global r
-    #base_sensor_version = ''
     ruleset_dirs = []
     sensor_tech = sensor_tech.split('-')[0]
     conf_dir = "%s/%s" % (CONF_STORAGE_PATH, sensor_tech)
     if sensor_tech is None:
         return render_template('/dalton/error.html', jid='', msg=["No Sensor technology selected for job."])
-    elif not re.match("^[a-zA-Z0-9\_\-\.]+$", sensor_tech):
+    elif not re.match(r"^[a-zA-Z0-9\_\-\.]+$", sensor_tech):
         return render_template('/dalton/error.html', jid='', msg=["Invalid Sensor technology requested: %s" % sensor_tech])
     elif sensor_tech == 'summary':
         return render_template('/dalton/error.html', jid='', msg=["Page expired.  Please resubmit your job or access it from the queue."])
@@ -700,6 +716,16 @@ def page_coverage_default(sensor_tech, error=None):
     if not os.path.isdir(conf_dir):
         return render_template('/dalton/error.html', jid='', msg=["No engine configuration directory for '%s' found (%s)." % (sensor_tech, conf_dir)])
 
+    # pcap filename passed in from Flowsynth
+    fspcap = None
+    try:
+        fspcap = request.args['fspcap']
+        err = verify_fs_pcap(fspcap)
+        if err != None:
+            return render_template('/dalton/error.html', jid='', msg=["%s" % (err)])
+    except Exception as e:
+        logger.error("error with fspcap: %s\n\n%s" % (e,  traceback.format_exc()))
+        fspcap = None
 
     # get list of rulesets based on engine
     rulesets = get_rulesets(sensor_tech.split('-')[0])
@@ -743,7 +769,7 @@ def page_coverage_default(sensor_tech, error=None):
         # no sensors available. Job won't run be we can provide a default engine.conf anyway
         engine_conf = "# not found"
         variables = "# not found"
-    return render_template('/dalton/coverage.html', sensor_tech = sensor_tech,rulesets = rulesets, error=error, variables = variables, engine_conf = engine_conf, sensors=sensors)
+    return render_template('/dalton/coverage.html', sensor_tech = sensor_tech,rulesets = rulesets, error=error, variables = variables, engine_conf = engine_conf, sensors=sensors, fspcap=fspcap)
 
 @dalton_blueprint.route('/dalton/job/<jid>')
 #@auth_required()
@@ -1656,10 +1682,10 @@ def controller_api_get_request(jid, requested_data):
     valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'perf', 'tech', 'error', 'time', 'statcode', 'debug', 'status', 'submission_time', 'start_time', 'user', 'all')
     json_response = {'error':False, 'error_msg':None, 'data':None}
     # some input validation
-    if not re.match ('^(teapot_)?[a-zA-Z\d]+$', jid):
+    if not re.match (r'^(teapot_)?[a-zA-Z\d]+$', jid):
         json_response["error"] = True
         json_response["error_msg"] = "Invalid Job ID value: %s" % jid
-    elif not re.match('^[a-zA-Z\d\_\.\-]+$', requested_data):
+    elif not re.match(r'^[a-zA-Z\d\_\.\-]+$', requested_data):
         json_response["error"] = True
         json_response["error_msg"] = "Invalid request for data: %s" % requested_data
     else:
