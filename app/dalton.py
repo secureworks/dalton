@@ -79,7 +79,7 @@ try:
     RULECAT_SCRIPT = dalton_config.get('dalton', 'rulecat_script')
     DEBUG = dalton_config.getboolean('dalton', 'debug')
 
-    # options for flowsynth
+    #options for flowsynth
     FS_BIN_PATH = dalton_config.get('flowsynth-web', 'bin_path')    #Path to the flowsynth application
     FS_PCAP_PATH = dalton_config.get('flowsynth-web', 'pcap_path')  #Path to temporarily store PCAPs
 
