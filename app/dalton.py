@@ -2,6 +2,19 @@
 """
 Dalton - a UI and management tool for submitting and viewing IDS jobs
 """
+# Copyright 2017 Secureworks
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # app imports
 from flask import Blueprint, render_template, request, Response, redirect, url_for
@@ -15,6 +28,9 @@ import datetime
 import time
 import json
 import zipfile
+import tarfile
+import gzip
+import bz2
 import sys
 import shutil
 from distutils.version import LooseVersion
@@ -26,6 +42,8 @@ from ruamel import yaml
 import base64
 import  cStringIO
 import traceback
+import subprocess
+import random
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -58,6 +76,7 @@ try:
     API_KEYS = dalton_config.get('dalton', 'api_keys')
     MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
     U2_ANALYZER = dalton_config.get('dalton', 'u2_analyzer')
+    RULECAT_SCRIPT = dalton_config.get('dalton', 'rulecat_script')
     DEBUG = dalton_config.getboolean('dalton', 'debug')
 
     #options for flowsynth
@@ -67,10 +86,10 @@ try:
 except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
-if DEBUG:
+if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
     file_handler.setLevel(logging.DEBUG)
     logger.setLevel(logging.DEBUG)
-
+    logger.debug("DEBUG logging enabled")
 
 if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
     logger.error("mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap." % MERGECAP_BINARY)
@@ -79,15 +98,36 @@ if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
 if not os.path.exists(U2_ANALYZER):
     logger.error("U2 Analyzer '%s' not found.  Cannot process alert details." % U2_ANALYZER)
     U2_ANALYZER = None
-if  U2_ANALYZER.endswith(".py"):
+elif  U2_ANALYZER.endswith(".py"):
     # assumes 'python' binary in path
     U2_ANALYZER = "%s %s" % ("python", U2_ANALYZER)
+else:
+    logger.error("U2 Analyzer '%s' does not end in .py.  Cannot process alert details." % U2_ANALYZER)
 
 #connect to the datastore
 try:
     r = redis.Redis(REDIS_HOST)
 except Exception as e:
     logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
+
+# if there are no rules, use idstools rulecat to download a set for Suri and Snort
+if os.path.exists(RULECAT_SCRIPT):
+    for engine in ['suricata', 'snort']:
+        ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
+        rules = [f for f in os.listdir(ruleset_dir) if (os.path.isfile(os.path.join(ruleset_dir, f)) and f.endswith(".rules"))]
+        if len(rules) == 0:
+            filename = "ET-%s-all-%s.rules" % (datetime.datetime.utcnow().strftime("%Y%m%d"), engine)
+            logger.info("No rulesets for %s found. Downloading the latest ET set as '%s'" % (engine, filename))
+            if engine == "suricata":
+                url = "https://rules.emergingthreats.net/open/suricata-1.3/emerging.rules.tar.gz"
+            if engine == "snort":
+                url = "https://rules.emergingthreats.net/open/snort-2.9.0/emerging.rules.tar.gz"
+            command = "python %s --url %s --merged %s" % (RULECAT_SCRIPT, url, os.path.join(ruleset_dir, filename))
+            try:
+                subprocess.call(command, stdin=None, stdout=None, stderr=None, shell=True)
+            except Exception as e:
+                logger.info("Unable to download ruleset for %s" % engine)
+                logger.debug("Exception: %s" % e)
 
 sensor_tech_re = re.compile(r"^[a-zA-Z0-9\x2D\x2E\x5F]+$")
 
@@ -111,9 +151,8 @@ def delete_temp_files(job_id):
         for file in glob.glob(os.path.join(TEMP_STORAGE_PATH, "%s*" % job_id)):
             if os.path.isfile(file):
                 os.unlink(file)
-    if os.path.exists("%s/%s" % (TEMP_STORAGE_PATH, job_id)):
-        shutil.rmtree("%s/%s" % (TEMP_STORAGE_PATH, job_id))
-
+    if os.path.exists(os.path.join(TEMP_STORAGE_PATH, job_id)):
+        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
 
 def verify_temp_storage_path():
     """verify and create if necessary the temp location where we will store files (PCAPs, configs, etc.)
@@ -131,7 +170,7 @@ def get_rulesets(engine=''):
     ruleset_list = []
     logger.debug("in get_rulesets(engine=%s)" % engine)
     # engine var should already be validated but just in case
-    if not re.match("^[a-zA-Z0-9\_\-\.]*$", engine):
+    if not re.match(r"^[a-zA-Z0-9\_\-\.]*$", engine):
         logger.error("Invalid engine value '%s' in get_rulesets()" % engine)
         return ruleset_list
     ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
@@ -144,10 +183,13 @@ def get_rulesets(engine=''):
         if not os.path.isfile(os.path.join(ruleset_dir, file)):
             continue
         if  os.path.splitext(file)[1] == '.rules':
-            # add full path or base or both?
-            ruleset_list.append([file, os.path.join(ruleset_dir, file)])
-    return ruleset_list
+            # just add file (base) for now so we can sort; build 2D list on return
+            ruleset_list.append(os.path.basename(file))
+    #sort
+    ruleset_list.sort(reverse=True)
 
+    # return 2D array with base and full path
+    return [[file, os.path.join(ruleset_dir, file)] for file in ruleset_list] 
 
 def set_job_status_msg(jobid, msg):
     """set a job's status message """
@@ -260,25 +302,14 @@ def get_engine_conf_file(sensor):
         conf_file = None
         vars_file = None
         (engine, version) = sensor.split('-', 1)
-        epath = "%s/%s" % (CONF_STORAGE_PATH, engine)
-        files = [f for f in os.listdir(epath) if os.path.isfile(os.path.join(epath, f))]
-        found_files = []
-        while len(found_files) == 0:
-            for file in files:
-                if file.startswith(sensor):
-                    found_files.append(file)
-            new_sensor = sensor.rsplit('.', 1)[0]
-            if new_sensor == sensor:
-                if sensor == engine:
-                    break
-                else:
-                    sensor = engine
-            else:
-                sensor = new_sensor
-
-        if len(found_files) > 0:
-            # if multiple matches, get the one with the longest filename as that is assumed to be more specific
-            conf_file = os.path.join(epath, sorted(found_files, key=lambda x: len(x))[0])
+        epath = os.path.join(CONF_STORAGE_PATH, engine)
+        filelist = [f for f in os.listdir(epath) if os.path.isfile(os.path.join(epath, f))]
+        # assumes an extension (e.g. '.yaml', '.conf') on engine config files
+        files = [f for f in filelist if LooseVersion(os.path.splitext(f)[0]) <= LooseVersion(sensor)]
+        if len(files) > 0:
+            files.sort(key=lambda v:LooseVersion(os.path.splitext(v)[0]), reverse=True)
+            conf_file = os.path.join(epath, files[0])
+        logger.debug("in get_engine_conf_file: passed sensor value: '%s', conf file used: '%s'" % (sensor, os.path.basename(conf_file)))
 
         engine_config = ''
         variables = ''
@@ -329,10 +360,17 @@ def get_engine_conf_file(sensor):
                 #  yes/no to true/false, Suri will throw an error when parsing the YAML
                 #  even though true/false are valid boolean valued for YAML 1.1.  ruamel.yaml
                 #  will normalize unquoted booleans to true/false so quoting them here to
-                #  preserve the yes/no.  This could/should? also be done on submission.
+                #  preserve the yes/no.  This also done on submission..
                 contents = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', contents)
                 # suri uses YAML 1.1
                 config = yaml.round_trip_load(contents, version=(1,1), preserve_quotes=True)
+                # usually I try not to mess with the config here since the user should set
+                # desired defaults in the yaml on disk.  But if the logging level is 'notice',
+                # that is next to useless and setting it to 'info' won't hurt anything and will
+                # provide some useful info such as number of rules loaded.
+                if "logging" in config and "default-log-level" in config['logging'] and config['logging']['default-log-level']  == "notice":
+                    config['logging']['default-log-level']  = "info"
+
                 # pull out vars and dump
                 variables = yaml.round_trip_dump({'vars': config.pop('vars', None)})
                 # (depending on how you do it) the YAML verison gets added back
@@ -347,14 +385,14 @@ def get_engine_conf_file(sensor):
                 engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
                 variables = ''
         else:
-            logger.warn("No configuration file for sensor '%s'." % sensor)
-            engine_config = "# No configuration file for sensor '%s'." % sensor
+            logger.warn("No suitable configuration file found for sensor '%s'." % sensor)
+            engine_config = "# No suitable configuration file found for sensor '%s'." % sensor
             variables = "# No variables in config for sensor '%s'." % sensor
         results = {'conf': engine_config, 'variables': variables}
         return json.dumps(results)
 
     except Exception, e:
-        logger.error("Problem getting configuration file for sensor '%s'.  Error: %s" % (sensor, e))
+        logger.error("Problem getting configuration file for sensor '%s'.  Error: %s\n%s" % (sensor, e, traceback.format_exc()))
         engine_config = "# Exception getting configuration file for sensor '%s'." % sensor
         variables = engine_config
         results = {'conf': engine_config, 'variables': variables}
@@ -513,22 +551,22 @@ def post_job_results(jobid):
         time = ""
     # alert_detailed is base64 encoded unified2 binary data
     alert_detailed = ""
-    if 'alert_detailed' in result_obj:
+    if 'alert_detailed' in result_obj and U2_ANALYZER:
         try:
             # write to disk and pass to u2spewfoo.py; we could do
             #  myriad other things here like modify or import that
             #  code but this works and should be compatible and
             #  incorporate any future changes/improvements to the
             #  script
-            u2_file = os.path.join(TEMP_STORAGE_PATH, "unified2_%s_%s" % (jobid, SENSOR_HASH))
+            u2_file = os.path.join(TEMP_STORAGE_PATH, "%s_unified2_%s" % (jobid, SENSOR_HASH))
             u2_fh = open(u2_file, "wb")
             u2_fh.write(base64.b64decode(result_obj['alert_detailed']))
             u2_fh.close()
             u2spewfoo_command = "%s %s" % (U2_ANALYZER, u2_file)
             logger.debug("Processing unified2 data with command: '%s'" % u2spewfoo_command)
             alert_detailed = subprocess.Popen(u2spewfoo_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
-            # delete u2 file?
-            #os.unlink(u2_file)
+            # delete u2 file
+            os.unlink(u2_file)
         except Exception as e:
             logger.error("Problem parsing unified2 data from Agent.  Error: %s" % e)
             alert_detailed = ""
@@ -607,7 +645,7 @@ def sensor_get_job(id):
         return Response(filedata,mimetype="application/zip", headers={"Content-Disposition":"attachment;filename=%s.zip" % id})
     else:
         logger.error("Dalton in sensor_get_job(): could not find job %s at %s." % (id, path))
-        return render_template('/dalton/error.html', jid=id, msg="Job %s does not exist on disk.  It is either invalid or has been deleted." % id)
+        return render_template('/dalton/error.html', jid=id, msg=["Job %s does not exist on disk.  It is either invalid or has been deleted." % id])
 
 
 def clear_old_agents():
@@ -647,26 +685,50 @@ def page_sensor_default():
             sensors[sensor]['agent_version'] = "%s" % r.get("%s-agent_version" % sensor)
     return render_template('/dalton/sensor.html', page='', sensors=sensors)
 
+# validates passed in filename (should be from Flowsynth) to verify
+# that it exists and isn't trying to do something nefarious like
+# directory traversal
+def verify_fs_pcap(fspcap):
+    global FS_PCAP_PATH
+    # require fspcap to be POSIX fully portable filename
+    if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", fspcap):
+        logger.error("Bad fspcap filename provided: '%s'. Filename must be POSIX fully portable." % fspcap)
+        return "Bad pcap filename provided: '%s'" % (fspcap)
+    fspcap_path = os.path.join(FS_PCAP_PATH, os.path.basename(fspcap))
+    logger.debug("Flowsynth pcap file passed: %s" % fspcap_path)
+    if not os.path.isfile(fspcap_path):
+        logger.error("fspcap file '%s' not found." % fspcap_path)
+        return "File not found: '%s'" % os.path.basename(fspcap)
+    return None
+
 @dalton_blueprint.route('/dalton/coverage/<sensor_tech>/', methods=['GET'])
 #@login_required()
 def page_coverage_default(sensor_tech, error=None):
     """the default coverage wizard page"""
     global CONF_STORAGE_PATH
     global r
-    #base_sensor_version = ''
     ruleset_dirs = []
     sensor_tech = sensor_tech.split('-')[0]
     conf_dir = "%s/%s" % (CONF_STORAGE_PATH, sensor_tech)
     if sensor_tech is None:
-        return render_template('/dalton/error.html', jid='', msg="No Sensor technology selected for job.")
-    elif not re.match("^[a-zA-Z0-9\_\-\.]+$", sensor_tech):
-        return render_template('/dalton/error.html', jid='', msg="Invalid Sensor technology requested: %s" % sensor_tech)
+        return render_template('/dalton/error.html', jid='', msg=["No Sensor technology selected for job."])
+    elif not re.match(r"^[a-zA-Z0-9\_\-\.]+$", sensor_tech):
+        return render_template('/dalton/error.html', jid='', msg=["Invalid Sensor technology requested: %s" % sensor_tech])
     elif sensor_tech == 'summary':
-        return render_template('/dalton/error.html', jid='', msg="Page expired.  Please resubmit your job or access it from the queue.")
+        return render_template('/dalton/error.html', jid='', msg=["Page expired.  Please resubmit your job or access it from the queue."])
 
     if not os.path.isdir(conf_dir):
-        return render_template('/dalton/error.html', jid='', msg="No engine configuration directory for '%s' found (%s)." % (sensor_tech, conf_dir))
+        return render_template('/dalton/error.html', jid='', msg=["No engine configuration directory for '%s' found (%s)." % (sensor_tech, conf_dir)])
 
+    # pcap filename passed in from Flowsynth
+    fspcap = None
+    try:
+        fspcap = request.args['fspcap']
+        err_msg = verify_fs_pcap(fspcap)
+        if err_msg != None:
+            return render_template('/dalton/error.html', jid='', msg=["%s" % (err_msg)])
+    except:
+        fspcap = None
 
     # get list of rulesets based on engine
     rulesets = get_rulesets(sensor_tech.split('-')[0])
@@ -710,7 +772,7 @@ def page_coverage_default(sensor_tech, error=None):
         # no sensors available. Job won't run be we can provide a default engine.conf anyway
         engine_conf = "# not found"
         variables = "# not found"
-    return render_template('/dalton/coverage.html', sensor_tech = sensor_tech,rulesets = rulesets, error=error, variables = variables, engine_conf = engine_conf, sensors=sensors)
+    return render_template('/dalton/coverage.html', sensor_tech = sensor_tech,rulesets = rulesets, error=error, variables = variables, engine_conf = engine_conf, sensors=sensors, fspcap=fspcap)
 
 @dalton_blueprint.route('/dalton/job/<jid>')
 #@auth_required()
@@ -723,7 +785,7 @@ def page_show_job(jid):
         # job doesn't exist
         # expire (delete) all keys related to the job just in case to prevent memory leaks
         expire_all_keys(jid)
-        return render_template('/dalton/error.html', jid=jid, msg="Invalid Job ID. Job may have expired.  By default, jobs are only kept for %d seconds; teapot jobs are kept for %s seconds." % (REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE))
+        return render_template('/dalton/error.html', jid=jid, msg=["Invalid Job ID. Job may have expired.", "By default, jobs are only kept for %d seconds; teapot jobs are kept for %s seconds." % (REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE)])
     elif int(status) != STAT_CODE_DONE:
         # job is queued or running
         return render_template('/dalton/coverage-summary.html', page='', job_id=jid, tech=tech)
@@ -762,11 +824,129 @@ def page_show_job(jid):
 
         return render_template('/dalton/job.html', overview=overview,page = '', jobid = jid, ids=ids, perf=perf, alert=alert, error=error, debug=debug, total_time=total_time, tech=tech, custom_rules=custom_rules, alert_detailed=alert_detailed, other_logs=other_logs)
 
+# sanitize passed in filename (string) and make it POSIX (fully portable)
+def clean_filename(filename):
+    return re.sub(r"[^a-zA-Z0-9\_\-\.]", "_", filename)
+
+# handle duplicate filenames (e.g. same pcap sumbitted more than once)
+#  by renaming pcaps with same name
+def handle_dup_names(filename, pcap_files, job_id, dupcount):
+    for pcap in pcap_files:
+        if pcap['filename'] == filename:
+            filename = "%s_%s_%d.pcap" % (os.path.splitext(filename)[0], job_id, dupcount[0])
+            dupcount[0] += 1
+            break
+    return filename
+
+# extracts files from an archive and add them to the list to be
+#  included with the Dalton job
+def extract_pcaps(archivename, pcap_files, job_id, dupcount):
+    global TEMP_STORAGE_PATH
+    # Note: archivename already sanitized
+    logger.debug("Attempting to extract pcaps from  file '%s'" % os.path.basename(archivename))
+    if archivename.lower().endswith('.zip'):
+        try:
+            if not zipfile.is_zipfile(archivename):
+                msg = "File '%s' is not recognized as a valid zip file." % os.path.basename(archivename)
+                logger.error(msg)
+                return msg
+            zf = zipfile.ZipFile(archivename, mode='r')
+            for file in zf.namelist():
+                logger.debug("Processing file '%s' from ZIP archive" % file)
+                if file.endswith('/'):
+                    continue
+                filename = clean_filename(os.path.basename(file))
+                if os.path.splitext(filename)[1].lower() != ".pcap" and os.path.splitext(filename)[1].lower() != ".pcapng":
+                    logger.warn("Not adding file '%s' from archive '%s': '.pcap' or '.pcapng' extension required." % (file, os.path.basename(archivename)))
+                    # just skip the file, and move on (and log it)
+                    continue
+                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
+                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                fh = open(pcappath, 'wb')
+                # if archive is password protected, try using 'infected' as password
+                fh.write(zf.read(file, pwd='infected'))
+                fh.close()
+                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+            zf.close()
+        except Exception as e:
+            msg = "Problem extracting ZIP file '%s': %s" % (os.path.basename(archivename), e)
+            logger.error(msg)
+            logger.debug("%s" % traceback.format_exc())
+            return msg
+    elif os.path.splitext(archivename)[1].lower() in ['.gz', '.gzip'] and \
+         os.path.splitext(os.path.splitext(archivename)[0])[1].lower() not in ['.tar']:
+        # gzipped file
+        try:
+            filename =  os.path.basename(os.path.splitext(archivename)[0])
+            logger.debug("Decompressing gzipped file '%s'" % filename)
+            with gzip.open(archivename, 'rb') as gz:
+                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
+                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                fh = open(pcappath, 'wb')
+                fh.write(gz.read())
+                fh.close()
+                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                logger.debug("Added %s" % filename)
+        except Exception as e:
+            msg = "Problem extracting gzip file '%s': %s" % (os.path.basename(archivename), e)
+            logger.error(msg)
+            logger.debug("%s" % traceback.format_exc())
+            return msg
+    elif os.path.splitext(archivename)[1].lower() in ['.bz2'] and \
+         os.path.splitext(os.path.splitext(archivename)[0])[1].lower() not in ['.tar']:
+        # bzip2 file
+        try:
+            filename =  os.path.basename(os.path.splitext(archivename)[0])
+            logger.debug("Decompressing bzip2 file '%s'" % filename)
+            with bz2.BZ2File(archivename, 'rb') as bz:
+                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
+                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                fh = open(pcappath, 'wb')
+                fh.write(bz.read())
+                fh.close()
+                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                logger.debug("Added %s" % filename)
+        except Exception as e:
+            msg = "Problem extracting bzip2 file '%s': %s" % (os.path.basename(archivename), e)
+            logger.error(msg)
+            logger.debug("%s" % traceback.format_exc())
+            return msg
+    else:
+        try:
+            archive = tarfile.open(archivename, mode="r:*")
+            for file in archive.getmembers():
+                logger.debug("Processing file '%s' from archive" % file.name)
+                if not file.isfile():
+                    logger.warn("Not adding member '%s' from archive '%s': not a file." % (file.name, os.path.basename(archivename)))
+                    continue
+                filename = clean_filename(os.path.basename(file.name))
+                if os.path.splitext(filename)[1].lower() != ".pcap" and os.path.splitext(filename)[1].lower() != ".pcapng":
+                    logger.warn("Not adding file '%s' from archive '%s': '.pcap' or '.pcapng' extension required." % (file.name, os.path.basename(archivename)))
+                    # just skip the file, and move on (and log it)
+                    continue
+                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
+                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                fh = open(pcappath, 'wb')
+                contentsfh = archive.extractfile(file)
+                fh.write(contentsfh.read())
+                fh.close()
+                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                logger.debug("Added %s" % filename)
+            archive.close()
+        except Exception as e:
+            msg = "Problem extracting archive file '%s': %s" % (os.path.basename(archivename), e)
+            logger.error(msg)
+            logger.debug("%s" % traceback.format_exc())
+            return msg
+    return None
+
 #  abstracting the job submission method away from the HTTP POST and creating this
 #   function so that it can be called easier (e.g. from an API)
 def submit_job():
     logger.debug("submit_job() called")
     # never finished coding this...
+    # TODO: API call that accepts a job zipfile and queues it up for an agent?
+    #       would have to beef up input validation on agent probably....
 
 @dalton_blueprint.route('/dalton/coverage/summary', methods=['POST'])
 #@auth_required()
@@ -779,6 +959,7 @@ def page_coverage_summary():
     global RULESET_STORAGE_PATH
     global r
     global STAT_CODE_QUEUED
+    global FS_PCAP_PATH
 
     verify_temp_storage_path()
     digest = hashlib.md5()
@@ -788,25 +969,61 @@ def page_coverage_summary():
     # get the user who submitted the job .. not implemented
     user = "undefined"
 
+    #generate job_id based of pcap filenames and timestamp
+    digest.update(str(datetime.datetime.now()))
+    digest.update(str(random.randrange(96313375)))
+    job_id = digest.hexdigest()[0:16]   #this is a temporary job id for the filename
+
+    #store the pcaps offline temporarily
+    # make temp job directory so there isn't a race condition if more
+    #  than one person submits a pcap with the same filename at the same time
+    if os.path.exists(os.path.join(TEMP_STORAGE_PATH, job_id)):
+        shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
+    os.makedirs(os.path.join(TEMP_STORAGE_PATH, job_id))
+
+    # list of dicts that have filename: and pcappath: entries for pcap files on disk to include in job
+    pcap_files = []
+    form_pcap_files = []
+    # pcapfilename from Flowsynth; on local (Dalton controller) disk
+    if request.form.get("fspcap"):
+        fspcap = request.form.get("fspcap")
+        err_msg = verify_fs_pcap(fspcap)
+        if err_msg:
+            delete_temp_files(job_id)
+            return render_template('/dalton/error.html', jid='', msg=[err_msg])
+        pcap_files.append({'filename': fspcap, 'pcappath': os.path.join(FS_PCAP_PATH, os.path.basename(fspcap))})
+
     # grab the user submitted files from the web form (max number of arbitrary files allowed on the web form is 5)
     # note that these are file handle objects? have to get filename using .filename
     MAX_PCAP_FILES = 5
-    form_pcap_files = []
+    # make this a list so I can pass by reference
+    dupcount = [0]
     for i in range(MAX_PCAP_FILES):
         try:
             pcap_file = request.files['coverage-pcap%d' % i]
             if (pcap_file != None and pcap_file.filename != None and pcap_file.filename != '<fdopen>' and (len(pcap_file.filename) > 0) ):
-                form_pcap_files.append(pcap_file)
-                digest.update(pcap_file.filename)
+                if os.path.splitext(pcap_file.filename)[1].lower() in ['.zip', '.tar', '.gz', '.tgz', '.gzip', '.bz2']:
+                    filename = clean_filename(os.path.basename(pcap_file.filename))
+                    filename = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                    pcap_file.save(filename)
+                    err_msg = extract_pcaps(filename, pcap_files, job_id, dupcount)
+                    if err_msg:
+                        delete_temp_files(job_id)
+                        return render_template('/dalton/error.html', jid='', msg=[err_msg])
+                else:
+                    form_pcap_files.append(pcap_file)
         except:
+            logger.debug("%s" % traceback.format_exc())
             pass
 
-    if len(form_pcap_files) == 0:
+    if len(form_pcap_files) == 0 and len(pcap_files) == 0:
         #throw an error, no pcaps submitted
-        return page_coverage_default(request.form.get('sensor_tech'),'You must specify a PCAP file.')
+        delete_temp_files(job_id)
+        return render_template('/dalton/error.html', jid='', msg=["You must specify a PCAP file."])
     elif (request.form.get('optionProdRuleset') == None and request.form.get('optionCustomRuleset') == None):
         #throw an error, no rules defined
-        return page_coverage_default(request.form.get('sensor_tech'),'You must specify at least one ruleset.')
+        delete_temp_files(job_id)
+        return render_template('/dalton/error.html', jid='', msg=["You must specify at least one ruleset."])
     else:
         #get the sensor technology and queue name
         sensor_tech = request.form.get('sensor_tech')
@@ -820,51 +1037,29 @@ def page_coverage_summary():
                     break
         if not valid_sensor_tech:
             logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, \'%s\'" % (user, sensor_tech))
-            return render_template('/dalton/error.html', jid="<not_defined>", msg="There are no sensors that support sensor technology \'%s\'." % sensor_tech)
-
-        #generate job_id based of pcap filenames and timestamp
-        digest.update(str(datetime.datetime.now()))
-        job_id = digest.hexdigest()[0:16]   #this is a temporary job id for the filename
-
-        #store the pcaps offline temporarily
-        # make temp job directory so there isn't a race condition if more
-        #  than one person submits a pcap with the same filename at the same time
-        if os.path.exists("%s/%s" % (TEMP_STORAGE_PATH, job_id)):
-            shutil.rmtree("%s/%s" % (TEMP_STORAGE_PATH, job_id))
-        os.makedirs("%s/%s" % (TEMP_STORAGE_PATH, job_id))
-
-        pcap_files = []
+            delete_temp_files(job_id)
+            return render_template('/dalton/error.html', jid='', msg=["There are no sensors that support sensor technology \'%s\'." % sensor_tech])
 
         # process files from web form
-        count = 0
         for pcap_file in form_pcap_files:
-            filename = pcap_file.filename
+            filename = os.path.basename(pcap_file.filename)
             # do some input validation on the filename and try to do some accommodation to preserve original pcap filename
-            filename = filename.replace(' ', '_')
-            filename = filename.replace('\t', '_')
-            filename = filename.replace('&', '_')
-            filename = filename.replace('~', '_')
-            if not re.match('^[a-zA-Z0-9\_\-\.]*$', filename):
-                filename = 'coverage%d_%s.pcap' % (count, job_id)
-            else:
-                if not os.path.splitext(filename)[1] == '.pcap':
+            filename = clean_filename(filename)
+            if os.path.splitext(filename)[1] != '.pcap':
                     filename = "%s.pcap" % filename
             # handle duplicate filenames (e.g. same pcap sumbitted more than once)
-            for pcap in pcap_files:
-                if pcap['filename'] == filename:
-                    filename = "%s_%s_%d.pcap" % (os.path.splitext(filename)[0], job_id, count)
-                    break
+            filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
             pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
-            count += 1
             pcap_files.append({'filename': filename, 'pcappath': pcappath})
             pcap_file.save(pcappath)
 
         # If multiple files submitted to Suricata, merge them here since
         #  Suricata can only read one file.
-        if len(pcap_files) > 1:
+        if len(pcap_files) > 1 and sensor_tech.startswith("suri"):
             if not MERGECAP_BINARY:
                 logger.error("No mergecap binary; unable to merge pcaps for Suricata job.")
-                return render_template('/dalton/error.html', jid="<not_defined>", msg="No mergecap binary found on Dalton Controller.  Unable to process multiple pcaps for this Suricata job.")
+                delete_temp_files(job_id)
+                return render_template('/dalton/error.html', jid=job_id, msg=["No mergecap binary found on Dalton Controller.", "Unable to process multiple pcaps for this Suricata job."])
             combined_file = "%s/combined-%s.pcap" % (os.path.join(TEMP_STORAGE_PATH, job_id), job_id)
             mergecap_command = "%s -w %s -F pcap %s" % (MERGECAP_BINARY, combined_file, ' '.join([p['pcappath'] for p in pcap_files]))
             logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s" % ', '.join([p['filename'] for p in pcap_files]))
@@ -874,11 +1069,13 @@ def page_coverage_summary():
                 if len(mergecap_output) > 0:
                     # return error?
                     logger.error("Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
-                    return render_template('/dalton/error.html', jid="<not_defined>", msg="Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
+                    delete_temp_files(job_id)
+                    return render_template('/dalton/error.html', jid="<not_defined>", msg=["Error merging pcaps with command:", "%s" % mergecap_command, "Output:", "%s" % (mergecap_command, mergecap_output)])
                 pcap_files = [{'filename': os.path.basename(combined_file), 'pcappath': combined_file}]
             except Exception as e:
                 logger.error("Could not merge pcaps.  Error: %s" % e)
-                return render_template('/dalton/error.html', jid="<not_defined>", msg="Could not merge pcaps.  Error: %s" % e)
+                delete_temp_files(job_id)
+                return render_template('/dalton/error.html', jid='', msg=["Could not merge pcaps.  Error:", " %s" % e])
 
         # get enable all rules option
         bEnableAllRules = False
@@ -971,34 +1168,34 @@ def page_coverage_summary():
                 if (len(line) > 0) and not re.search(r'^[\x00-\x7F]+$', line):
                     fh.close()
                     delete_temp_files(job_id)
-                    return page_coverage_default(request.form.get('sensor_tech'),"Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules. Please encode necesary non-ASCII characters appropriately.  Rule:  %s" % line)
+                    return render_template('/dalton/error.html', jid='', msg=["Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules.", "Please encode necesary non-ASCII characters appropriately.  Rule:", " %s" % line])
                 # some rule validation for Snort and Suricata
                 if sensor_tech.startswith('snort') or sensor_tech.startswith('suri'):
                     # rule must start with alert|log|pass|activate|dynamic|drop|reject|sdrop
                     if not re.search(r'^(alert|log|pass|activate|dynamic|drop|reject|sdrop|event_filter|threshold|suppress|rate_filter|detection_filter)\s', line):
                         fh.close()
                         delete_temp_files(job_id)
-                        return page_coverage_default(request.form.get('sensor_tech'),"Invalid rule, action (first word in rule) of \'%s\' not supported.  Rule: %s" % (line.split()[0], line))
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule, action (first word in rule) of \'%s\' not supported.  Rule:" % line.split()[0], "%s" % line])
 
                     # rule must end in closing parenthesis
                     if not line.endswith(')') and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         fh.close()
                         delete_temp_files(job_id)
-                        return page_coverage_default(request.form.get('sensor_tech'),"Invalid rule, does not end with closing parenthesis.  Rule: %s" % line)
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule; does not end with closing parenthesis.  Rule:", "%s" % line])
 
                     # last keyword in the rule must be terminated by a semicolon
                     if not line[:-1].rstrip().endswith(';') and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         fh.close()
                         delete_temp_files(job_id)
-                        return page_coverage_default(request.form.get('sensor_tech'),"Invalid rule, last rule option must end with semicolon.  Rule:  %s" % line)
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule, last rule option must end with semicolon.  Rule:",  "%s" % line])
 
                     # add sid if not included
                     if not re.search(r'(\s|\x3B)sid\s*\:\s*\d+\s*\x3B', line) and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         # if no sid in rule, fix automatically instead of throwing an error
-                        #return page_coverage_default(request.form.get('sensor_tech'),"\'sid\' not specified in rule, this will error.  Rule: %s" % line)
+                        #return render_template('/dalton/error.html', jid='', msg=["\'sid\' not specified in rule, this will error.  Rule:", "%s" % line])
                         line = re.sub(r'\x29$', " sid:%d;)" % (sid_base + sid_offset), line)
                         sid_offset += 1
                 # including newline because it was removed earlier with rstrip()
@@ -1007,18 +1204,23 @@ def page_coverage_summary():
 
         if not sensor_tech:
             delete_temp_files(job_id)
-            return render_template('/dalton/error.html', jid="<not_defined>", msg="Variable \'sensor_tech\' not specified.  Please reload the submission page and try again.")
+            return render_template('/dalton/error.html', jid="<not_defined>", msg=["Variable \'sensor_tech\' not specified.  Please reload the submission page and try again."])
 
         # get and write variables
         vars = request.form.get('custom_vars')
         if not vars:
             delete_temp_files(job_id)
-            return page_coverage_default(request.form.get('sensor_tech'),"No variables defined.")
+            return render_template('/dalton/error.html', jid='', msg=["No variables defined."])
+        # pre-set IP vars to add to the config if they don't exist.
+        # this helps with some rulesets that may use these variables
+        # but the variables aren't in the default config.
+        ipv2add = {'RFC1918': "[10.0.0.0/8,192.168.0.0/16,172.16.0.0/12]"
+                  }
 
         conf_file = request.form.get('custom_engineconf')
         if not conf_file:
             delete_temp_files(job_id)
-            return page_coverage_default(request.form.get('sensor_tech'),"No configuration file provided.")
+            return render_template('/dalton/error.html', jid='', msg=["No configuration file provided."])
 
         if sensor_tech.startswith('suri'):
             #yaml-punch!
@@ -1034,8 +1236,15 @@ def page_coverage_summary():
                 config = yaml.round_trip_load(conf_file, version=(1,1), preserve_quotes=True)
                 # add in vars
                 vars_config = yaml.safe_load(vars, version=(1,1))
+                # add some IP vars common to some rulesets
+                try:
+                    for v in ipv2add:
+                        if v not in vars_config['vars']['address-groups']:
+                            vars_config['vars']['address-groups'][v] = ipv2add[v]
+                except Exception as e:
+                    logger.warn("(Not Fatal) Problem customizing Suricata variables; your YAML may be bad. %s" % e)
+                    logger.debug("%s" % traceback.format_exc())
                 config.update(vars_config)
-
                 # first, do rule includes
                 # should references to other rule files be removed?
                 removeOtherRuleFiles = True
@@ -1147,10 +1356,9 @@ def page_coverage_summary():
                     else:
                         config['outputs'].append(dns_config)
 
-                    # Don't try to enable eve-log since it is unformatted and redundant in many cases
+                    # Don't try to enable eve-log since it is unformatted and redundant in many cases.
                     # But in case it is enabled, set the filename and disable EVE tls since you
                     # can't have tls log to file AND be included in the EVE log.
-                    # NOTE: I'm not even sure this Suri config is valid YAML 1.1 ....
                     try:
                         # set filename
                         config['outputs'][olist.index('eve-log')]['eve-log']['filename'] = "dalton-eve.json"
@@ -1178,14 +1386,14 @@ def page_coverage_summary():
                                                         'filename': "dalton-rule_perf.log", \
                                                         'append': True, \
                                                         'sort': "avgticks", \
-                                                        'limit': 100, \
+                                                        'limit': 1000, \
                                                         'json': False}
                     else:
                         config['profiling']['rules']['enabled'] = True
                         config['profiling']['rules']['filename'] = "dalton-rule_perf.log"
                         config['profiling']['rules']['json'] = False
                     # keyword profiling
-                    # is this supported by older Suri versions?
+                    # is this supported by older Suri versions? If not Suri will ignore when loading YAML
                     if 'keywords' in config['profiling']:
                         config['profiling']['keywords'] = {'enabled': True, \
                                                            'filename': "dalton-keyword_perf.log", \
@@ -1197,14 +1405,15 @@ def page_coverage_summary():
                 engine_conf_fh.close()
             except Exception as e:
                 logger.error("Problem processing YAML file(s): %s" % e)
-		logger.debug("%s" % traceback.format_exc())
+                logger.debug("%s" % traceback.format_exc())
                 delete_temp_files(job_id)
-                return page_coverage_default(request.form.get('sensor_tech'),"Error processing YAML file(s):\n%s" % e)
+                return render_template('/dalton/error.html', jid='', msg=["Error processing YAML file(s):", "%s" % e])
         else:
             engine_conf_file = None
             vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
             vars_fh = open(vars_file, "wb")
             if sensor_tech.startswith('snort'):
+                # check variables
                 for line in vars.split('\n'):
                     # strip out trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
                     line = line.rstrip()
@@ -1216,8 +1425,43 @@ def page_coverage_summary():
                     if not re.search(r'^(var|portvar|ipvar)\s', line):
                         vars_fh.close()
                         delete_temp_files(job_id)
-                        return page_coverage_default(request.form.get('sensor_tech'),"Invalid variable definition. Must be 'var', 'portvar', or 'ipvar': %s" % line)
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid variable definition. Must be 'var', 'portvar', or 'ipvar':", "%s" % line])
                     vars_fh.write("%s\n" % line)
+                # add some IP vars common to some rulesets
+                try:
+                    for v in ipv2add:
+                        if not "\nipvar %s" % v in vars and not vars.startswith("ipvar %s" % v):
+                            vars_fh.write("ipvar %s %s" % (v, ipv2add[v]))
+                except Exception as e:
+                    logger.warn("(Not Fatal) Problem customizing Snort variables: %s" % e)
+                    logger.debug("%s" % traceback.format_exc())
+
+                # tweak Snort conf file
+                if bTrackPerformance:
+                    new_conf = ''
+                    perf_found = False
+                    # splitlines without 'True' arg removes ending newline char(s)
+                    lines = iter(conf_file.splitlines())
+                    while True:
+                        try:
+                            line = next(lines)
+                            # might as well strip out comments
+                            if line.lstrip(' ').startswith('#') or line.lstrip(' ').rstrip(' ') == '': continue
+                            if line.startswith("config profile_rules:"):
+                                perf_found = True
+                                while line.endswith("\\"):
+                                    line = line.rstrip('\\') + next(lines)
+                                if "filename " in line:
+                                    line = re.sub(r'filename\s+[^\s\x2C]+', 'filename dalton-rule_perf.log', line)
+                                else:
+                                    line += ", filename dalton-rule_perf.log append"
+                            new_conf += "%s\n" % line
+                        except StopIteration:
+                            break
+                    if not perf_found:
+                        new_conf += "\nconfig profile_rules: print 1000, sort avg_ticks, filename dalton-rule_perf.log append"
+                    conf_file = new_conf
+
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_snort.conf" % job_id)
             else:
                 vars_fh.write(vars)
@@ -1250,16 +1494,17 @@ def page_coverage_summary():
             if request.form.get('optionProdRuleset'):
                 ruleset_path = request.form.get('prod_ruleset')
                 if not ruleset_path:
-                    return render_template('/dalton/error.html', jid=jid, msg="No defined ruleset provided.")
+                    delete_temp_files(job_id)
+                    return render_template('/dalton/error.html', jid=jid, msg=["No defined ruleset provided."])
                 if not prod_ruleset_name: # if Suri job, this is already set above
                     prod_ruleset_name = os.path.basename(ruleset_path)
                     if not prod_ruleset_name.endswith(".rules"):
                         prod_ruleset_name = "%s.rules" % prod_ruleset_name
                 logger.debug("ruleset_path = %s" % ruleset_path)
-                logger.debug("Dalton in page_coverage_summary():\n    prod_ruleset_name: %s" % (prod_ruleset_name))
+                logger.debug("Dalton in page_coverage_summary():   prod_ruleset_name: %s" % (prod_ruleset_name))
                 if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
                     delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid=jid, msg="Invalid ruleset submitted: '%s'. Path/name invalid." % prod_ruleset_name)
+                    return render_template('/dalton/error.html', jid=jid, msg=["Invalid ruleset submitted: '%s'." % prod_ruleset_name, "Path/name invalid."])
                 elif not os.path.exists(ruleset_path):
                     delete_temp_files(job_id)
                     return render_template('/dalton/error.html', jid=jid, msg="Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path))
@@ -1267,85 +1512,6 @@ def page_coverage_summary():
                     # if these options are set, modify ruleset accordingly
                     if bEnableAllRules or bShowFlowbitAlerts:
                         modified_rules_path = "%s/%s_prod_modified.rules" % (TEMP_STORAGE_PATH, job_id)
-                        ### begin superfluous code (see possible_negated_vars comment)
-                        modified_vars_file = "%s/%s_variables_modified.conf" % (TEMP_STORAGE_PATH, job_id)
-                        # not populated at the moment so most of the below code is
-                        #  unnecessary.  (Enable flowbits rules code still used.)
-                        possible_negated_vars = []
-                        RFC_1918 = '[10.0.0.0/8,192.168.0.0/16,172.16.0.0/12]'
-
-                        # load all variables into variables_dict dictionary
-                        variables_dict = {}
-                        if bEnableAllRules:
-                            if sensor_tech.startswith('suri'):
-                                # this is YAML; we could use some YAML libs to parse but probably overkill.
-                                # Assumming at least 4 spaces before variable definitions
-                                # TODO: think thru this a little more
-                                regex = re.compile(r"^\s{4,}(?P<name>[^\x3A\x23]+)\x3A\s+[\x22\x27]?(?P<value>[^\x22\x27]+)")
-                            else:
-                                # can add other sensor formats with elif clauses
-                                # this is for Snort:
-                                regex = re.compile(r"^(ip)?var\s+(?P<name>[^\s]+)\s+(?P<value>.*)")
-
-                            variables_fh = open(vars_file, 'rb')
-                            for line in variables_fh:
-                                if sensor_tech.startswith('snort'):
-                                    line = line.lstrip()
-                                result = regex.search(line)
-                                if result:
-                                    variables_dict[result.group('name')] = result.group('value')
-                            variables_fh.close()
-
-                        # disable some rules to prevent errors from !any rules;
-                        # this is a simple hack although if you wanted you could parse all
-                        # rules to identify !any situations but I don't think that is
-                        # necessary at this point.
-                        #
-                        # do variable expansion on variables_dict
-                        for var in variables_dict.keys():
-                            original_var_value = variables_dict[var]
-                            count = 0
-                            while variables_dict[var][0] == '$':
-                                newvar = variables_dict[var].lstrip('$')
-                                # check to see if referenced variable is valid
-                                if newvar in variables_dict:
-                                    variables_dict[var] = variables_dict[newvar]
-                                else:
-                                    # referenced variable does not exist; reset value back to original and let engine throw the error
-                                    variables_dict[var] = original_var_value
-                                    break
-                                count += 1
-                                if count > 100:
-                                    # variable loop (or overly long expansion) encountered; reset value back to original and let engine throw the error
-                                    variables_dict[var] = original_var_value
-                                    break
-
-                        # Sometimes there are variables that are set to 'any' by default but are used
-                        # in a negated context in the (disabled by default) ruleset.  Set those vars to RFC1918 if that is the case.
-                        # Only do this if enable all rules is selected since !any rules should not be enabled in a default ruleset.
-                        if bEnableAllRules:
-                            vars_fh = open(vars_file, 'rb')
-                            modified_vars_fh = open(modified_vars_file, 'wb')
-                            for line in vars_fh:
-                                for var in possible_negated_vars:
-                                    if var in line and var in variables_dict and variables_dict[var] == 'any':
-                                        if sensor_tech.startswith('suri'):
-                                            regex = re.compile(r"^\s{4}" + re.escape(var) + r"\s*\x3A\s+[\x22\x27]?(?P<value>[^\x22\x27]+)")
-                                        else:
-                                            regex = re.compile(r"^(ip)?var\s+" + re.escape(var) + r"\s+(?P<value>.*)")
-                                        result = regex.search(line)
-                                        if result:
-                                            value = result.group('value')
-                                            new_line = re.sub(re.escape(value), RFC_1918, line, 1)
-                                            line = new_line
-                                            break
-                                modified_vars_fh.write(line)
-                            modified_vars_fh.close()
-                            vars_fh.close()
-                            vars_file = modified_vars_file
-                        ### end superfluous code (see possible_negated_vars comment)
-
-
                         regex = re.compile(r"^#+\s*(alert|log|pass|activate|dynamic|drop|reject|sdrop)\s")
                         prod_rules_fh = open(ruleset_path, 'rb')
                         modified_rules_fh = open(modified_rules_path, 'wb')
@@ -1366,6 +1532,7 @@ def page_coverage_summary():
                 if request.form.get('optionCustomRuleset') and request.form.get('custom_ruleset'):
                     zf.write(custom_rules_file, arcname='dalton-custom.rules')
             except:
+                logger.warn("Problem adding custom rules: %s" % e)
                 pass
             if vars_file:
                 zf.write(vars_file, arcname='variables.conf')
@@ -1529,10 +1696,10 @@ def controller_api_get_request(jid, requested_data):
     valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'perf', 'tech', 'error', 'time', 'statcode', 'debug', 'status', 'submission_time', 'start_time', 'user', 'all')
     json_response = {'error':False, 'error_msg':None, 'data':None}
     # some input validation
-    if not re.match ('^(teapot_)?[a-zA-Z\d]+$', jid):
+    if not re.match (r'^(teapot_)?[a-zA-Z\d]+$', jid):
         json_response["error"] = True
         json_response["error_msg"] = "Invalid Job ID value: %s" % jid
-    elif not re.match('^[a-zA-Z\d\_\.\-]+$', requested_data):
+    elif not re.match(r'^[a-zA-Z\d\_\.\-]+$', requested_data):
         json_response["error"] = True
         json_response["error_msg"] = "Invalid request for data: %s" % requested_data
     else:

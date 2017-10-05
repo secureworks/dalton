@@ -1,6 +1,22 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
 	var MAX_PCAP_FILES = 5;
+
+    function updateHeading(version) {
+        var newstr = ''
+        if (version == undefined) {
+            version = $('input[name="sensor_tech"]:checked').val();
+        }
+        version = version.charAt(0).toUpperCase() + version.slice(1);
+        mysplit = version.split('-');
+        if (mysplit.length > 1) {
+             newstr = mysplit[0] + ' ' + mysplit.slice(1,).join('-');
+        } else {
+            newstr = version;
+        }
+        document.getElementById("versionHeading").innerHTML = newstr
+    }
+
 	$(document).ready(function() {
 		$('#prod_ruleset').show();
 		if ($('#optionRuleset').prop('checked')) {
@@ -19,13 +35,17 @@
 		}
 		if ($('#optionCustomVars').prop('checked')) {
 			$('#custom_vars').show();
+            $('#showHideOptionCustomVars').find('i').removeClass('icon-chevron-right').addClass('icon-chevron-down');
 		} else {
 			$('#custom_vars').hide();
+            $('#showHideOptionCustomVars').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
 		}
 		if ($('#optionCustomEngineConf').prop('checked')) {
 			$('#custom_engineconf').show();
+            $('#showHideOptionCustomEngineConf').find('i').removeClass('icon-chevron-right').addClass('icon-chevron-down');
 		} else {
 			$('#custom_engineconf').hide();
+            $('#showHideOptionCustomEngineConf').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
 		}
 
 		for(i=1; i < MAX_PCAP_FILES; i++) {
@@ -61,20 +81,24 @@
 			}
 		});
 
-		$('#optionCustomVars').click( function() {
-			if ($('#optionCustomVars').prop('checked')) {
-				$('#custom_vars').show();
-			} else {
-				$('#custom_vars').hide();
-			}
-		});
+		$('#showHideOptionCustomVars').click( function() {
+            $(this).find('i').toggleClass('icon-chevron-right').toggleClass('icon-chevron-down');
+		    $('#custom_vars').toggle();
+            if ($('#custom_vars').is(':visible')) {
+                $('#optionCustomVars').prop('checked', true);
+            } else {
+                $('#optionCustomVars').prop('checked', false);
+            }
+   		});
 
-		$('#optionCustomEngineConf').click( function() {
-			if ($('#optionCustomEngineConf').prop('checked')) {
-				$('#custom_engineconf').show();
-			} else {
-				$('#custom_engineconf').hide();
-			}
+		$('#showHideOptionCustomEngineConf').click( function() {
+            $(this).find('i').toggleClass('icon-chevron-right').toggleClass('icon-chevron-down');
+		    $('#custom_engineconf').toggle();
+            if ($('#custom_engineconf').is(':visible')) {
+                $('#optionCustomEngineConf').prop('checked', true);
+            } else {
+                $('#optionCustomEngineConf').prop('checked', false);
+            }
 		});
 
 		$('#addpcap').click( function() {
@@ -108,15 +132,17 @@
 
         <!-- called when sensor version changed.  Updates engine.conf data AND variables -->
         $('input[name="sensor_tech"]').change( function() {
-            var new_engine_conf = $.get("/dalton/sensor_api/request_engine_conf/" + $(this).attr("id"), function( data ) {
+            var version = $(this).attr("id")
+            var new_engine_conf = $.get("/dalton/sensor_api/request_engine_conf/" + version, function( data ) {
                 if (data && data != '') {
                     confs = JSON.parse(data)
                     document.getElementById('custom_engineconf_t').value = confs.conf;
                     document.getElementById('custom_vars_t').value = confs.variables;
+                    updateHeading(version);
                 }
             });
         });
-
+        updateHeading();
     });
 {% endblock %}
 
@@ -130,24 +156,32 @@
 		<div class="span12">
 			<form id='submitjob' action="/dalton/coverage/summary" method="post" enctype="multipart/form-data">
 				<h2>
-				Submit A New Job for 
-                {% set tlist = sensor_tech.split('-') %}
-                {% if tlist|length > 1 %}
-                    {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+				Submit A New Job for <b id="versionHeading">
+                {% if sensors != None and sensors != '' and sensors|length > 0 %}
+                    {% set sensor = sensors[0].split('-') %}
+                    {% if sensor|length > 1 %}
+                        {{sensor[0]|title}} {{sensor[1:]|join('-')}}
+                    {% else %}
+                        {{sensor|title}}
+                    {% endif %}
                 {% else %}
                     {{sensor_tech|title}}
                 {% endif %}
+                </b>
 				</h2>
 				<p>Test pcaps on an IDS sensor against defined and/or ad-hoc rulesets.</p>
 				<div class="tabbable tabs-left">
 					<ul class="nav nav-tabs">
-						<li class='active'><a href="#pcapdetails" data-toggle='tab'>Packet Capture</a></li>
-						<li><a href="#sensorconf" data-toggle='tab'>Sensor Configuration</a></li>
-						<li><a href="#notification" data-toggle='tab'>Notification Options</a></li>
+						<li class='active'><a href="#jobdetails" data-toggle='tab'>Job Settings</a></li>
+						<li><a href="#sensorconf" data-toggle='tab'>Config Files</a></li>
 					</ul>
 					<div class="tab-content">
-						<div class="tab-pane active" id="pcapdetails">
+						<div class="tab-pane active" id="jobdetails">
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;font-size:21px;line-height:40px;color:#333;border:0;">Packet Captures</div>
                             <p>Please specify a packet capture (libpcap). Depending on the engine, pcapng format may be supported as well.</p>
+                            {% if fspcap %}
+                                <input type="text" name="fspcap" id="fspcap" readonly="readonly" value={{fspcap}}><p/>
+                            {% endif %}
                             <!-- TODO: generate this dynamically via JavaScript -->
 							<input type="file" name="coverage-pcap0" id="coverage-pcap0" placeholder='Select a PCAP'><p/>
 
@@ -172,29 +206,18 @@
 								&nbsp;|&nbsp;
 							</div>
 							<div id="resetpcap" style="display:inline;">
-								<a href="#">Reset</a>
+								<a href="#">Reset Pcaps</a>
 							</div>
-	
-						</div>
 
-                        <!-- TODO: remove this -->
-						<div class="tab-pane" id="notification">
-							<label class="checkbox">
-								<input type="checkbox" id='notify_owner' name='send_email'> Email me results
-							</label>
-							<label>Email Address:</label>
-							<input type="text" name="email_address" value="" placeholder="james.dalton@roadhouse.oisf.net">
-						</div>
 
-						<div class="tab-pane" id="sensorconf">
-							<div style="display:block;width:100%;padding:0;margin-botton:5x;font-size:21px;line-height:40px;color:#333;border:0;">Sensor Version</div>
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Sensor Version</div>
                                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
                                     {% for sensor in sensors %}
                                         <!-- TODO: make this a grid insead of a list -->
                                         <input type="radio" name="sensor_tech" id="{{sensor}}" value="{{sensor}}"{% if loop.first %} checked{% endif %}><label for="{{sensor}}" class="radio inline">
                                             {% set tlist = sensor.split('-') %}
                                             {% if tlist|length > 1 %}
-                                            {{tlist[1:]|join('-')}}
+                                                {{tlist[1:]|join('-')}}
                                             {% else %}
                                                 {{sensor|title}}
                                             {% endif %}
@@ -234,47 +257,50 @@
 							<span id="custom_ruleset">
 								<textarea rows='10' cols='80' style='width: 1000px;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"");'></textarea>
 							</span>
-							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Variables</div>
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Logs</div>
 							<label class="checkbox">
-								<input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom">
-								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
+								<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed">
+							    Pcap records from alerts
+                            </label>
+                            {% if sensor_tech.startswith('suri') %}
+                                <label class="checkbox">
+                                    <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs">
+                                    Other logs (Alert Debug, HTTP, TLS, DNS, etc.)
+                                </label>
+                            {% endif %}
+							<label class="checkbox">
+								<input type="checkbox" name="optionPerf" id="optionPerf" value="perf">
+								Rule profiling
 							</label>
+                            {% if sensor_tech.startswith('suri') %}
+                                <label class="checkbox">
+                                    <input type="checkbox" name="optionFastPattern" id="optionFastPattern" value="optionFastPattern">
+                                    Fast pattern info
+                                </label>
+                            {% endif %}
+						</div>
+						<div class="tab-pane" id="sensorconf">
+							<div style="display:block;width:100%;padding:0;margin-bottom:5px;font-size:21px;line-height:40px;color:#333;border:0;">Variables</div>
+                                <input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom" style="display:none;">
+								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
+                                <br><a id="showHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
+                                <p>
 							<span id="custom_vars">
 								<textarea rows='25' cols='50' style='width: 1000px;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
 							</span>
 							
-                            <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration Files</div>
-                            <label class="checkbox">
-                                <input type="checkbox" name="optionCustomEngineConf" id="optionCustomEngineConf" value="custom">
+                            <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration File</div>
+                                <input type="checkbox" name="optionCustomEngineConf" id="optionCustomEngineConf" value="custom" style="display:none;">
                                 Modify {{ sensor_tech.split('-')[0]|title }} configuration{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
-                            </label>
+                                <br><a id="showHideOptionCustomEngineConf" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
+                                <p>
                             <span id="custom_engineconf">
                                 <textarea rows='25' cols='50' style='width: 1000px;' name="custom_engineconf" id="custom_engineconf_t">{{ engine_conf }}</textarea>
                             </span>
 
-							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Performance</div>
-							<label class="checkbox">
-								<input type="checkbox" name="optionPerf" id="optionPerf" value="perf">
-								Enable rule profiling
-							</label>			
-                            {% if sensor_tech.startswith('suri') %}
-                                <label class="checkbox">
-                                    <input type="checkbox" name="optionFastPattern" id="optionFastPattern" value="optionFastPattern">
-                                    Generate fast pattern info
-                                </label>
-                            {% endif %}
-							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Other</div>
-							<label class="checkbox">
-								<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed">
-							    Include detailed alerts (unified2 data including pcap data from alerts)
-                            </label>
-                            {% if sensor_tech.startswith('suri') %}
-                            <label class="checkbox">
-                                <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs">
-                                Return all other logs
-                            </label>
-                            {% endif %}
+	
 						</div>
+
 					</div>
 				</div>
 
