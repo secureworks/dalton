@@ -690,11 +690,11 @@ def verify_fs_pcap(fspcap):
     # require fspcap to be POSIX fully portable filename
     if not re.match(r"^[A-Za-z0-9_\x2D\x2E]+$", fspcap):
         return "Bad pcap filename provided: '%s'" % (fspcap)
-    fspcap_path = os.path.join(FS_PCAP_PATH, fspcap)
+    fspcap_path = os.path.join(FS_PCAP_PATH, os.path.basename(fspcap))
     logger.debug("Flowsynth pcap file passed: %s" % fspcap_path)
     if not os.path.isfile(fspcap_path):
         logger.error("fspcap file '%s' not found." % fspcap_path)
-        return "File not found: '%s'" % (fspcap)
+        return "File not found: '%s'" % os.path.basename(fspcap)
     return None
 
 @dalton_blueprint.route('/dalton/coverage/<sensor_tech>/', methods=['GET'])
@@ -720,12 +720,11 @@ def page_coverage_default(sensor_tech, error=None):
     fspcap = None
     try:
         fspcap = request.args['fspcap']
-    except Exception as e:
-        logger.debug("error with fspcap (probably not passed): %s\n\n%s" % (e,  traceback.format_exc()))
-    if fspcap:
-        err = verify_fs_pcap(fspcap)
-        if err != None:
-            return render_template('/dalton/error.html', jid='', msg=["%s" % (err)])
+        err_msg = verify_fs_pcap(fspcap)
+        if err_msg != None:
+            return render_template('/dalton/error.html', jid='', msg=["%s" % (err_msg)])
+    except:
+        fspcap = None
 
     # get list of rulesets based on engine
     rulesets = get_rulesets(sensor_tech.split('-')[0])
@@ -955,6 +954,7 @@ def page_coverage_summary():
     global RULESET_STORAGE_PATH
     global r
     global STAT_CODE_QUEUED
+    global FS_PCAP_PATH
 
     verify_temp_storage_path()
     digest = hashlib.md5()
@@ -976,12 +976,21 @@ def page_coverage_summary():
         shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
     os.makedirs(os.path.join(TEMP_STORAGE_PATH, job_id))
 
-    # grab the user submitted files from the web form (max number of arbitrary files allowed on the web form is 5)
-    # note that these are file handle objects? have to get filename using .filename
-    MAX_PCAP_FILES = 5
     # list of dicts that have filename: and pcappath: entries for pcap files on disk to include in job
     pcap_files = []
     form_pcap_files = []
+    # pcapfilename from Flowsynth; on local (Dalton controller) disk
+    if request.form.get("fspcap"):
+        fspcap = request.form.get("fspcap")
+        err_msg = verify_fs_pcap(fspcap)
+        if err_msg:
+            delete_temp_files(job_id)
+            return render_template('/dalton/error.html', jid='', msg=[err_msg])
+        pcap_files.append({'filename': fspcap, 'pcappath': os.path.join(FS_PCAP_PATH, fspcap)})
+
+    # grab the user submitted files from the web form (max number of arbitrary files allowed on the web form is 5)
+    # note that these are file handle objects? have to get filename using .filename
+    MAX_PCAP_FILES = 5
     # make this a list so I can pass by reference
     dupcount = [0]
     for i in range(MAX_PCAP_FILES):
