@@ -14,6 +14,7 @@ services:
       - ./run.py:/opt/dalton/run.py
       - ./rulesets:/opt/dalton/rulesets
       - ./engine-configs:/opt/dalton/engine-configs
+      - ./flowsynth-gh:/opt/flowsynth
     restart: always
 
   nginx:
