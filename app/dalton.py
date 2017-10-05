@@ -78,8 +78,11 @@ try:
     U2_ANALYZER = dalton_config.get('dalton', 'u2_analyzer')
     RULECAT_SCRIPT = dalton_config.get('dalton', 'rulecat_script')
     DEBUG = dalton_config.getboolean('dalton', 'debug')
-    # no validation here that this value is sane and desired
-    FS_PCAP_PATH = dalton_config.get('flowsynth-web', 'pcap_path')
+
+    # options for flowsynth
+    FS_BIN_PATH = dalton_config.get('flowsynth-web', 'bin_path')    #Path to the flowsynth application
+    FS_PCAP_PATH = dalton_config.get('flowsynth-web', 'pcap_path')  #Path to temporarily store PCAPs
+
 except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
