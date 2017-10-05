@@ -79,7 +79,7 @@ try:
     RULECAT_SCRIPT = dalton_config.get('dalton', 'rulecat_script')
     DEBUG = dalton_config.getboolean('dalton', 'debug')
     # no validation here that this value is sane and desired
-    FS_PCAP_PATH = dalton_config.getboolean('flowsynth-web', 'pcap_path')
+    FS_PCAP_PATH = dalton_config.get('flowsynth-web', 'pcap_path')
 except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
@@ -167,7 +167,7 @@ def get_rulesets(engine=''):
     ruleset_list = []
     logger.debug("in get_rulesets(engine=%s)" % engine)
     # engine var should already be validated but just in case
-    if not re.match("r^[a-zA-Z0-9\_\-\.]*$", engine):
+    if not re.match(r"^[a-zA-Z0-9\_\-\.]*$", engine):
         logger.error("Invalid engine value '%s' in get_rulesets()" % engine)
         return ruleset_list
     ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
@@ -720,12 +720,12 @@ def page_coverage_default(sensor_tech, error=None):
     fspcap = None
     try:
         fspcap = request.args['fspcap']
+    except Exception as e:
+        logger.debug("error with fspcap (probably not passed): %s\n\n%s" % (e,  traceback.format_exc()))
+    if fspcap:
         err = verify_fs_pcap(fspcap)
         if err != None:
             return render_template('/dalton/error.html', jid='', msg=["%s" % (err)])
-    except Exception as e:
-        logger.error("error with fspcap: %s\n\n%s" % (e,  traceback.format_exc()))
-        fspcap = None
 
     # get list of rulesets based on engine
     rulesets = get_rulesets(sensor_tech.split('-')[0])
