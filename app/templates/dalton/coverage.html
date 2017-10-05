@@ -180,7 +180,7 @@
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;font-size:21px;line-height:40px;color:#333;border:0;">Packet Captures</div>
                             <p>Please specify a packet capture (libpcap). Depending on the engine, pcapng format may be supported as well.</p>
                             {% if fspcap %}
-                                <input type="text" name="fspcap" id="fspcap" readonly="readonly" value={{fspcap}}>
+                                <input type="text" name="fspcap" id="fspcap" readonly="readonly" value={{fspcap}}><p/>
                             {% endif %}
                             <!-- TODO: generate this dynamically via JavaScript -->
 							<input type="file" name="coverage-pcap0" id="coverage-pcap0" placeholder='Select a PCAP'><p/>
