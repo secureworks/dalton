@@ -860,7 +860,8 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                 filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
                 pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
                 fh = open(pcappath, 'wb')
-                fh.write(zf.read(file))
+                # if archive is password protected, try using 'infected' as password
+                fh.write(zf.read(file, pwd='infected'))
                 fh.close()
                 pcap_files.append({'filename': filename, 'pcappath': pcappath})
             zf.close()
