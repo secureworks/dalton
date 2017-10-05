@@ -688,7 +688,8 @@ def page_sensor_default():
 def verify_fs_pcap(fspcap):
     global FS_PCAP_PATH
     # require fspcap to be POSIX fully portable filename
-    if not re.match(r"^[A-Za-z0-9_\x2D\x2E]+$", fspcap):
+    if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", fspcap):
+        logger.error("Bad fspcap filename provided: '%s'. Filename must be POSIX fully portable." % fspcap)
         return "Bad pcap filename provided: '%s'" % (fspcap)
     fspcap_path = os.path.join(FS_PCAP_PATH, os.path.basename(fspcap))
     logger.debug("Flowsynth pcap file passed: %s" % fspcap_path)
@@ -986,7 +987,7 @@ def page_coverage_summary():
         if err_msg:
             delete_temp_files(job_id)
             return render_template('/dalton/error.html', jid='', msg=[err_msg])
-        pcap_files.append({'filename': fspcap, 'pcappath': os.path.join(FS_PCAP_PATH, fspcap)})
+        pcap_files.append({'filename': fspcap, 'pcappath': os.path.join(FS_PCAP_PATH, os.path.basename(fspcap))})
 
     # grab the user submitted files from the web form (max number of arbitrary files allowed on the web form is 5)
     # note that these are file handle objects? have to get filename using .filename
