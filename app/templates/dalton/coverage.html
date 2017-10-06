@@ -153,7 +153,7 @@
 		</div>
 	{% endif %}
 	<div class="row-fluid">
-		<div class="span12">
+		<div class="span11">
 			<form id='submitjob' action="/dalton/coverage/summary" method="post" enctype="multipart/form-data">
 				<h2>
 				Submit A New Job for <b id="versionHeading">
@@ -235,7 +235,7 @@
 								Use a defined ruleset
 							</label>
 							<span id="prod_ruleset">
-								<select name="prod_ruleset" style="width: 400px;">
+								<select name="prod_ruleset" style="width:auto;">
 									{% for ruleset in rulesets %}
 										<option value="{{ruleset[1]}}">{{ ruleset[0] }}</option>
 									{% endfor %}
@@ -285,8 +285,8 @@
 								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
                                 <br><a id="showHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
                                 <p>
-							<span id="custom_vars">
-								<textarea rows='25' cols='50' style='width: 1000px;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
+							<span id="custom_vars" class="span11";>
+								<textarea rows='25' cols='50' style='width: 100%;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
 							</span>
 							
                             <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration File</div>
@@ -294,8 +294,8 @@
                                 Modify {{ sensor_tech.split('-')[0]|title }} configuration{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
                                 <br><a id="showHideOptionCustomEngineConf" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
                                 <p>
-                            <span id="custom_engineconf">
-                                <textarea rows='25' cols='50' style='width: 1000px;' name="custom_engineconf" id="custom_engineconf_t">{{ engine_conf }}</textarea>
+                            <span id="custom_engineconf" class="span11">
+                                <textarea rows='25' cols='50' style='width: 100%;' name="custom_engineconf" id="custom_engineconf_t">{{ engine_conf }}</textarea>
                             </span>
 
 	

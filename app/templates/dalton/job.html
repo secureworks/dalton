@@ -1,7 +1,7 @@
 {% extends "dalton/layout.html" %}
 {% block body %}
     <div class="row">
-        <div class="span9">
+        <div class="span11">
             <h2>
 		Report for {{jobid}}
         {% set tlist = tech.split('-') %}
@@ -30,7 +30,7 @@
 				unknown
 			{% endif %}
 			<br/><br/>
-			    <a href="/dalton/sensor_api/get_job/{{jobid}}">Download Job Zipfile</a> (includes pcap, rules, and variables)
+			    <a href="/dalton/sensor_api/get_job/{{jobid}}">Download Job Zipfile</a> (includes pcap(s), rules, and config)
 			    <br/><br/>
 	        <div class="tabbable">
 	            <ul class="nav nav-tabs">
