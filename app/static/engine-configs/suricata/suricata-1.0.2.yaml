@@ -447,6 +447,7 @@ vars:
     ORACLE_PORTS: 1521
 
     SSH_PORTS: 22
+    FTP_PORTS: 21
 
 # Host specific policies for defragmentation and TCP stream
 # reassembly.  The host OS lookup is done using a radix tree, just

@@ -759,6 +759,7 @@ vars:
     ORACLE_PORTS: 1521
 
     SSH_PORTS: 22
+    FTP_PORTS: 21
 
 
 # Set the order of alerts bassed on actions
