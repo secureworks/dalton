@@ -856,8 +856,8 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                 if file.endswith('/'):
                     continue
                 filename = clean_filename(os.path.basename(file))
-                if os.path.splitext(filename)[1].lower() != ".pcap" and os.path.splitext(filename)[1].lower() != ".pcapng":
-                    logger.warn("Not adding file '%s' from archive '%s': '.pcap' or '.pcapng' extension required." % (file, os.path.basename(archivename)))
+                if os.path.splitext(filename)[1].lower() not in ['.pcap', '.pcapng', '.cap']:
+                    logger.warn("Not adding file '%s' from archive '%s': '.pcap', '.cap', or '.pcapng' extension required." % (file, os.path.basename(archivename)))
                     # just skip the file, and move on (and log it)
                     continue
                 filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
@@ -920,8 +920,8 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     logger.warn("Not adding member '%s' from archive '%s': not a file." % (file.name, os.path.basename(archivename)))
                     continue
                 filename = clean_filename(os.path.basename(file.name))
-                if os.path.splitext(filename)[1].lower() != ".pcap" and os.path.splitext(filename)[1].lower() != ".pcapng":
-                    logger.warn("Not adding file '%s' from archive '%s': '.pcap' or '.pcapng' extension required." % (file.name, os.path.basename(archivename)))
+                if os.path.splitext(filename)[1].lower() not in ['.pcap', '.pcapng', '.cap']:
+                    logger.warn("Not adding file '%s' from archive '%s': '.pcap', '.cap', or '.pcapng' extension required." % (file.name, os.path.basename(archivename)))
                     # just skip the file, and move on (and log it)
                     continue
                 filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
