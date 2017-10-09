@@ -2,19 +2,19 @@
 {% block body %}
     <script type="text/javascript">
     function loading_image() {
-        return 'Loading...';
+        return 'Sending...';
     }
 
-    $(document).ready(function(){   
+    $(document).ready(function(){
+        window.onload=window.onpageshow=function() {
+            $("#testcase-status").html('');
+        };
+
         $('#testcase').click(function(){
             $("#testcase-status").html(loading_image());
-		  $("#pcap-link").html("");
+	    	$("#pcap-link").html("");
 
-            postdata = { engine: $("#engine").val(), filename: $("#filename").val() };
-
-            $.post("savetestcase", postdata, function (data) {
-                $("#testcase-status").html(data);
-            });
+            window.location.href="/dalton/coverage/" + $('input[name=engine]:checked').val() + "/?fspcap=" + $("#filename").val() + ".pcap";
         });
     });
     </script>
@@ -24,16 +24,16 @@
 		<legend>Build Status <span class="label label-success">Success</span></legend>
 
 		<a href="get_pcap/{{ filename }}"><img src="{{ url_for('static', filename='images/disk-black.png') }}">&nbsp;Click Here to Download PCAP</a></br>
-        <legend>Add Test Case</legend>
+        <p>&nbsp;<p>
+        <legend>Send To Dalton</legend>
         <input type="hidden" id="filename" value="{{ filename }}">
-            <label>Engine</label>
-            <select id="engine">
-              <option value="suricata">Suricata</option>
-              <option value="snort">Snort</option>
-              <option value="both" selected>Both (Suricata / Snort)</option>
-            </select></br>
+            <label><b>Select Engine</b></label>
+            <input name="engine" type="radio" value="suricata" checked> Suricata</input>
+            <br>
+            <input name="engine" type="radio" value="snort"> Snort</input>
+            <br>&nbsp;<br>
         <div id="testcase-status"></div>
-		<input type="button" class="btn btn-inverse" id="testcase" value="Send to sensor">
+		<input type="button" class="btn btn-inverse" id="testcase" value="Submit">
 		{% else %}
 		<legend>Build Status <span class="label label-failure">Failure</span></legend>
 		There was a problem with your Flowsynth script:

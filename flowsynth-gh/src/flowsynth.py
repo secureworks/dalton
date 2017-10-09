@@ -330,7 +330,11 @@ class FSLexer:
                     eventdecl['contents'].append({'type': 'string', 'value': modifier_value})
                 elif (modifier_key.lower() == 'filecontent'):
                     #filecontent
-                    eventdecl['contents'].append({'type': 'file', 'value': modifier_value})
+                    if ARGS.no_filecontent:
+                        # '--no-filecontent' option was passed to flowsynth
+                        compiler_bailout("The 'filecontent' attribute is not supported in this context.")
+                    else:
+                        eventdecl['contents'].append({'type': 'file', 'value': modifier_value})
                 elif (modifier_key.lower() == 'uricontent'):
                     #uricontent
                     eventdecl['contents'].append({'type': 'uri', 'value': modifier_value})
@@ -459,7 +463,12 @@ class Flow:
                 if (content_type == 'string'):
                     str_payload = "%s%s" % (str_payload, self.parse_content(content_value))
                 elif (content_type == 'file'):
-                    str_payload = "%s%s" % (str_payload, self.get_file_content(content_value))
+                    if ARGS.no_filecontent:
+                        # '--no-filecontent' option was passed to flowsynth
+                        # This is also checked previously in the code path but adding here too
+                        compiler_bailout("The 'filecontent' attribute is not supported in this context.")
+                    else:
+                        str_payload = "%s%s" % (str_payload, self.get_file_content(content_value))
 
         return str_payload
 
@@ -697,6 +706,7 @@ def parse_cmd_line():
     parser.add_argument('-q', dest='quiet', action='store_true', default=False, help='Run silently')
     parser.add_argument('-d', dest='debug', action='store_true', default=False, help='Run in debug mode')
     parser.add_argument('--display', dest='display', action='store', default='text', choices=['text','json'], help='Display format')
+    parser.add_argument('--no-filecontent', dest='no_filecontent', action='store_true', default=False, help='Disable support for the filecontent attribute')
 
     args = parser.parse_args()
 

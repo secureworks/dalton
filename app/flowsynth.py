@@ -8,6 +8,7 @@ import json
 import sys
 import random
 import tempfile
+import re
 
 from flask import Blueprint, render_template, request, Response, redirect
 from dalton import FS_BIN_PATH as BIN_PATH
@@ -207,7 +208,7 @@ def compile_fs():
     fptr.close()
 
     #run the flowsynth command
-    command = "%s/src/flowsynth.py %s -f pcap -w %s --display json" % (BIN_PATH, inpath, outpath)
+    command = "%s/src/flowsynth.py %s -f pcap -w %s --display json --no-filecontent" % (BIN_PATH, inpath, outpath)
     print command
     proc = subprocess.Popen(shlex.split(command), stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     output = proc.communicate()[0]
@@ -237,6 +238,10 @@ def about_page():
 def retrieve_pcap(pcapid):
     """returns a PCAP to the user"""
     global PCAP_PATH
-    path = '%s/%s.pcap' % (PCAP_PATH, pcapid)
+    if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", pcapid):
+        return render_template('/pcapwg/error.html', error_text = "Bad pcapid: '%s'" % pcapid)
+    path = '%s/%s.pcap' % (PCAP_PATH, os.path.basename(pcapid))
+    if not os.path.isfile(path):
+        return render_template('/pcapwg/error.html', error_text = "File not found: '%s'" % os.path.basename(path))
     filedata = open(path,'r').read()
     return Response(filedata,mimetype="application/vnd.tcpdump.pcap", headers={"Content-Disposition":"attachment;filename=%s.pcap" % pcapid})
