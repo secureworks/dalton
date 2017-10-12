@@ -123,6 +123,20 @@ services:
 ###### Snort Agents #######
 ###########################
 
+# Snort 2.9.11 from source
+  agent-snort-2.9.11:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_snort
+      args:
+        - SNORT_VERSION=2.9.11
+        - DAQ_VERSION=2.0.6
+    image: snort-2.9.11:latest
+    container_name: snort-2.9.11
+    environment:
+      - AGENT_DEBUG=${AGENT_DEBUG}
+    restart: always
+
 # Snort 2.9.9.0 from source
   agent-snort-2.9.9.0:
     build:
