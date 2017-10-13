@@ -52,7 +52,7 @@ from logging.handlers import RotatingFileHandler
 from distutils.version import LooseVersion
 
 # urllib2 in Python < 2.6 doesn't support setting a timeout so doing it like this
-socket.setdefaulttimeout(30)
+socket.setdefaulttimeout(120)
 
 #*********************************
 #*** Parse Comand Line Options ***
