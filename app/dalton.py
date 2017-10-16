@@ -44,6 +44,7 @@ import  cStringIO
 import traceback
 import subprocess
 import random
+from threading import Thread
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -69,9 +70,10 @@ try:
     RULESET_STORAGE_PATH = dalton_config.get('dalton', 'ruleset_path')
     JOB_STORAGE_PATH = dalton_config.get('dalton', 'job_path')
     CONF_STORAGE_PATH = dalton_config.get('dalton', 'engine_conf_path')
-    REDIS_EXPIRE = int(dalton_config.get('dalton', 'redis_expire'))
-    TEAPOT_REDIS_EXPIRE = int(dalton_config.get('dalton', 'teapot_redis_expire'))
-    JOB_RUN_TIMEOUT = int(dalton_config.get('dalton', 'job_run_timeout'))
+    REDIS_EXPIRE = (dalton_config.getint('dalton', 'redis_expire') * 60)
+    TEAPOT_REDIS_EXPIRE = (dalton_config.getint('dalton', 'teapot_redis_expire') * 60)
+    JOB_RUN_TIMEOUT = dalton_config.getint('dalton', 'job_run_timeout')
+    AGENT_PURGE_TIME = dalton_config.getint('dalton', 'agent_purge_time')
     REDIS_HOST = dalton_config.get('dalton', 'redis_host')
     API_KEYS = dalton_config.get('dalton', 'api_keys')
     MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
@@ -128,6 +130,18 @@ if os.path.exists(RULECAT_SCRIPT):
             except Exception as e:
                 logger.info("Unable to download ruleset for %s" % engine)
                 logger.debug("Exception: %s" % e)
+
+# check for sane timeout values
+if REDIS_EXPIRE <= 0:
+    logger.critical("redis_expire value of %d minutes is invalid.  Expect problems." % dalton_config.getint('dalton', 'redis_expire'))
+if TEAPOT_REDIS_EXPIRE <= 0:
+    logger.critical("teapot_redis_expire value of %d minutes is invalid.  Expect problems." % dalton_config.getint('dalton', 'teapot_redis_expire'))
+if AGENT_PURGE_TIME <= 1:
+    logger.critical("agent_purge_time value of %d seconds is invalid.  Expect problems." % AGENT_PURGE_TIME)
+if JOB_RUN_TIMEOUT <= 4:
+    logger.critical("job_run_time value of %d seconds is invalid.  Expect problems." % JOB_RUN_TIMEOUT)
+if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
+    logger.warn("teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis." % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE))
 
 sensor_tech_re = re.compile(r"^[a-zA-Z0-9\x2D\x2E\x5F]+$")
 
@@ -259,7 +273,7 @@ def expire_all_keys(jid):
 
 
 def check_for_timeout(jobid):
-    """checks to see if a jobs has been running more than JOB_RUN_TIMEOUT seconds and sets it to STAT_CODE_TIMEOUT and sets keys to expire"""
+    """checks to see if a job has been running more than JOB_RUN_TIMEOUT seconds and sets it to STAT_CODE_TIMEOUT and sets keys to expire"""
     global r
     try:
         start_time = int(r.get("%s-start_time" % jobid))
@@ -278,6 +292,47 @@ def check_for_timeout(jobid):
     else:
         return False
 
+
+@dalton_blueprint.route('/dalton/controller_api/delete-old-job-files', methods=['GET'])
+def delete_old_job_files():
+    """Deletes job files on disk if modificaiton time exceeds expire time(s)"""
+    global REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, JOB_STORAGE_PATH, logger
+    total_deleted = 0
+
+    # this coded but not enabled since I don't think any user should be able
+    if request:
+        mmin = request.args.get('mmin')
+        teapot_mmin = request.args.get('teapot_mmin')
+        if mmin is not None:
+            logger.warn("Passing a mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for regular jobs." % REDIS_EXPIRE)
+        if teapot_mmin is not None:
+            logger.warn("Passing a teapot_mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for teapot jobs." % TEAPOT_REDIS_EXPIRE)
+
+    job_mmin = REDIS_EXPIRE
+    teapot_mmin = TEAPOT_REDIS_EXPIRE
+
+    if os.path.exists(JOB_STORAGE_PATH):
+        now = time.time()
+        # assumption is REDIS_EXPIRE >= TEAPOT_REDIS_EXPIRE
+        for file in glob.glob(os.path.join(JOB_STORAGE_PATH, "*.zip")):
+            if os.path.isfile(file):
+                mtime = os.path.getmtime(file)
+                if (now-mtime) > REDIS_EXPIRE:
+                    logger.debug("Deleting job file '%s'. mtime %s; now %s; diff %d seconds; expire threshold %d seconds" % (os.path.basename(file), now, mtime, (now-mtime), REDIS_EXPIRE))
+                    os.unlink(file)
+                    total_deleted += 1
+        for file in glob.glob(os.path.join(JOB_STORAGE_PATH, "teapot_*.zip")):
+            if os.path.isfile(file):
+                mtime = os.path.getmtime(file)
+                if (now-mtime) > TEAPOT_REDIS_EXPIRE:
+                    logger.debug("Deleting teapot job file '%s'. mtime %s; now %s; diff %d seconds; expire threshold %d seconds" % (os.path.basename(file), now, mtime, (now-mtime), TEAPOT_REDIS_EXPIRE))
+                    os.unlink(file)
+                    total_deleted += 1
+    if total_deleted > 0:
+        logger.info("Deleted %d job file(s) from disk." % total_deleted)
+    # returning a string so Flask can render it; calling functions that use the
+    #  return value need to cast it back to int if they wish to use it as an int
+    return str(total_deleted)
 
 @dalton_blueprint.route('/')
 def index():
@@ -602,6 +657,8 @@ def get_ajax_job_status_msg(jobid):
     """return the job status msg (as a string)"""
     # user's browser requesting job status msg
     global STAT_CODE_RUNNING
+    if not validate_jobid(jobid):
+        return Response("Invalid Job ID: %s" % jobid, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
     stat_code = get_job_status(jobid)
     if stat_code:
         if int(stat_code) == STAT_CODE_RUNNING:
@@ -621,6 +678,8 @@ def get_ajax_job_status_code(jobid):
     """return the job status code (AS A STRING! -- you need to cast the return value as an int if you want to use it as an int)"""
     # user's browser requesting job status code
     global STAT_CODE_INVALID, STAT_CODE_RUNNING
+    if not validate_jobid(jobid):
+        return "%d" % STAT_CODE_INVALID
     r_status_code = get_job_status(jobid)
     if not r_status_code:
         # invalid jobid
@@ -638,6 +697,9 @@ def sensor_get_job(id):
     global JOB_STORAGE_PATH
     # get the user (for logging)
     logger.debug("Dalton in sensor_get_job(): request for job zip file %s" % (id))
+    if not validate_jobid(id):
+        logger.error("Bad jobid given: '%s'. Possible hacking attempt." % id)
+        return render_template('/dalton/error.html', jid=id, msg=["Bad jobid, invalid characters in: '%s'" % (id)])
     path = "%s/%s.zip" % (JOB_STORAGE_PATH, id)
     if os.path.exists(path):
         filedata = open(path,'r').read()
@@ -649,13 +711,11 @@ def sensor_get_job(id):
 
 
 def clear_old_agents():
-    global r
+    global r, AGENT_PURGE_TIME
     if r.exists('sensors'):
         for sensor in r.smembers('sensors'):
             minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
-            # 7200 minutes == 5 days
-#            if minutes_ago > 7200:
-            if minutes_ago > 60:
+            if minutes_ago >= AGENT_PURGE_TIME:
                 # delete old agents
                 r.delete("%s-uid" % sensor)
                 r.delete("%s-ip" % sensor)
@@ -700,6 +760,14 @@ def verify_fs_pcap(fspcap):
         logger.error("fspcap file '%s' not found." % fspcap_path)
         return "File not found: '%s'" % os.path.basename(fspcap)
     return None
+
+"""validate that job_id has expected characters; prevent directory traversal"""
+def validate_jobid(jid):
+    if not re.match (r'^(teapot_)?[a-zA-Z\d]+$', jid):
+        return False
+    else:
+        return True
+
 
 @dalton_blueprint.route('/dalton/coverage/<sensor_tech>/', methods=['GET'])
 #@login_required()
@@ -1064,7 +1132,7 @@ def page_coverage_summary():
             mergecap_command = "%s -w %s -F pcap %s" % (MERGECAP_BINARY, combined_file, ' '.join([p['pcappath'] for p in pcap_files]))
             logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s" % ', '.join([p['filename'] for p in pcap_files]))
             try:
-                # validation on pcap filenames done above; otherwise OS command injeciton here
+                # validation on pcap filenames done above; otherwise OS command injection here
                 mergecap_output = subprocess.Popen(mergecap_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
                 if len(mergecap_output) > 0:
                     # return error?
@@ -1613,6 +1681,12 @@ def page_queue_default():
     global r
     num_jobs_to_show_default = 25
 
+    # clear old job files from disk
+    # spin off a thread in case deleting files from
+    #  disk takes a while; this way we won't block the
+    #  queue page from loading
+    Thread(target=delete_old_job_files).start()
+
     try:
         num_jobs_to_show = int(request.args['numjobs'])
     except:
@@ -1696,7 +1770,7 @@ def controller_api_get_request(jid, requested_data):
     valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'perf', 'tech', 'error', 'time', 'statcode', 'debug', 'status', 'submission_time', 'start_time', 'user', 'all')
     json_response = {'error':False, 'error_msg':None, 'data':None}
     # some input validation
-    if not re.match (r'^(teapot_)?[a-zA-Z\d]+$', jid):
+    if not validate_jobid(jid):
         json_response["error"] = True
         json_response["error_msg"] = "Invalid Job ID value: %s" % jid
     elif not re.match(r'^[a-zA-Z\d\_\.\-]+$', requested_data):
