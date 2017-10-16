@@ -4,7 +4,7 @@ MAINTAINER David Wharton
 # wireshark needed for mergecap; statically compiled
 #  mergecap would be smaller but doing this for now
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y install wireshark-common
+    DEBIAN_FRONTEND=noninteractive apt-get -y install wireshark-common cron
 
 # for development; not needed by the app
 RUN apt-get install -y less nano net-tools
@@ -21,6 +21,13 @@ COPY run.py /opt/dalton/run.py
 COPY dalton.conf /opt/dalton/dalton.conf
 COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
+RUN DALTON_JOB_DIR=$(grep -P '^job_path\s*\x3D\s*' /opt/dalton/dalton.conf | cut -d'=' -f2 | sed -e 's/^\s*//' -e 's/\s*$//') && \
+    DALTON_REDIS_EXPIRE=$(grep -P -o '^redis_expire\s*\x3D\s*\d+' /opt/dalton/dalton.conf | grep -P -o "\d+$") && \
+    DALTON_REDIS_TEAPOT_EXPIRE=$(grep -P -o '^teapot_redis_expire\s*\x3D\s*\d+' /opt/dalton/dalton.conf | grep -P -o '\d+$') && \
+    echo "0 * * * * /usr/bin/find $DALTON_JOB_DIR/*.zip -mmin +$DALTON_REDIS_EXPIRE | /usr/bin/xargs /bin/rm -rf" > /tmp/dalton_job_delete.cron && \
+    echo "0 * * * * /usr/bin/find $DALTON_JOB_DIR/teapot_*.zip -mmin +$DALTON_REDIS_TEAPOT_EXPIRE | /usr/bin/xargs /bin/rm -rf" >> /tmp/dalton_job_delete.cron && \
+    /usr/bin/crontab /tmp/dalton_job_delete.cron && \
+    /etc/init.d/cron start
 
 #install flowsynth (REMOVE THIS NEXT LINE ONCE IN GH)
 COPY flowsynth-gh /opt/flowsynth
@@ -29,4 +36,4 @@ COPY flowsynth-gh /opt/flowsynth
 #ADD https://github.com/secureworks/flowsynth/blob/master/src/flowsynth.py /opt/flowsynth/src/flowsynth.py
 RUN pip install -r /opt/flowsynth/requirements.txt
 
-CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf
+CMD /etc/init.d/cron start & python /opt/dalton/run.py -c /opt/dalton/dalton.conf

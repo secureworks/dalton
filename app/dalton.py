@@ -69,9 +69,10 @@ try:
     RULESET_STORAGE_PATH = dalton_config.get('dalton', 'ruleset_path')
     JOB_STORAGE_PATH = dalton_config.get('dalton', 'job_path')
     CONF_STORAGE_PATH = dalton_config.get('dalton', 'engine_conf_path')
-    REDIS_EXPIRE = int(dalton_config.get('dalton', 'redis_expire'))
-    TEAPOT_REDIS_EXPIRE = int(dalton_config.get('dalton', 'teapot_redis_expire'))
-    JOB_RUN_TIMEOUT = int(dalton_config.get('dalton', 'job_run_timeout'))
+    REDIS_EXPIRE = (dalton_config.getint('dalton', 'redis_expire') * 60)
+    TEAPOT_REDIS_EXPIRE = (dalton_config.getint('dalton', 'teapot_redis_expire') * 60)
+    JOB_RUN_TIMEOUT = dalton_config.getint('dalton', 'job_run_timeout')
+    AGENT_PURGE_TIME = dalton_config.getint('dalton', 'agent_purge_time')
     REDIS_HOST = dalton_config.get('dalton', 'redis_host')
     API_KEYS = dalton_config.get('dalton', 'api_keys')
     MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
@@ -128,6 +129,17 @@ if os.path.exists(RULECAT_SCRIPT):
             except Exception as e:
                 logger.info("Unable to download ruleset for %s" % engine)
                 logger.debug("Exception: %s" % e)
+
+# check for sane timeout values
+if REDIS_EXPIRE <= 0:
+    logger.critical("redis_expire value of %d minutes is invalid.  Expect problems." % dalton_config.getint('dalton', 'redis_expire'))
+if TEAPOT_REDIS_EXPIRE <= 0:
+    logger.critical("teapot_redis_expire value of %d minutes is invalid.  Expect problems." % dalton_config.getint('dalton', 'teapot_redis_expire'))
+if AGENT_PURGE_TIME <= 1:
+    logger.critical("agent_purge_time value of %d seconds is invalid.  Expect problems." % AGENT_PURGE_TIME)
+if JOB_RUN_TIMEOUT <= 4:
+    logger.critical("job_run_time value of %d seconds is invalid.  Expect problems." % JOB_RUN_TIMEOUT)
+
 
 sensor_tech_re = re.compile(r"^[a-zA-Z0-9\x2D\x2E\x5F]+$")
 
@@ -649,13 +661,13 @@ def sensor_get_job(id):
 
 
 def clear_old_agents():
-    global r
+    global r, AGENT_PURGE_TIME
     if r.exists('sensors'):
         for sensor in r.smembers('sensors'):
             minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
             # 7200 minutes == 5 days
 #            if minutes_ago > 7200:
-            if minutes_ago > 60:
+            if minutes_ago > AGENT_PURGE_TIME:
                 # delete old agents
                 r.delete("%s-uid" % sensor)
                 r.delete("%s-ip" % sensor)
