@@ -273,7 +273,7 @@ def expire_all_keys(jid):
 
 
 def check_for_timeout(jobid):
-    """checks to see if a jobs has been running more than JOB_RUN_TIMEOUT seconds and sets it to STAT_CODE_TIMEOUT and sets keys to expire"""
+    """checks to see if a job has been running more than JOB_RUN_TIMEOUT seconds and sets it to STAT_CODE_TIMEOUT and sets keys to expire"""
     global r
     try:
         start_time = int(r.get("%s-start_time" % jobid))
@@ -657,6 +657,8 @@ def get_ajax_job_status_msg(jobid):
     """return the job status msg (as a string)"""
     # user's browser requesting job status msg
     global STAT_CODE_RUNNING
+    if not validate_jobid(jobid):
+        return Response("Invalid Job ID: %s" % jobid, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
     stat_code = get_job_status(jobid)
     if stat_code:
         if int(stat_code) == STAT_CODE_RUNNING:
@@ -676,6 +678,8 @@ def get_ajax_job_status_code(jobid):
     """return the job status code (AS A STRING! -- you need to cast the return value as an int if you want to use it as an int)"""
     # user's browser requesting job status code
     global STAT_CODE_INVALID, STAT_CODE_RUNNING
+    if not validate_jobid(jobid):
+        return "%d" % STAT_CODE_INVALID
     r_status_code = get_job_status(jobid)
     if not r_status_code:
         # invalid jobid
@@ -693,6 +697,9 @@ def sensor_get_job(id):
     global JOB_STORAGE_PATH
     # get the user (for logging)
     logger.debug("Dalton in sensor_get_job(): request for job zip file %s" % (id))
+    if not validate_jobid(id):
+        logger.error("Bad jobid given: '%s'. Possible hacking attempt." % id)
+        return render_template('/dalton/error.html', jid=id, msg=["Bad jobid, invalid characters in: '%s'" % (id)])
     path = "%s/%s.zip" % (JOB_STORAGE_PATH, id)
     if os.path.exists(path):
         filedata = open(path,'r').read()
@@ -708,9 +715,7 @@ def clear_old_agents():
     if r.exists('sensors'):
         for sensor in r.smembers('sensors'):
             minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
-            # 7200 minutes == 5 days
-#            if minutes_ago > 7200:
-            if minutes_ago > AGENT_PURGE_TIME:
+            if minutes_ago >= AGENT_PURGE_TIME:
                 # delete old agents
                 r.delete("%s-uid" % sensor)
                 r.delete("%s-ip" % sensor)
@@ -755,6 +760,14 @@ def verify_fs_pcap(fspcap):
         logger.error("fspcap file '%s' not found." % fspcap_path)
         return "File not found: '%s'" % os.path.basename(fspcap)
     return None
+
+"""validate that job_id has expected characters; prevent directory traversal"""
+def validate_jobid(jid):
+    if not re.match (r'^(teapot_)?[a-zA-Z\d]+$', jid):
+        return False
+    else:
+        return True
+
 
 @dalton_blueprint.route('/dalton/coverage/<sensor_tech>/', methods=['GET'])
 #@login_required()
@@ -1119,7 +1132,7 @@ def page_coverage_summary():
             mergecap_command = "%s -w %s -F pcap %s" % (MERGECAP_BINARY, combined_file, ' '.join([p['pcappath'] for p in pcap_files]))
             logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s" % ', '.join([p['filename'] for p in pcap_files]))
             try:
-                # validation on pcap filenames done above; otherwise OS command injeciton here
+                # validation on pcap filenames done above; otherwise OS command injection here
                 mergecap_output = subprocess.Popen(mergecap_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
                 if len(mergecap_output) > 0:
                     # return error?
@@ -1757,7 +1770,7 @@ def controller_api_get_request(jid, requested_data):
     valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'perf', 'tech', 'error', 'time', 'statcode', 'debug', 'status', 'submission_time', 'start_time', 'user', 'all')
     json_response = {'error':False, 'error_msg':None, 'data':None}
     # some input validation
-    if not re.match (r'^(teapot_)?[a-zA-Z\d]+$', jid):
+    if not validate_jobid(jid):
         json_response["error"] = True
         json_response["error_msg"] = "Invalid Job ID value: %s" % jid
     elif not re.match(r'^[a-zA-Z\d\_\.\-]+$', requested_data):
