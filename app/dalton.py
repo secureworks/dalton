@@ -44,6 +44,7 @@ import  cStringIO
 import traceback
 import subprocess
 import random
+from threading import Thread
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -139,7 +140,8 @@ if AGENT_PURGE_TIME <= 1:
     logger.critical("agent_purge_time value of %d seconds is invalid.  Expect problems." % AGENT_PURGE_TIME)
 if JOB_RUN_TIMEOUT <= 4:
     logger.critical("job_run_time value of %d seconds is invalid.  Expect problems." % JOB_RUN_TIMEOUT)
-
+if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
+    logger.warn("teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis." % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE))
 
 sensor_tech_re = re.compile(r"^[a-zA-Z0-9\x2D\x2E\x5F]+$")
 
@@ -290,6 +292,47 @@ def check_for_timeout(jobid):
     else:
         return False
 
+
+@dalton_blueprint.route('/dalton/controller_api/delete-old-job-files', methods=['GET'])
+def delete_old_job_files():
+    """Deletes job files on disk if modificaiton time exceeds expire time(s)"""
+    global REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, JOB_STORAGE_PATH, logger
+    total_deleted = 0
+
+    # this coded but not enabled since I don't think any user should be able
+    if request:
+        mmin = request.args.get('mmin')
+        teapot_mmin = request.args.get('teapot_mmin')
+        if mmin is not None:
+            logger.warn("Passing a mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for regular jobs." % REDIS_EXPIRE)
+        if teapot_mmin is not None:
+            logger.warn("Passing a teapot_mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for teapot jobs." % TEAPOT_REDIS_EXPIRE)
+
+    job_mmin = REDIS_EXPIRE
+    teapot_mmin = TEAPOT_REDIS_EXPIRE
+
+    if os.path.exists(JOB_STORAGE_PATH):
+        now = time.time()
+        # assumption is REDIS_EXPIRE >= TEAPOT_REDIS_EXPIRE
+        for file in glob.glob(os.path.join(JOB_STORAGE_PATH, "*.zip")):
+            if os.path.isfile(file):
+                mtime = os.path.getmtime(file)
+                if (now-mtime) > REDIS_EXPIRE:
+                    logger.debug("Deleting job file '%s'. mtime %s; now %s; diff %d seconds; expire threshold %d seconds" % (os.path.basename(file), now, mtime, (now-mtime), REDIS_EXPIRE))
+                    os.unlink(file)
+                    total_deleted += 1
+        for file in glob.glob(os.path.join(JOB_STORAGE_PATH, "teapot_*.zip")):
+            if os.path.isfile(file):
+                mtime = os.path.getmtime(file)
+                if (now-mtime) > TEAPOT_REDIS_EXPIRE:
+                    logger.debug("Deleting teapot job file '%s'. mtime %s; now %s; diff %d seconds; expire threshold %d seconds" % (os.path.basename(file), now, mtime, (now-mtime), TEAPOT_REDIS_EXPIRE))
+                    os.unlink(file)
+                    total_deleted += 1
+    if total_deleted > 0:
+        logger.info("Deleted %d job file(s) from disk." % total_deleted)
+    # returning a string so Flask can render it; calling functions that use the
+    #  return value need to cast it back to int if they wish to use it as an int
+    return str(total_deleted)
 
 @dalton_blueprint.route('/')
 def index():
@@ -1624,6 +1667,12 @@ def page_queue_default():
     """the default queue page"""
     global r
     num_jobs_to_show_default = 25
+
+    # clear old job files from disk
+    # spin off a thread in case deleting files from
+    #  disk takes a while; this way we won't block the
+    #  queue page from loading
+    Thread(target=delete_old_job_files).start()
 
     try:
         num_jobs_to_show = int(request.args['numjobs'])
