@@ -1356,9 +1356,12 @@ def page_coverage_summary():
                 if 'unified2-alert' in olist:
                     try:
                         deployment = config['outputs'][olist.index('unified2-alert')]['unified2-alert']['xff']['deployment']
+                    except Exception as e:
+                        logger.debug("Could not get outputs->unified2-alert->xff->deployment.  Using default value of '%s'" % deployment)
+                    try:
                         header = config['outputs'][olist.index('unified2-alert')]['unified2-alert']['xff']['header']
                     except Exception as e:
-                        logger.debug("Could not get 'deployment' and/or 'header' values for outputs->unified2-alert->xff->")
+                        logger.debug("Could not get outputs->unified2-alert->xff->header.  Using default value of '%s'" % header)
                 u2_config = {'unified2-alert': {'enabled': True, \
                              'filename': "unified2.dalton.alert", \
                              'xff': {'enabled': True, 'mode': 'extra-data', \
@@ -1430,17 +1433,31 @@ def page_coverage_summary():
                     try:
                         # set filename
                         config['outputs'][olist.index('eve-log')]['eve-log']['filename'] = "dalton-eve.json"
-                        # disable EVE TLS logging. This mixing of dicts and lists is onerous to no end....
+                        # disable EVE TLS logging. This mixing of dicts and lists is onerous....
+                        # doing this one at a time (two passes) since we are iterating over the structure
+                        # we want to edit AND we are using list indexes.
+                        # Also, the yaml will be represented differenlty based on the values (e.g. string vs ordered dict).
+                        # Instead of trying to check everything every time, just catch the exception(s) and move on. The
+                        # stuff we want disabled will still get disabled despite the exceptions along the way.
                         for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
                             try:
                                 if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'alert':
-                                    logger.debug("Removing outputs->eve-log->types->alert->tls")
+                                    # apparently this is supported -- http://suricata.readthedocs.io/en/latest/output/eve/eve-json-output.html
                                     config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
-                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
-                                    logger.debug("Removing outputs->eve-log->types->tls")
-                                    del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
+                                    logger.debug("Removed outputs->eve-log->types->alert->tls")
+                                    break
                             except Exception as e:
-                                logger.debug("Could not disable EVE TLS log. Error: %s" % e)
+                                #logger.debug("Possible issue when removing outputs->eve-log->types->alert->tls (EVE TLS log). Error: %s" % e)
+                                pass
+
+                        for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
+                            try:
+                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
+                                    del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
+                                    logger.debug("Removed outputs->eve-log->types->tls")
+                                    break
+                            except Exception as e:
+                                #logger.debug("Possible issue when removing outputs->eve-log->types->tls (EVE TLS log). Error: %s" % e)
                                 pass
                     except Exception as e:
                         logger.debug("Problem editing eve-log section of config: %s" % e)
