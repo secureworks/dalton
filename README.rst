@@ -580,6 +580,29 @@ exclude them from the list.
 Adding Rulesets
 ===============
 
+For each Dalton job, a single 'defined ruleset' file can be used and/or 'custom rules'. 
+Custom rules are entered in the Web UI but defined rulesets are stored on disk.
+
+On the Dalton Controller, defined rulesets must be in the directory 
+``/opt/dalton/rulesets/suricata/`` for Suricata rules and
+``/opt/dalton/rulesets/snort/`` for Snort rules.  The ruleset files must end in
+``.rules``.
+
+The ``rulesets`` directory (and subdirectories) on the host running the Dalton 
+Controller container is shared with the container so '.rules' files can be easily 
+added from the host machine.
+
+Popular open source rule download and management tools such as 
+`rulecat <https://github.com/jasonish/py-idstools>`__ and 
+`PulledPork <https://github.com/shirkdog/pulledpork>`__ make it trivial to download
+rulesets, combine all rules into a single file, and then store it in the necessary 
+location.
+
+The Dalton Controller container includes rulecat (see the ``rulecat_script`` variable 
+in ``dalton.conf``) and when the Dalton Controller first starts up, if there 
+are no existing rulesets, it will attempt to download the latest Suricata and Snort rulesets 
+from `rules.emergingthreats.net <https://rules.emergingthreats.net>`__.
+
 Adding Sensors
 ==============
 
