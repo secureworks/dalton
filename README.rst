@@ -44,8 +44,13 @@ Contents
 -  `Teapot Jobs <#teapot-jobs>`__
 -  `Adding Rulesets <#adding-rulesets>`__
 -  `Adding Sensors <#adding-sensors>`__
--  `Updating Sensor Configs <#updating-sensor-configs>`__
--  `Flowsynth <#flowsynth>`__
+
+   -  `Docker Sensors <#docker-sensors>`__
+   -  `Non-Docker Sensors <#non-docker-sensors>`__
+
+-  `Adding Sensor Configs <#adding-sensor-configs>`__
+-  `Logging and Debugging <#logging-and-debugging>`__
+-  `Flowsynth WebUI <#flowsynth-webui>`__
 -  `Frequently Asked Questions <#frequently-asked-questions>`__
 -  `Authors <#authors>`__
 
@@ -558,8 +563,8 @@ keep them around after that.  Often this is utilized in the programmatic
 submission of jobs combined with using the `Dalton API <#dalton-api>`__
 to automatically and/or quickly process the results.
 
-Such job submissions are short (lived) and stout (voluminous).  Like a little 
-teapot.
+Such job submissions are short (lived) and stout (voluminous).  *Like a little 
+teapot.*
 
 Teapot jobs differ from regular jobs in a few main ways:
 
@@ -606,11 +611,145 @@ from `rules.emergingthreats.net <https://rules.emergingthreats.net>`__.
 Adding Sensors
 ==============
 
-Updating Sensor Configs
-=======================
+Docker Sensors
+--------------
+The ``docker-compose.yml`` file includes directives to build Dalton Agents for
+a variety of Suricata and Snort versions.  The sensor engines (Suricata or
+Snort) are built from source.  To add a new or different version, just copy 
+one of the existing specifications and change the version number(s) as necessary.
 
-Flowsynth
-=========
+For example, here is the specification for Suricata 3.2.3:
+
+.. code:: yaml
+
+      agent-suricata-3.2.3:
+        build:
+          context: ./dalton-agent
+          dockerfile: Dockerfiles/Dockerfile_suricata
+          args:
+            - SURI_VERSION=3.2.3
+        image: suricata-3.2.3:latest
+        container_name: suricata-3.2.3
+        environment:
+          - AGENT_DEBUG=${AGENT_DEBUG}
+        restart: always
+
+To add a specification for Suricata 4.0.2 (if it exists) just change the
+SURI_VERSION arg value from '3.2.3' to '4.0.2'.  The other places the version is used here
+('image', 'container_name', etc.) are there to provide useful labels for 
+easier management of the Dalton Agent containers.  Example Suricata 4.0.2
+specification:
+
+.. code:: yaml
+
+      agent-suricata-4.0.2:
+        build:
+          context: ./dalton-agent
+          dockerfile: Dockerfiles/Dockerfile_suricata
+          args:
+            - SURI_VERSION=4.0.2
+        image: suricata-4.0.2:latest
+        container_name: suricata-4.0.2
+        environment:
+          - AGENT_DEBUG=${AGENT_DEBUG}
+        restart: always
+        
+Suricata can also have ``SURI_VERSION=current`` in which case the latest 
+Suricata version will be used to build the Agent.
+
+Snort agents are the same way but the args to customize are ``SNORT_VERSION`` and 
+(possibly) ``DAQ_VERSION``.  Example Snort specification:
+
+.. code:: yaml
+
+      # Snort 2.9.11 from source
+        agent-snort-2.9.11:
+          build:
+            context: ./dalton-agent
+            dockerfile: Dockerfiles/Dockerfile_snort
+            args:
+              - SNORT_VERSION=2.9.11
+              - DAQ_VERSION=2.0.6
+          image: snort-2.9.11:latest
+          container_name: snort-2.9.11
+          environment:
+            - AGENT_DEBUG=${AGENT_DEBUG}
+          restart: always
+
+Suricata agents should build off the suricata Dockerfile -- 
+``Dockerfiles/Dockerfile_suricata``; and Snort agents should build off the 
+Snort Dockerfile at ``Dockerfiles/Dockerfile_snort``.
+
+Non-Docker Sensors
+------------------
+Sensors don't have to be Docker containers or part of the docker-compose
+network to be used by the Dalton Controller; they just have to be able to 
+access and talk with the Docker Controller webserver.
+
+A Suricata or Snort machine can be turned into a Dalton Agent fairly easily. 
+Requirements:
+
+-  Engine (Suricata or Snort)
+-  Python
+-  ``dalton-agent.py``
+-  ``dalton-agent.conf``
+
+The ``dalton-agent.conf`` file must be modified to point to the Docker 
+Controller (see ``DALTON_API`` option).  Additionally, if the 
+``SENSOR_TECHNOLOGY`` value is not set to 'auto' (or automatic version 
+determination fails), the ``SENSOR_TECHNOLOGY`` value must follow a certain
+pattern; it should start with the engine name ('suricata' or 'snort'), 
+followed by a dash followed by the version number. For example:  'suricata-4.0.1'.  
+This format helps tell the Dalton Controll what technology is being used as 
+well as maps back to the config files on the Controller.
+
+For more details on the Dalton Agent configuration options, see the inline 
+comments in the ``dalton-agent.py`` file.
+
+To start the Dalton Agent, run dalton-agent.py::
+        
+        Usage: dalton-agent.py [options]
+
+        Options:
+        -h, --help            show this help message and exit
+        -c CONFIGFILE, --config=CONFIGFILE
+                              path to config file [default: dalton-agent.conf]
+
+
+Adding Sensor Configs
+=====================
+
+TODO
+
+
+Logging and Debugging
+=====================
+
+By default, the Dalton Controller logs to ``/var/log/dalton.log`` and Dalton 
+Agents log to ``/var/log/dalton-agent.log``.  The nginx container logs to 
+the ``/var/log/nginx`` directory (``dalton-access.log`` and 
+``dalton-error.log``).  The (frequent) polling that Dalton Agents do to the 
+nginx container to check for new jobs is not logged.
+
+For the Dalton Controller, debugging can be enabled in ``dalton.conf`` file or 
+by setting the ``CONTROLLER_DEBUG`` environment variable (e.g. 
+``CONTROLLER_DEBUG=1``.  This can also be passed during the container build 
+process and set in the ``.env`` file.  If either the config file or environment 
+variable has debugging set, debug logging will be enabled.
+
+For the Dalton Controller, debugging can be enabled in ``dalton-agent.conf`` file or 
+by setting the ``AGENT_DEBUG`` environment variable (e.g. 
+``AGENT_DEBUG=1``.  This can also be passed during the container build 
+process and set in the ``.env`` file.  If either the config file or environment 
+variable has debugging set, debug logging will be enabled.
+
+Flowsynth WebUI
+===============
+
+Dalton included a Web UI for 
+`Flowsynth <https://github.com/secureworks/flowsynth>`__ , a tool that 
+facilitates network packet caputre creation. ... TODO
+
 
 Frequently Asked Questions
 ==========================
@@ -621,13 +760,13 @@ Frequently Asked Questions
 
 #. | **How do I configure the Dalton Controller to listen on a different port?**
    | The external listen port of the Dalton Controller can be set in the ``.env``
-     file in the repository root.  The Dalton Controller and Nginx containers
+     file in the repository root.  The Dalton Controller and nginx containers
      must be rebuilt for the change to take effect (just run ``start_dalton.sh``).
 
 #. | **Is SSL/TLS supported?**
    | The default configuration does not leverage SSL nor is there a simple
      "on/off" switch for SSL/TLS.  However, if you know what you are doing, it
-     isn't difficult to configure Nginx for it and point the Dalton Agents to
+     isn't difficult to configure nginx for it and point the Dalton Agents to
      it.  This has been done in some environments.
    
 #. | **Will this work on Windows?**
@@ -635,7 +774,7 @@ Frequently Asked Questions
      However, if the Linux containers can run on Windows, then 
      it should be possible to get containers working on a Windows host.  But
      this has not been tested.
-   
+
 #. | **Is there Dalton Agent support for Snort < v2.9.1?**
    | Currently no.  Dalton Agents that run Snort utilize the 'dump' DAQ to replay pcaps
      and DAQ wasn't introduced until Snort 2.9.  Dalton Agents for older Snort
@@ -657,6 +796,11 @@ Frequently Asked Questions
      authorization does mean that it isn't difficult for malicious actors to 
      flood the Controller, submit malformed jobs, corrupt job results, dequeue
      jobs, and DoS the application.
+     
+#. | **How can I programmatically submit a job to Dalton?**
+   | Right now, a programmatic submission must mimic a Web UI submission. In the
+     future, a more streamlined and easier to use submission API may be exposed.
+     Feel free to submit a pull request with this feature.
 
 #. | **Referring to the code ... why did you do that like that? What were you 
      thinking? Do you even know about object-oriented programming?**
@@ -664,10 +808,10 @@ Frequently Asked Questions
      when the author was new to Python, never having written any Python code
      before other than tweaking a few lines of code in existing projects, and
      unaware of Python's object-oriented support.  While such code could be
-     cleaned up and refactored, a lot of it was left as is since it already 
+     cleaned up and refactored, a lot of it was left as-is since it already 
      worked and it was decided that time and effort should be spent elsewhere.
      Additionally, the Dalton Agent code was originally written to run on 
-     restricted/custom sytems that only had Python 2.4 support and couldn't use 
+     restricted/custom systems that only had Python 2.4 support and couldn't use 
      non-standard libraries.  This is especially noticable (painful?) with 
      the use of urllib2 instead of urllib3 or Requests.  Therefore, if you 
      do review the code, it is reqeusted that you approach it with charity.
