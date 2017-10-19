@@ -1434,6 +1434,8 @@ def page_coverage_summary():
                         # set filename
                         config['outputs'][olist.index('eve-log')]['eve-log']['filename'] = "dalton-eve.json"
                         # disable EVE TLS logging. This mixing of dicts and lists is onerous....
+                        # Update: apparently in Suri 4 (and 3, at least 3.2.3) you CAN have multiple
+                        #  tls loggers....
                         # doing this one at a time (two passes) since we are iterating over the structure
                         # we want to edit AND we are using list indexes.
                         # Also, the yaml will be represented differenlty based on the values (e.g. string vs ordered dict).
