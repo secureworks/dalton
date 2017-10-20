@@ -25,6 +25,9 @@ or this which does the same thing:
 
 Then navigate to ``http://<docker-host>/dalton/``
 
+To configure what sensors are available, see 
+`Adding Sensors <#adding-sensors>`__.
+
 Contents
 ========
 
