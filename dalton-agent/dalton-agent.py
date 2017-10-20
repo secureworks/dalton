@@ -20,7 +20,7 @@ Dalton Agent - runs on IDS engine; receives jobs, runs them, and reports results
 #
 # Note: originally written to run on Python 2.4 and up without the need for
 # non-standard libararies so that is why some things are written the way 
-# they are. This is especially noticable (painful?) with the use of urllib2
+# they are. This is especially noticeable (painful?) with the use of urllib2
 # instead of urllib3 or Requests.
 #
 
