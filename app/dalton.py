@@ -555,17 +555,20 @@ def sensor_request_job(sensor_tech):
 #@auth_required('write')
 def post_job_results(jobid):
     """ called by Dalton Agent sending job results """
-    # not authentication or authorization so this is easily abused; anyone with jobid
+    # no authentication or authorization so this is easily abused; anyone with jobid
     # can overwrite results if they submit first.
-    global STAT_CODE_DONE, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, TEMP_STORAGE_PATH
+    global STAT_CODE_DONE, STAT_CODE_QUEUED, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, TEMP_STORAGE_PATH
     global r
 
     # check and make sure job results haven't already been posted in order to prevent
-    # abuse/overwriting.
-    if r.exists("%s-time" % jobid):
-        logger.error("Data for jobid %s already exists in database; not overwriting. Source IP: %s" % (jobid, request.remote_addr))
-        return Response("Error: job results already exist.", mimetype='text/plain', headers = {'X-Dalton-Webapp':'Error'})
-
+    # abuse/overwriting.  This still isn't foolproof.
+   # if r.exists("%s-time" % jobid) and (get_job_status(jobid) not in [STAT_CODE_RUNNING, STAT_CODE_QUEUED]):
+    #    logger.error("Data for jobid %s already exists in database; not overwriting. Source IP: %s .. code: %d" % (jobid, request.remote_addr, get_job_status(jobid)))
+  #      logger.debug("stat code: %d" % get_job_status(jobid))
+        # typically this would go back to Agent who ignores it
+   #     return render_template('/dalton/error.html', jid='', msg=["Data for jobid %s already exists in database; not overwriting." % jobid])
+#        return Response("Error: job results already exist.", mimetype='text/plain', headers = {'X-Dalton-Webapp':'Error'})
+#        AAAA
 
     jsons = request.form.get('json_data')
     result_obj = json.loads(jsons)
@@ -1603,7 +1606,7 @@ def page_coverage_summary():
                     return render_template('/dalton/error.html', jid=jid, msg=["Invalid ruleset submitted: '%s'." % prod_ruleset_name, "Path/name invalid."])
                 elif not os.path.exists(ruleset_path):
                     delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid=jid, msg="Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path))
+                    return render_template('/dalton/error.html', jid=jid, msg=["Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path)])
                 else:
                     # if these options are set, modify ruleset accordingly
                     if bEnableAllRules or bShowFlowbitAlerts:
