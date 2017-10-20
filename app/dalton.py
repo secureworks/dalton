@@ -430,7 +430,7 @@ def get_engine_conf_file(sensor):
                 variables = yaml.round_trip_dump({'vars': config.pop('vars', None)})
                 # (depending on how you do it) the YAML verison gets added back
                 # in when YAML of just vars is dumped.
-                #  This data is concatenated with the rest of the config and there
+                #  This data (variables) is concatenated with the rest of the config and there
                 #  can't be multiple version directives. So just in case, strip it out.
                 if variables.startswith("%YAML 1.1\n---\n"):
                     variables = variables[14:]
@@ -497,7 +497,8 @@ def sensor_request_job(sensor_tech):
 
     # update check-in data; use md5 hash of SENSOR_UID.SENSOR_IP
     # note: sensor keys are expired by function clear_old_agents() which removes the sensor
-    # when it has not checked in in <x> amount of time (expire time configurable in that function).
+    # when it has not checked in in <x> amount of time (expire time configurable via
+    # 'agent_purge_time' parameter in dalton.conf.
     hash = hashlib.md5()
     hash.update(SENSOR_UID)
     hash.update(SENSOR_IP)
@@ -538,8 +539,8 @@ def sensor_request_job(sensor_tech):
         r.set("%s-start_time" % new_jobid, int(time.time()))
         r.expire("%s-start_time" % new_jobid, EXPIRE_VALUE)
         set_job_status(new_jobid,STAT_CODE_RUNNING)
-        # if a user sees the "Running" message for more than a few seconds (depending on
-        #   the size of the pcap(s)), then the job is hung on the agent or is going to
+        # if a user sees the "Running" message for more than a few dozen seconds (depending on
+        #   the size of the pcap(s) and ruleset), then the job is hung on the agent or is going to
         #   timeout. Most likely the agent was killed or died during the job run.
         set_job_status_msg(new_jobid, "Running...")
 
@@ -554,8 +555,17 @@ def sensor_request_job(sensor_tech):
 #@auth_required('write')
 def post_job_results(jobid):
     """ called by Dalton Agent sending job results """
+    # not authentication or authorization so this is easily abused; anyone with jobid
+    # can overwrite results if they submit first.
     global STAT_CODE_DONE, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, TEMP_STORAGE_PATH
     global r
+
+    # check and make sure job results haven't already been posted in order to prevent
+    # abuse/overwriting.
+    if r.exists("%s-time" % jobid):
+        logger.error("Data for jobid %s already exists in database; not overwriting. Source IP: %s" % (jobid, request.remote_addr))
+        return Response("Error: job results already exist.", mimetype='text/plain', headers = {'X-Dalton-Webapp':'Error'})
+
 
     jsons = request.form.get('json_data')
     result_obj = json.loads(jsons)
