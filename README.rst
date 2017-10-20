@@ -387,8 +387,8 @@ Sensors
 =======
 
 Agents (a.k.a. "Sensors") check in to the Dalton server frequently
-(about every second but configurable in the ``dalton-agent.conf`` file). You
-can view the last time an agent checked in on the ``Sensors`` page. Agents
+(about every second but configurable in the ``dalton-agent.conf`` file). The 
+last time an agent checked in can be viewed on the ``Sensors`` page. Agents
 that have not checked in recently will be pruned based on the 
 ``agent_purge_time`` value in the ``dalton.conf`` config file. When an
 expired or new agent checks in to the Dalton Controller it will be
@@ -467,8 +467,8 @@ Where ``<jobid>`` is the Job ID and::
    in the browser when a job is submitted via the web interface to
    inform the user of the current progress/state of the job.  When a job
    is done, this will actually be a hyperlink saying "Click here to view
-   your results".  Unless you have a specific use-case, you probably
-   want to use 'statcode' instead of 'status'.
+   your results".  Unless there is a specific use case, 'statcode' is 
+   usually used instead of 'status' for determining the status of a job.
 
 -  **submission\_time** - The time (formatted as "%b %d %H:%M:%S") the
    job was submitted to the Dalton Controller.
@@ -489,9 +489,9 @@ An API request returns JSON with three root elements:
 -  | **name**
    | The requested data.   **All data is returned as a quoted string if it is
      not null**.  If the 'all' key is requested, this contains key/value
-     pairs of all valid keys (so you will need to double-read the JSON to get
+     pairs of all valid keys (so the JSON will need to be double-read to get
      to the data).  If the 'other\_logs' keyword is requested, this is
-     key/value pairs so you will have to double-read the JSON to get to the
+     key/value pairs the JSON will need to be double-read to get to the
      data or triple-read it if it is part of an 'all' request. This is null
      if there is no data for the requested key.
 
@@ -554,7 +554,7 @@ Response:
 Teapot Jobs
 ===========
 
-Dalton has the concept and capability of what is called a 'teapot' job. 
+Dalton has the concept and capability of what is called a "teapot" job. 
 A teapot job is one that is short lived in the Redis database and
 (usually) on disk.
 
