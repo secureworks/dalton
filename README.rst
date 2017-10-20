@@ -35,7 +35,8 @@ Contents
 -  `Using Dalton <#using-dalton>`__
 
    -  `Launching A New Job <#launching-a-new-job>`__
-   -  `Configuration Options <#configuration-options>`__
+   -  `Job Settings <#job-settings>`__
+   -  `Config Files <#config-files>`__
    -  `Job Results <#job-results>`__
    -  `Job Queue <#job-queue>`__
    -  `Sensors <#sensors>`__
@@ -94,7 +95,7 @@ Design
 
 Dalton consists of a “controller” (dalton.py) and “agents”
 (dalton-agent.py). The controller provides a web interface as well as a
-HTTP API for agent communication and programmatic job results retrial.
+HTTP API for agent communication and programmatic job results retrieval.
 From a web interface, a user submits a job to be run on a particular
 agent or agent platform. A Dalton job consists of one or more pcaps, a
 pre-defined ruleset and/or custom rules, agent engine configuration
@@ -192,10 +193,10 @@ established session because of the lack of a TCP 3-way handshake. If
 testing such a packet is desired, it will need to be incorporated into a
 new pcap that includes a 3-way handshake and the server and client IPs
 set correctly. This can be done fairly easily using Flowsynth; the
-`Flowsynth Web UI <#flowsynth>`__ makes this easy.
+`Flowsynth Web UI <#flowsynth-webui>`__ makes this easy.
 
-Configuration Options
----------------------
+Job Settings
+------------
 
 On the job submission page, the "Job Settings" vertical tab provides a
 number of user-configurable options:
@@ -292,6 +293,9 @@ number of user-configurable options:
          data can be voluminous so it is not recommended that this be
          selected for a large production/pre-defined ruleset.
 
+Config Files
+------------
+
 On the job submission page, the "Config Files" vertical tab provides the
 ability to edit the configuration file(s) for the sensor:
 
@@ -365,7 +369,7 @@ hasn't expired) by accessing the following url::
 
 A job zip file, which includes the packet capture file(s) submitted
 along with rules and variables associated with the job, is stored on
-disk, by default in the ``/opt/dalton/jobs/`` directory; this location is
+disk, by default in the ``/opt/dalton/jobs`` directory; this location is
 configurable via the ``job_path`` parameter in the ``dalton.conf`` file.
 These files are cleaned up by Dalton based on the ``redis_expire`` and 
 ``teapot_redis_expire``.  Dalton only cleans up job zip files from disk when 
@@ -393,8 +397,8 @@ automatically (re)added and made available for job submissions.
 Dalton API
 ==========
 
-The Dalton controller also provides a RESTful API to retrieve data about
-submitted jobs.  API responses use JSON although the data in the returned is, 
+The Dalton controller provides a RESTful API to retrieve data about
+submitted jobs.  API responses use JSON although the data returned in the values is, 
 in most cases, just the raw text that is displayed in the Dalton web interface.
 The API can be utilized via HTTP GET requests in this format::
 
@@ -402,7 +406,7 @@ The API can be utilized via HTTP GET requests in this format::
 
 Where ``<jobid>`` is the Job ID and::
 
-    <key> : [alert|alert_detailed|all|debug|emailAddress|error|ids|other_logs|perf|start_time|statcode|status|submission_time|tech|time|user]
+    <key> : [alert|alert_detailed|all|debug|error|ids|other_logs|perf|start_time|statcode|status|submission_time|tech|time|user]
 
 **Valid Keys**
 
@@ -421,16 +425,13 @@ Where ``<jobid>`` is the Job ID and::
 -  **error** - Error data from the job.  This is the same as what is
    displayed in the "Error" tab in the job results page.
 
--  **fakering** - Fakering data from the job.  This is the same as what
-   is displayed in the "Fakering" tab in the job results page.
-
 -  **ids** - IDS Engine output from the job.  This is the same as what
    is displayed in the "IDS Engine" tab in the job results page.  Engine
    statistics for iSensor v7 (if the job was configured to generate
    these) are included in this output as well.
 
--  **other\_logs** - Other logs from the job (Suricata only as of Feb
-   2015). This is returned as key/value pairs with the key being the
+-  **other\_logs** - Other logs from the job (Suricata only). 
+   This is returned as key/value pairs with the key being the
    name of the log and the value being the contents of the log.
 
 -  **perf** - Performance data from the job (if the job generated
@@ -473,8 +474,8 @@ Where ``<jobid>`` is the Job ID and::
    job was submitted to the Dalton Controller.
 
 -  **tech** - The sensor technology (i.e. engine and version) the job was submitted
-   for.  For example, 'suricata4.0.0' is Suricata v4.0.0.  Suricata Agents
-   start with "suricata" and Snort Agents start with "snort".
+   for.  For example, 'suricata-4.0.0' is Suricata v4.0.0.  Suricata Agents
+   start with "suricata-" and Snort Agents start with "snort-".
 
 -  **time** - The time in seconds the job took to run, as reported by
    the Dalton Agent (this includes job download time by the agent). 
@@ -563,14 +564,14 @@ keep them around after that.  Often this is utilized in the programmatic
 submission of jobs combined with using the `Dalton API <#dalton-api>`__
 to automatically and/or quickly process the results.
 
-Such job submissions are short (lived) and stout (voluminous).  *Like a little 
-teapot.*
+Such job submissions are fleeting and voluminous in number.  In other 
+words, short and stout.  *Like a little teapot.*
 
 Teapot jobs differ from regular jobs in a few main ways:
 
 -  Results kept for a shorter period of time than regular jobs. 
    Teapot job expire timeouts are  configured with the ``teapot_redis_expire`` 
-   option.
+   option in ``dalton.conf``.
 -  Teapot jobs are submitted using the 'teapotJob' POST parameter (with
    any value).  This parameter is not set or available when submitting
    jobs via the Dalton web UI.
@@ -589,19 +590,23 @@ For each Dalton job, a single 'defined ruleset' file can be used and/or 'custom 
 Custom rules are entered in the Web UI but defined rulesets are stored on disk.
 
 On the Dalton Controller, defined rulesets must be in the directory 
-``/opt/dalton/rulesets/suricata/`` for Suricata rules and
-``/opt/dalton/rulesets/snort/`` for Snort rules.  The ruleset files must end in
+specified by the ``ruleset_path`` variable in ``dalton.conf``.  By default this is  
+``/opt/dalton/rulesets``.  Inside that directory there must be a ``suricata`` 
+directory where Suricata rules must be placed and a ``snort`` directory where 
+Snort rules must be placed.  The ruleset files must end in
 ``.rules``.
 
-The ``rulesets`` directory (and subdirectories) on the host running the Dalton 
+If the default ``ruleset_path`` value is not changed from 
+``/opt/dalton/rulesets`` then the ``rulesets`` directory 
+(and subdirectories) on the host running the Dalton 
 Controller container is shared with the container so '.rules' files can be easily 
 added from the host machine.
 
 Popular open source rule download and management tools such as 
 `rulecat <https://github.com/jasonish/py-idstools>`__ and 
 `PulledPork <https://github.com/shirkdog/pulledpork>`__ make it trivial to download
-rulesets, combine all rules into a single file, and then store it in the necessary 
-location.
+rulesets, combine all rules into a single ``.rules`` file, and then store it 
+in the necessary location.
 
 The Dalton Controller container includes rulecat (see the ``rulecat_script`` variable 
 in ``dalton.conf``) and when the Dalton Controller first starts up, if there 
@@ -610,6 +615,16 @@ from `rules.emergingthreats.net <https://rules.emergingthreats.net>`__.
 
 Adding Sensors
 ==============
+
+Adding sensors to Dalton is a farily simple process.  If there isn't already 
+a corresponding or compatible configuration file for the new sensor, that 
+will also need to be added; see `Adding Sensor Configs <#adding-sensor-configs>`__.
+
+It is possible and often desirable to have multiple sensors of the same type 
+(e.g. Suricata 4.0.1), all running jobs.  In that case, just set the ``SENSOR_TECHNOLOGY`` 
+value the same (e.g. 'suricata-4.0.1') and they will all request jobs that 
+have been submitted to that queue.  A single job is given to only one sensor 
+so whichever Agent requests the next job in the queue first get it.
 
 Docker Sensors
 --------------
@@ -701,7 +716,8 @@ Requirements:
 The ``dalton-agent.conf`` file must be modified to point to the Docker 
 Controller (see ``DALTON_API`` option).  Additionally, if the 
 ``SENSOR_TECHNOLOGY`` value is not set to 'auto' (or automatic version 
-determination fails), the ``SENSOR_TECHNOLOGY`` value must follow a certain
+determination fails), the the ``SENSOR_TECHNOLOGY`` value should be 
+set and must follow a certain
 pattern; it should start with the engine name ('suricata' or 'snort'), 
 followed by a dash followed by the version number. For example:  'suricata-4.0.1'.  
 This format helps tell the Dalton Controller what technology is being used as 
@@ -709,7 +725,7 @@ well as maps back to the config files on the Controller.  Technically the versio
 number part of the ``SENSOR_TECHNOLOGY`` string can be arbitrary but in that 
 case a configuration file with the corresponding name should be present on the 
 Dalton Controller so it knows which configuration file to load and use for jobs 
-for that sensor.
+related to that sensor.
 
 For more details on the Dalton Agent configuration options, see the inline 
 comments in the ``dalton-agent.py`` file.
@@ -731,22 +747,59 @@ Sensor configuration files (e.g. ``suricata.yaml`` or ``snort.conf``) are
 stored on the Dalton Controller.  When a sensor checks in to the Controller, 
 it is registered in Redis and when that sensor is selected for a Dalton job, 
 the correspoinding config file is loaded, populated under the ``Config Files`` vertical tab 
-and submitted with the Dalton job.
+in the Web UI, and submitted with the Dalton job.
 
-The Controller picks the config file to load based off the sensor technology 
+The Dalton Controller uses the ``engine_conf_path`` variable from ``dalton.conf`` 
+to use as a starting location on the filesystem to find sensor configuration files to use.  
+Inside that directory there must be 
+a ``suricata`` directory where the Suricata ``.yaml`` files go and a ``snort`` 
+directory where the Snort ``.conf`` files go.
+
+By default, on the Controller, ``engine_conf_path`` is set to ``/opt/dalton/app/static/engine-configs`` 
+which is symlinked from ``/opt/dalton/engine-configs``.  The Dalton Controller and host also 
+share the ``engine-configs`` directory to make it easy to add config files as needed 
+from the host.
+
+It is recommended that the ``engine_conf_path`` not be changed since Flask looks in 
+the ``static`` directory to serve the config files and changing it will 
+mostly like break something.
+
+Sensor configuration files 
+are not automatically added when Agents are build or the Controller is run; 
+they must be manually added. 
+However, the Dalton Controller already comes with the default (from source) config files 
+for Suricata versions 0.8.1 thru 4.0.1 and for Snort 2.9.0 thru 2.9.11. 
+Duplicate config files are not included.  For example, since all the Suricata 
+1.4.x versions have the same (default) .yaml file, only "suricata-1.4.yaml" 
+is included.
+
+The Controller picks the config file to load/use based off the sensor technology 
 (Suricata or Snort) and Agent supplied version number, both of which are part 
-of the ``SENSOR_TECHNOLOGY`` string submitted by the Agent. 
+of the ``SENSOR_TECHNOLOGY`` string submitted by the Agent which should start 
+with "snort-" or "suricata-", depending on the engine type.  The "version 
+number" is just the part of the string after "suricata-" or "snort-".
 
-Suricata configuration files are stored in ``app/static/engine-configs/suricata/``, 
-with a symlink from ``engine-configs/suricata/``; and 
-Snort configuration files are stored in ``app/static/engine-configs/snort/``, 
-with a symlink from ``engine-configs/snort/``.  
+So if a sensor identifies itself as "suricata-5.9.1" then the Controller will 
+look for a file with the name "suricata-5.9.1.yaml" in the 
+``engine-configs/suricata/`` directory.  If it can't find an 
+exact match, it will attempt to find the closest match it can based off the
+version number.  The version number is just used to help map an Agent 
+to a config.  So, for example, if an Agent identified itself as 
+"suricata-mycustomwhatever" and there was a corresponding 
+"suricata-mycustomwhatever.yaml" file in ``engine-configs/suricata``, 
+it would work fine.
 
-The ``engine-configs`` directory (and subdirectories) on the host running the Dalton 
-Controller container is shared with the container so config files can be easily 
-added from the host machine.
 
-prepopulated; shared directory
+For new Suricata releases, the ``.yaml`` file from source should just 
+be added to the ``engine-configs/suricata`` directory and named 
+appropriately.  For new Snort releases, it is recommended that the 
+default ``.conf`` file be run thru  the ``clean_snort_config.py`` 
+script located in the ``engine-configs/`` directory::
+
+    Usage:
+    
+    python clean_snort_config.py <in-file> <out-file>
+
 
 
 Logging and Debugging
@@ -776,14 +829,16 @@ Flowsynth WebUI
 
 Dalton included a Web UI for 
 `Flowsynth <https://github.com/secureworks/flowsynth>`__ , a tool that 
-facilitates network packet caputre creation. ... TODO
+facilitates network packet caputre creation. ... 
+
+TODO
 
 
 Frequently Asked Questions
 ==========================
 
 1. | **Why is it named 'Dalton'?**
-   | Dalton is the name of Patrick Swayze's character in the movie, 
+   | Dalton is the name of Patrick Swayze's character in the movie 
      "Road House".
 
 #. | **How do I configure the Dalton Controller to listen on a different port?**
@@ -799,6 +854,7 @@ Frequently Asked Questions
    
 #. | **Will this work on Windows?**
    | The native Dalton code won't work as expected on Windows without non-trivial 
+     code changes. 
      However, if the Linux containers can run on Windows, then 
      it should be possible to get containers working on a Windows host.  But
      this has not been tested.
@@ -808,7 +864,7 @@ Frequently Asked Questions
      and DAQ wasn't introduced until Snort 2.9.  Dalton Agents for older Snort
      versions (e.g. 2.4) have been written in the past but are not part of this 
      open source release.  However, if there is a demand for such support, then
-     adding it will be reconsidered.
+     adding support for older Snort versions will be reconsidered.
 
 #. | **Are other sensor engines supported such as Bro?**
    | No; currenlty only Suricata and Snort are supported.
@@ -830,7 +886,7 @@ Frequently Asked Questions
      future, a more streamlined and easier to use submission API may be exposed.
      Feel free to submit a pull request with this feature.
 
-#. | **Referring to the code ... why did you do that like that? What were you 
+#. | **Regarding the code ... why did you do that like that? What were you 
      thinking? Do you even know about object-oriented programming?**
    | These are valid questions.  Much of the code was written many years ago 
      when the author was new to Python, never having written any Python code
@@ -842,7 +898,8 @@ Frequently Asked Questions
      restricted/custom systems that only had Python 2.4 support and couldn't use 
      non-standard libraries.  This is especially noticable (painful?) with 
      the use of urllib2 instead of urllib3 or Requests.  Therefore, if you 
-     do review the code, it is reqeusted that you approach it with charity.
+     do review the code, it is reqeusted that you approach it with a spirit of
+     charity.
 
 #. | **I found a bug in Dalton.  What should I do?**
    | Feel free to report it and/or fix it and submit a pull request.
