@@ -51,9 +51,7 @@ dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='temp
 
 # logging
 file_handler = RotatingFileHandler('/var/log/dalton.log', 'a', 1 * 1024 * 1024, 10)
-file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
-#file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
 logger = logging.getLogger("dalton")
 logger.addHandler(file_handler)
 logger.setLevel(logging.INFO)
@@ -89,7 +87,6 @@ except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
 if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
-    file_handler.setLevel(logging.DEBUG)
     logger.setLevel(logging.DEBUG)
     logger.debug("DEBUG logging enabled")
 
@@ -518,6 +515,7 @@ def sensor_request_job(sensor_tech):
     else:
         respobj = json.loads(response)
         new_jobid = respobj['id']
+        logger.info("Dalton Agent %s grabbed job %s for %s" % (SENSOR_UID, new_jobid, sensor_tech))
         # there is a key for each sensor which is ("%s-current_job" % SENSOR_HASH) and has
         #  the value of the current job id it is running.  This value is set when a job is
         #  requested and set to 'None' when the results are posted.  A sensor can only run
@@ -562,13 +560,10 @@ def post_job_results(jobid):
 
     # check and make sure job results haven't already been posted in order to prevent
     # abuse/overwriting.  This still isn't foolproof.
-   # if r.exists("%s-time" % jobid) and (get_job_status(jobid) not in [STAT_CODE_RUNNING, STAT_CODE_QUEUED]):
-    #    logger.error("Data for jobid %s already exists in database; not overwriting. Source IP: %s .. code: %d" % (jobid, request.remote_addr, get_job_status(jobid)))
-  #      logger.debug("stat code: %d" % get_job_status(jobid))
-        # typically this would go back to Agent who ignores it
-   #     return render_template('/dalton/error.html', jid='', msg=["Data for jobid %s already exists in database; not overwriting." % jobid])
-#        return Response("Error: job results already exist.", mimetype='text/plain', headers = {'X-Dalton-Webapp':'Error'})
-#        AAAA
+    if r.exists("%s-time" % jobid) and (int(get_job_status(jobid)) not in [STAT_CODE_RUNNING, STAT_CODE_QUEUED]):
+        logger.error("Data for jobid %s already exists in database; not overwriting. Source IP: %s. job_status_code code: %d" % (jobid, request.remote_addr, int(get_job_status(jobid))))
+         #typically this would go back to Agent who then ignores it
+        return Response("Error: job results already exist.", mimetype='text/plain', headers = {'X-Dalton-Webapp':'Error'})
 
     jsons = request.form.get('json_data')
     result_obj = json.loads(jsons)
@@ -588,7 +583,7 @@ def post_job_results(jobid):
     r.set("%s-current_job" % SENSOR_HASH, None)
     r.expire("%s-current_job" % SENSOR_HASH, REDIS_EXPIRE)
 
-    logger.debug("Dalton agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
+    logger.info("Dalton agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
 
     #save results to db
     if 'ids' in result_obj:
