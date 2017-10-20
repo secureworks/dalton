@@ -47,7 +47,7 @@ Contents
 
    -  `Docker Sensors <#docker-sensors>`__
    -  `Non-Docker Sensors <#non-docker-sensors>`__
-
+   
 -  `Adding Sensor Configs <#adding-sensor-configs>`__
 -  `Logging and Debugging <#logging-and-debugging>`__
 -  `Flowsynth WebUI <#flowsynth-webui>`__
@@ -655,10 +655,14 @@ specification:
         restart: always
         
 Suricata can also have ``SURI_VERSION=current`` in which case the latest 
-Suricata version will be used to build the Agent.
+Suricata version will be used to build the Agent.  Having a 'current' Suricata 
+version specification in the ``docker-compose.yml`` file is especially convenient 
+since when a new version comes out, all that has to be done is run the
+``start-dalton.sh`` script and a new Dalton Agent with the latest Suricata 
+version will be built and available.
 
 Snort agents are the same way but the args to customize are ``SNORT_VERSION`` and 
-(possibly) ``DAQ_VERSION``.  Example Snort specification:
+(if changed) ``DAQ_VERSION``.  Example Snort specification:
 
 .. code:: yaml
 
@@ -700,8 +704,12 @@ Controller (see ``DALTON_API`` option).  Additionally, if the
 determination fails), the ``SENSOR_TECHNOLOGY`` value must follow a certain
 pattern; it should start with the engine name ('suricata' or 'snort'), 
 followed by a dash followed by the version number. For example:  'suricata-4.0.1'.  
-This format helps tell the Dalton Controll what technology is being used as 
-well as maps back to the config files on the Controller.
+This format helps tell the Dalton Controller what technology is being used as 
+well as maps back to the config files on the Controller.  Technically the version 
+number part of the ``SENSOR_TECHNOLOGY`` string can be arbitrary but in that 
+case a configuration file with the corresponding name should be present on the 
+Dalton Controller so it knows which configuration file to load and use for jobs 
+for that sensor.
 
 For more details on the Dalton Agent configuration options, see the inline 
 comments in the ``dalton-agent.py`` file.
@@ -719,7 +727,26 @@ To start the Dalton Agent, run dalton-agent.py::
 Adding Sensor Configs
 =====================
 
-TODO
+Sensor configuration files (e.g. ``suricata.yaml`` or ``snort.conf``) are 
+stored on the Dalton Controller.  When a sensor checks in to the Controller, 
+it is registered in Redis and when that sensor is selected for a Dalton job, 
+the correspoinding config file is loaded, populated under the ``Config Files`` vertical tab 
+and submitted with the Dalton job.
+
+The Controller picks the config file to load based off the sensor technology 
+(Suricata or Snort) and Agent supplied version number, both of which are part 
+of the ``SENSOR_TECHNOLOGY`` string submitted by the Agent. 
+
+Suricata configuration files are stored in ``app/static/engine-configs/suricata/``, 
+with a symlink from ``engine-configs/suricata/``; and 
+Snort configuration files are stored in ``app/static/engine-configs/snort/``, 
+with a symlink from ``engine-configs/snort/``.  
+
+The ``engine-configs`` directory (and subdirectories) on the host running the Dalton 
+Controller container is shared with the container so config files can be easily 
+added from the host machine.
+
+prepopulated; shared directory
 
 
 Logging and Debugging
@@ -729,7 +756,8 @@ By default, the Dalton Controller logs to ``/var/log/dalton.log`` and Dalton
 Agents log to ``/var/log/dalton-agent.log``.  The nginx container logs to 
 the ``/var/log/nginx`` directory (``dalton-access.log`` and 
 ``dalton-error.log``).  The (frequent) polling that Dalton Agents do to the 
-nginx container to check for new jobs is not logged.
+nginx container to check for new jobs is intentionally not logged since it is 
+considered too noisy.
 
 For the Dalton Controller, debugging can be enabled in ``dalton.conf`` file or 
 by setting the ``CONTROLLER_DEBUG`` environment variable (e.g. 
@@ -774,7 +802,7 @@ Frequently Asked Questions
      However, if the Linux containers can run on Windows, then 
      it should be possible to get containers working on a Windows host.  But
      this has not been tested.
-
+   
 #. | **Is there Dalton Agent support for Snort < v2.9.1?**
    | Currently no.  Dalton Agents that run Snort utilize the 'dump' DAQ to replay pcaps
      and DAQ wasn't introduced until Snort 2.9.  Dalton Agents for older Snort
