@@ -514,7 +514,7 @@ Request::
 
 Response:
 
-.. code:: javascript
+.. code::
 
     {
     "data": "06/26/2017-12:08:13.255103  [**] [1:2023754:6] ET CURRENT_EVENTS 
