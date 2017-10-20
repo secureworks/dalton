@@ -124,7 +124,7 @@ compiled into network pcaps by the Flowsynth script. This is basically a
 GUI to facilitate input and output to Flowsynth. There is the option to
 easily send Flowsynth WebUI generated pcaps to Dalton for testing.
 
-While all the above systems could be independent physical (or vitrual)
+While all the above systems could be independent physical (or virtual)
 machines (and in fact this setup has been done), for ease of install and
 use, everything has also been architected as a group of
 `Docker <https://www.docker.com/>`__ containers. The Dalton codebase
@@ -202,7 +202,7 @@ On the job submission page, the "Job Settings" vertical tab provides a
 number of user-configurable options:
 
 -  | **Packet Captures**
-   | Specify packet captures (libpcap format) to be run accross the
+   | Specify packet captures (libpcap format) to be run across the
      sensor. Depending on the engine, pcapng format may be supported as
      well. Archive files that contain pcaps can be submitted and the files
      will be extracted and used. Supported extensions (and their inferred
@@ -287,7 +287,7 @@ number of user-configurable options:
          in the "Fast Pattern" tab) with details on what the engine is
          using for the fast pattern match.  To generate this, Suricata
          must do two runs – one to generate the fast pattern info and
-         one to actually run the submitted job so this will approximtely
+         one to actually run the submitted job so this will approximately
          double the job run time. Unless fast pattern info is needed for
          some reason, there isn't a need to check this. Fast pattern
          data can be voluminous so it is not recommended that this be
@@ -307,7 +307,7 @@ ability to edit the configuration file(s) for the sensor:
      Dalton agent uses for the job.
 
 The variables and rest of the configuration file are separated
-dynamically when the pages loads, or when a new sensor verison is
+dynamically when the pages loads, or when a new sensor version is
 selected. But on the disk the config is just one file in the
 "engine-configs/" directory (e.g.
 'engine-configs/suricata/suricata-4.0.0.yaml'). See also `Updating
@@ -379,7 +379,7 @@ send a HTTP GET request to::
   /dalton/controller_api/delete-old-job-files
 
 A job zip file can be accessed from the appropriate link on the job results 
-page or directly downloaded using the follwing URL::
+page or directly downloaded using the following URL::
 
   /dalton/sensor_api/get_job/<jobid>.zip
 
@@ -426,9 +426,9 @@ Where ``<jobid>`` is the Job ID and::
    displayed in the "Error" tab in the job results page.
 
 -  **ids** - IDS Engine output from the job.  This is the same as what
-   is displayed in the "IDS Engine" tab in the job results page.  Engine
-   statistics for iSensor v7 (if the job was configured to generate
-   these) are included in this output as well.
+   is displayed in the "IDS Engine" tab in the job results page.  
+   For Snort Agents, engine statistics output at the end of the job 
+   run are populated here.
 
 -  **other\_logs** - Other logs from the job (Suricata only). 
    This is returned as key/value pairs with the key being the
@@ -579,7 +579,7 @@ Teapot jobs differ from regular jobs in a few main ways:
 -  The submission of a teapot job results in the JID being returned
    instead of a redirect page.
 
-Currently, if teapot jobs have not exipired, they will show up in the Dalton
+Currently, if teapot jobs have not expired, they will show up in the Dalton
 Queue in the web UI although it would be fairly trivial to change the code to
 exclude them from the list.
 
@@ -746,7 +746,7 @@ Adding Sensor Configs
 Sensor configuration files (e.g. ``suricata.yaml`` or ``snort.conf``) are 
 stored on the Dalton Controller.  When a sensor checks in to the Controller, 
 it is registered in Redis and when that sensor is selected for a Dalton job, 
-the correspoinding config file is loaded, populated under the ``Config Files`` vertical tab 
+the corresponding config file is loaded, populated under the ``Config Files`` vertical tab 
 in the Web UI, and submitted with the Dalton job.
 
 The Dalton Controller uses the ``engine_conf_path`` variable from ``dalton.conf`` 
@@ -829,7 +829,7 @@ Flowsynth WebUI
 
 Dalton included a Web UI for 
 `Flowsynth <https://github.com/secureworks/flowsynth>`__ , a tool that 
-facilitates network packet caputre creation. ... 
+facilitates network packet capture creation. ... 
 
 TODO
 
@@ -870,9 +870,9 @@ Frequently Asked Questions
    | No; currenlty only Suricata and Snort are supported.
 
 #. | **Does Dalton support authentication such as username/password/API tokens or 
-     authorization enforcment like discrectionary access control?**
+     authorization enforcement like discretionary access control?**
    | No, not in this open source release although such additions have been done
-     before, incuding single sign on integration.  However, such enhancements 
+     before, including single sign on integration.  However, such enhancements 
      would require non-trivial code additions. There are some authentication 
      decorators commented out and scattered throughout the code and the Dalton 
      Agents do send and API token as part of their requests but the Dalton 
@@ -896,7 +896,7 @@ Frequently Asked Questions
      worked and it was decided that time and effort should be spent elsewhere.
      Additionally, the Dalton Agent code was originally written to run on 
      restricted/custom systems that only had Python 2.4 support and couldn't use 
-     non-standard libraries.  This is especially noticable (painful?) with 
+     non-standard libraries.  This is especially noticeable (painful?) with 
      the use of urllib2 instead of urllib3 or Requests.  Therefore, if you 
      do review the code, it is reqeusted that you approach it with a spirit of
      charity.
