@@ -495,7 +495,7 @@ def sensor_request_job(sensor_tech):
     # update check-in data; use md5 hash of SENSOR_UID.SENSOR_IP
     # note: sensor keys are expired by function clear_old_agents() which removes the sensor
     # when it has not checked in in <x> amount of time (expire time configurable via
-    # 'agent_purge_time' parameter in dalton.conf.
+    # 'agent_purge_time' parameter in dalton.conf).
     hash = hashlib.md5()
     hash.update(SENSOR_UID)
     hash.update(SENSOR_IP)
@@ -555,7 +555,7 @@ def post_job_results(jobid):
     """ called by Dalton Agent sending job results """
     # no authentication or authorization so this is easily abused; anyone with jobid
     # can overwrite results if they submit first.
-    global STAT_CODE_DONE, STAT_CODE_QUEUED, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, TEMP_STORAGE_PATH
+    global STAT_CODE_DONE, STAT_CODE_RUNNING, STAT_CODE_QUEUED, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, TEMP_STORAGE_PATH
     global r
 
     # check and make sure job results haven't already been posted in order to prevent
