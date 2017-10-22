@@ -134,6 +134,14 @@ services:
 ###########################
 ###### Snort Agents #######
 ###########################
+#
+# Note: Attempting to build Snort 2.9.0 and 2.9.0.x
+#  will fail because Autoconf can't find the dnet files.
+#  This was apparently fixed in Snort > 2.9.1 so if
+#  you really want a Snort 2.9.0 or 2.9.0.x, feel free
+#  to build it yourself.  The Dalton Agent should work
+#  fine on it.
+#
 
 # Snort 2.9.11 from source
   agent-snort-2.9.11:
