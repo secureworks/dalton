@@ -889,6 +889,16 @@ Frequently Asked Questions
      future, a more streamlined and easier to use submission API may be exposed.
      Feel free to submit a pull request with this feature.
 
+#. | **Why is it that when I try to build a Snort 2.9.0 or 2.9.0.x container, it fails when
+     configuring Snort saying it can't find the 'dnet' files?**
+   | Attempting to build Snort 2.9.0 and 2.9.0.x  will fail because 
+     Autoconf can't find the dnet files. This was apparently fixed in 
+     Snort > 2.9.1. If 
+     you really want a Snort 2.9.0 or 2.9.0.x Agent, you will have to build 
+     one out yourself.  The Dalton Agent code should work
+     fine on it.  If it turns out that there is a lot of demand for 
+     Snort 2.9.0.x Agents, adding native support for it will be reconsidered.
+
 #. | **Regarding the code ... why did you do that like that? What were you 
      thinking? Do you even know about object-oriented programming?**
    | These are valid questions.  Much of the code was written many years ago 
