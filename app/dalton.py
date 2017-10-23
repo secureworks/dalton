@@ -51,9 +51,7 @@ dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='temp
 
 # logging
 file_handler = RotatingFileHandler('/var/log/dalton.log', 'a', 1 * 1024 * 1024, 10)
-file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
-#file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
 logger = logging.getLogger("dalton")
 logger.addHandler(file_handler)
 logger.setLevel(logging.INFO)
@@ -89,7 +87,6 @@ except Exception as e:
     logger.critical("Problem parsing config file '%s': %s" % (dalton_config_filename, e))
 
 if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
-    file_handler.setLevel(logging.DEBUG)
     logger.setLevel(logging.DEBUG)
     logger.debug("DEBUG logging enabled")
 
@@ -430,7 +427,7 @@ def get_engine_conf_file(sensor):
                 variables = yaml.round_trip_dump({'vars': config.pop('vars', None)})
                 # (depending on how you do it) the YAML verison gets added back
                 # in when YAML of just vars is dumped.
-                #  This data is concatenated with the rest of the config and there
+                #  This data (variables) is concatenated with the rest of the config and there
                 #  can't be multiple version directives. So just in case, strip it out.
                 if variables.startswith("%YAML 1.1\n---\n"):
                     variables = variables[14:]
@@ -497,7 +494,8 @@ def sensor_request_job(sensor_tech):
 
     # update check-in data; use md5 hash of SENSOR_UID.SENSOR_IP
     # note: sensor keys are expired by function clear_old_agents() which removes the sensor
-    # when it has not checked in in <x> amount of time (expire time configurable in that function).
+    # when it has not checked in in <x> amount of time (expire time configurable via
+    # 'agent_purge_time' parameter in dalton.conf).
     hash = hashlib.md5()
     hash.update(SENSOR_UID)
     hash.update(SENSOR_IP)
@@ -517,6 +515,7 @@ def sensor_request_job(sensor_tech):
     else:
         respobj = json.loads(response)
         new_jobid = respobj['id']
+        logger.info("Dalton Agent %s grabbed job %s for %s" % (SENSOR_UID, new_jobid, sensor_tech))
         # there is a key for each sensor which is ("%s-current_job" % SENSOR_HASH) and has
         #  the value of the current job id it is running.  This value is set when a job is
         #  requested and set to 'None' when the results are posted.  A sensor can only run
@@ -538,8 +537,8 @@ def sensor_request_job(sensor_tech):
         r.set("%s-start_time" % new_jobid, int(time.time()))
         r.expire("%s-start_time" % new_jobid, EXPIRE_VALUE)
         set_job_status(new_jobid,STAT_CODE_RUNNING)
-        # if a user sees the "Running" message for more than a few seconds (depending on
-        #   the size of the pcap(s)), then the job is hung on the agent or is going to
+        # if a user sees the "Running" message for more than a few dozen seconds (depending on
+        #   the size of the pcap(s) and ruleset), then the job is hung on the agent or is going to
         #   timeout. Most likely the agent was killed or died during the job run.
         set_job_status_msg(new_jobid, "Running...")
 
@@ -554,8 +553,17 @@ def sensor_request_job(sensor_tech):
 #@auth_required('write')
 def post_job_results(jobid):
     """ called by Dalton Agent sending job results """
-    global STAT_CODE_DONE, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, TEMP_STORAGE_PATH
+    # no authentication or authorization so this is easily abused; anyone with jobid
+    # can overwrite results if they submit first.
+    global STAT_CODE_DONE, STAT_CODE_RUNNING, STAT_CODE_QUEUED, DALTON_URL, REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, TEMP_STORAGE_PATH
     global r
+
+    # check and make sure job results haven't already been posted in order to prevent
+    # abuse/overwriting.  This still isn't foolproof.
+    if r.exists("%s-time" % jobid) and (int(get_job_status(jobid)) not in [STAT_CODE_RUNNING, STAT_CODE_QUEUED]):
+        logger.error("Data for jobid %s already exists in database; not overwriting. Source IP: %s. job_status_code code: %d" % (jobid, request.remote_addr, int(get_job_status(jobid))))
+         #typically this would go back to Agent who then ignores it
+        return Response("Error: job results already exist.", mimetype='text/plain', headers = {'X-Dalton-Webapp':'Error'})
 
     jsons = request.form.get('json_data')
     result_obj = json.loads(jsons)
@@ -575,7 +583,7 @@ def post_job_results(jobid):
     r.set("%s-current_job" % SENSOR_HASH, None)
     r.expire("%s-current_job" % SENSOR_HASH, REDIS_EXPIRE)
 
-    logger.debug("Dalton agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
+    logger.info("Dalton agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
 
     #save results to db
     if 'ids' in result_obj:
@@ -1356,9 +1364,12 @@ def page_coverage_summary():
                 if 'unified2-alert' in olist:
                     try:
                         deployment = config['outputs'][olist.index('unified2-alert')]['unified2-alert']['xff']['deployment']
+                    except Exception as e:
+                        logger.debug("Could not get outputs->unified2-alert->xff->deployment.  Using default value of '%s'" % deployment)
+                    try:
                         header = config['outputs'][olist.index('unified2-alert')]['unified2-alert']['xff']['header']
                     except Exception as e:
-                        logger.debug("Could not get 'deployment' and/or 'header' values for outputs->unified2-alert->xff->")
+                        logger.debug("Could not get outputs->unified2-alert->xff->header.  Using default value of '%s'" % header)
                 u2_config = {'unified2-alert': {'enabled': True, \
                              'filename': "unified2.dalton.alert", \
                              'xff': {'enabled': True, 'mode': 'extra-data', \
@@ -1430,17 +1441,32 @@ def page_coverage_summary():
                     try:
                         # set filename
                         config['outputs'][olist.index('eve-log')]['eve-log']['filename'] = "dalton-eve.json"
-                        # disable EVE TLS logging. This mixing of dicts and lists is onerous to no end....
+                        # disable EVE TLS logging. This mixing of dicts and lists is onerous....
+                        # Update: apparently in Suri 4 and > 3.1 you CAN have multiple tls loggers....
+                        # doing this one at a time (two passes) since we are iterating over the structure
+                        # we want to edit AND we are using list indexes.
+                        # Also, the yaml will be represented differenlty based on the values (e.g. string vs ordered dict).
+                        # Instead of trying to check everything every time, just catch the exception(s) and move on. The
+                        # stuff we want disabled will still get disabled despite the exceptions along the way.
                         for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
                             try:
                                 if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'alert':
-                                    logger.debug("Removing outputs->eve-log->types->alert->tls")
+                                    # apparently this is supported -- http://suricata.readthedocs.io/en/latest/output/eve/eve-json-output.html
                                     config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
-                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
-                                    logger.debug("Removing outputs->eve-log->types->tls")
-                                    del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
+                                    logger.debug("Removed outputs->eve-log->types->alert->tls")
+                                    break
                             except Exception as e:
-                                logger.debug("Could not disable EVE TLS log. Error: %s" % e)
+                                #logger.debug("Possible issue when removing outputs->eve-log->types->alert->tls (EVE TLS log). Error: %s" % e)
+                                pass
+
+                        for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
+                            try:
+                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
+                                    del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
+                                    logger.debug("Removed outputs->eve-log->types->tls")
+                                    break
+                            except Exception as e:
+                                #logger.debug("Possible issue when removing outputs->eve-log->types->tls (EVE TLS log). Error: %s" % e)
                                 pass
                     except Exception as e:
                         logger.debug("Problem editing eve-log section of config: %s" % e)
@@ -1575,7 +1601,7 @@ def page_coverage_summary():
                     return render_template('/dalton/error.html', jid=jid, msg=["Invalid ruleset submitted: '%s'." % prod_ruleset_name, "Path/name invalid."])
                 elif not os.path.exists(ruleset_path):
                     delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid=jid, msg="Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path))
+                    return render_template('/dalton/error.html', jid=jid, msg=["Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path)])
                 else:
                     # if these options are set, modify ruleset accordingly
                     if bEnableAllRules or bShowFlowbitAlerts:

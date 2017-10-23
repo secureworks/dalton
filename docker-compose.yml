@@ -61,6 +61,8 @@ services:
 #        - SURI_VERSION=4.0.0
 #    image: suricata-4.0.0:latest
 #    container_name: suricata-4.0.0
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
 # Suricata 3.2.3 from source
@@ -72,6 +74,8 @@ services:
         - SURI_VERSION=3.2.3
     image: suricata-3.2.3:latest
     container_name: suricata-3.2.3
+    environment:
+      - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
 # Suricata 3.1.4 from source
@@ -83,6 +87,8 @@ services:
 #        - SURI_VERSION=3.1.4
 #    image: suricata-3.1.4:latest
 #    container_name: suricata-3.1.4
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
 # Suricata 2.0.9 from source
@@ -94,6 +100,8 @@ services:
 #        - SURI_VERSION=2.0.9
 #    image: suricata-2.0.9:latest
 #    container_name: suricata-2.0.9
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
 # Suricata 2.0.6 from source
@@ -105,6 +113,8 @@ services:
 #        - SURI_VERSION=2.0.6
 #    image: suricata-2.06:latest
 #    container_name: suricata-2.0.6
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
 # Suricata 1.3.6 from source
@@ -116,12 +126,22 @@ services:
 #        - SURI_VERSION=1.3.6
 #    image: suricata-1.3.6:latest
 #    container_name: suricata-1.3.6
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
 
 ###########################
 ###### Snort Agents #######
 ###########################
+#
+# Note: Attempting to build Snort 2.9.0 and 2.9.0.x
+#  will fail because Autoconf can't find the dnet files.
+#  This was apparently fixed in Snort > 2.9.1 so if
+#  you really want a Snort 2.9.0 or 2.9.0.x, feel free
+#  to build it yourself.  The Dalton Agent should work
+#  fine on it.
+#
 
 # Snort 2.9.11 from source
   agent-snort-2.9.11:
@@ -166,6 +186,8 @@ services:
 #        - DAQ_VERSION=2.0.6
 #    image: snort-2.9.7.5:latest
 #    container_name: snort-2.9.7.5
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
 # Snort 2.9.3.1 from source
@@ -178,6 +200,8 @@ services:
 #        - DAQ_VERSION=2.0.6
 #    image: snort-2.9.3.1:latest
 #    container_name: snort-2.9.3.1
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
 # Snort 2.9.1.1 from source
@@ -190,6 +214,8 @@ services:
 #        - DAQ_VERSION=2.0.6
 #    image: snort-2.9.1.1:latest
 #    container_name: snort-2.9.1.1
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
 # Snort 2.9.7.0 from Ubuntu Repos
@@ -199,5 +225,7 @@ services:
 #      dockerfile: Dockerfiles/Dockerfile_snort-2.9.7.0
 #    image: snort-2.9.7.0-repo:latest
 #    container_name: snort-2.9.7.0-repo
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
