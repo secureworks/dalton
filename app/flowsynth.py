@@ -9,6 +9,7 @@ import sys
 import random
 import tempfile
 import re
+import certsynth
 
 from flask import Blueprint, render_template, request, Response, redirect
 from dalton import FS_BIN_PATH as BIN_PATH
@@ -82,23 +83,23 @@ def payload_http(request):
 
     return synth
 
-# TODO
-def payload_cert(request):
-    return ""  # TODO
+def payload_cert(formobj):
     empty_synth = 'default > (content:"";);'
-    formobj = request.form
+
     # make sure we have stuff we need
     if not ('cert_file_type' in formobj and 'cert_file' in request.files):
         return empty_synth
+
     file_content = request.files['cert_file'].read()
-    if formobj['cert_file_type'] == 'pem':
+    if formobj.get('cert_file_type') == 'pem':
         if certsynth.pem_cert_validate(file_content.strip()):
             return certsynth.cert_to_synth(file_content.strip(), 'PEM')
         else:
             return empty_synth
-    elif formobj['cert_file_type'] == 'der':
+    elif formobj.get('cert_file_type') == 'der':
         return certsynth.cert_to_synth(file_content, 'DER')
-    else:  # this shouldn't happen if people are behaving
+    else:
+        # this shouldn't happen if people are behaving
         return empty_synth
 
 
@@ -180,7 +181,7 @@ def generate_fs():
     elif (payload_fmt == 'http'):
         payload_cmds = payload_http(request)  # TODO
     elif (payload_fmt == 'cert'):
-        payload_cmds = payload_cert(request)  # TODO
+        payload_cmds = payload_cert(request.form)  # TODO
     synth = "%s\n%s" % (synth, payload_cmds)
     return render_template('/pcapwg/compile.html', page='compile', flowsynth_code=synth)
 
