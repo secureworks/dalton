@@ -1,7 +1,5 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
-	var MAX_PCAP_FILES = 5;
-
     function updateHeading(version) {
         var newstr = ''
         if (version == undefined) {
@@ -48,10 +46,10 @@
             $('#showHideOptionCustomEngineConf').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
 		}
 
-		for(i=1; i < MAX_PCAP_FILES; i++) {
+		for(i=1; i < {{max_pcaps}}; i++) {
 			if ($('#coverage-pcap'+i).val()) {
 				$('#pcap'+i).show();
-				if (i == MAX_PCAP_FILES -1) {
+				if (i == {{max_pcaps}} -1) {
 					$('#addpcap').hide();
 				}
 			}
@@ -102,10 +100,10 @@
 		});
 
 		$('#addpcap').click( function() {
-			for(i=1; i < MAX_PCAP_FILES; i++) {
+			for(i=1; i < {{max_pcaps}}; i++) {
 				if ($('#pcap'+i).is(':hidden')) {
 					$('#pcap'+i).show();
-					if (i == MAX_PCAP_FILES - 1) {
+					if (i == {{max_pcaps}} - 1) {
 						$('#addpcap').hide();
 					}
 					break;
@@ -115,7 +113,7 @@
 
 		$('#resetpcap').click( function() {
 			<!-- reset file input fields before making them hidden (important!) -->
-			for(i=0; i < MAX_PCAP_FILES; i++) {
+			for(i=0; i < {{max_pcaps}}; i++) {
 				reset_file_input($('#coverage-pcap'+i));
 				if (i > 0) {
 					$('#pcap'+i).hide();
@@ -182,24 +180,15 @@
                             {% if fspcap %}
                                 <input type="text" name="fspcap" id="fspcap" readonly="readonly" value={{fspcap}}><p/>
                             {% endif %}
-                            <!-- TODO: generate this dynamically via JavaScript -->
-							<input type="file" name="coverage-pcap0" id="coverage-pcap0" placeholder='Select a PCAP'><p/>
-
-							<div id="pcap1" style="display:none;">
-								<input type="file" name="coverage-pcap1" id="coverage-pcap1" placeholder='Select a PCAP'><p/>
-							</div>
-
-							<div id="pcap2" style="display:none;">
-								<input type="file" name="coverage-pcap2" id="coverage-pcap2" placeholder='Select a PCAP'><p/>
-							</div>
-	
-							<div id="pcap3" style="display:none;">
-								<input type="file" name="coverage-pcap3" id="coverage-pcap3" placeholder='Select a PCAP'><p/>
-							</div>
-	
-							<div id="pcap4" style="display:none;">
-								<input type="file" name="coverage-pcap4" id="coverage-pcap4" placeholder='Select a PCAP'><p/>
-							</div>
+                            {% for n in range(max_pcaps|int) %}
+                                {% if n != 0 %}
+                                    <div id="pcap{{n}}" style="display:none;">
+                                {% endif %}
+                                    <input type="file" name="coverage-pcap{{n}}" id="coverage-pcap{{n}}" placeholder='Select a PCAP'><p/>
+                                {% if n != 0 %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
 	
 							<div id="addpcap" style="display:inline;">
 								<a href="#">Add another pcap</a>
