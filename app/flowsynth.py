@@ -9,6 +9,8 @@ import sys
 import random
 import tempfile
 import re
+import logging
+from logging.handlers import RotatingFileHandler
 import certsynth
 
 from flask import Blueprint, render_template, request, Response, redirect
@@ -17,6 +19,15 @@ from dalton import FS_PCAP_PATH as PCAP_PATH
 
 # setup the flowsynth blueprint
 flowsynth_blueprint = Blueprint('flowsynth_blueprint', __name__, template_folder='templates/')
+
+# logging
+file_handler = RotatingFileHandler('/var/log/flowsynth.log', 'a', 1 * 1024 * 1024, 10)
+file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+logger = logging.getLogger("flowsynth")
+logger.addHandler(file_handler)
+logger.setLevel(logging.INFO)
+
+logger.info("Logging started")
 
 def payload_raw(formobj):
     """parse and format a raw payload"""
@@ -84,23 +95,24 @@ def payload_http(request):
     return synth
 
 def payload_cert(formobj):
-    empty_synth = 'default > (content:"";);'
-
     # make sure we have stuff we need
     if not ('cert_file_type' in formobj and 'cert_file' in request.files):
-        return empty_synth
+        logger.error("No cert submitted")
+        return None
 
     file_content = request.files['cert_file'].read()
     if formobj.get('cert_file_type') == 'pem':
         if certsynth.pem_cert_validate(file_content.strip()):
             return certsynth.cert_to_synth(file_content.strip(), 'PEM')
         else:
-            return empty_synth
+            logger.error("Unable to validate submitted pem file.")
+            return None
     elif formobj.get('cert_file_type') == 'der':
         return certsynth.cert_to_synth(file_content, 'DER')
     else:
         # this shouldn't happen if people are behaving
-        return empty_synth
+        logger.error("Unable to validate submitted der file.")
+        return None
 
 
 def fs_replace_badchars(payload):
@@ -179,9 +191,12 @@ def generate_fs():
     if payload_fmt == 'raw':
         payload_cmds = payload_raw(request.form)
     elif (payload_fmt == 'http'):
-        payload_cmds = payload_http(request)  # TODO
+        payload_cmds = payload_http(request)
     elif (payload_fmt == 'cert'):
-        payload_cmds = payload_cert(request.form)  # TODO
+        payload_cmds = payload_cert(request.form)
+        if payload_cmds is None:
+            return render_template('/pcapwg/error.html', error_text = "Unable to process submitted certificate. See log for more details.")
+
     synth = "%s\n%s" % (synth, payload_cmds)
     return render_template('/pcapwg/compile.html', page='compile', flowsynth_code=synth)
 
@@ -219,6 +234,7 @@ def compile_fs():
         synthstatus = json.loads(output)
     except ValueError:
         #there was a problem producing output.
+        logger.error("Problem processing Flowsynth output: %s" % output)
         return render_template('/pcapwg/error.html', error_text = output)
 
     #delete the tempfile
@@ -238,11 +254,13 @@ def about_page():
 @flowsynth_blueprint.route('/pcap/get_pcap/<pcapid>')
 def retrieve_pcap(pcapid):
     """returns a PCAP to the user"""
-    global PCAP_PATH
+    global PCAP_PATH, logger
     if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", pcapid):
+        logger.error("Bad pcapid in get_pcap request: '%s'" % pcapid)
         return render_template('/pcapwg/error.html', error_text = "Bad pcapid: '%s'" % pcapid)
     path = '%s/%s.pcap' % (PCAP_PATH, os.path.basename(pcapid))
     if not os.path.isfile(path):
+        logger.error("In get_pcap request: file not found: '%s'" % os.path.basename(path))
         return render_template('/pcapwg/error.html', error_text = "File not found: '%s'" % os.path.basename(path))
     filedata = open(path,'r').read()
     return Response(filedata,mimetype="application/vnd.tcpdump.pcap", headers={"Content-Disposition":"attachment;filename=%s.pcap" % pcapid})
