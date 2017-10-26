@@ -899,7 +899,8 @@ Frequently Asked Questions
      Suricata only supports the reading of a single pcap.  Therefore, to support 
      multiple pcaps in the same Suricata job, the Dalton Controller will combine 
      the pcaps into a single file before making the job available for Agents to
-     grab.  By default, the pcap merging is done with mergecap.
+     grab.  By default, the pcap merging is done with 
+     `mergecap <https://www.wireshark.org/docs/man-pages/mergecap.html>`__.
 
 #. | **Why is it that when I try to build a Snort 2.9.0 or 2.9.0.x container, it fails when
      configuring Snort saying it can't find the 'dnet' files?**
