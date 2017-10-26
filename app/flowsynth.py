@@ -52,43 +52,54 @@ def payload_http(request):
     synth = ""
 
     # we must have a request header.
-    request_header = unicode_safe(request.form.get('request_header')).strip("\r\n")
-    request_body = unicode_safe(request.form.get('request_body')).strip("\r\n")
-    request_body_len = len(request_body) - (request_body.count("\\x") * 3)
+    try:
+        request_header = fs_replace_badchars(unicode_safe(request.form.get('request_header')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+        request_body = fs_replace_badchars(unicode_safe(request.form.get('request_body')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+        request_body_len = len(request_body) - (request_body.count("\\x") * 3)
+    except Exception as e:
+        logger.error("Problem parsing HTTP Wizard payload request content: %s" % e)
+        return None
 
     #the start of the flowsynth
-    synth = 'default > (content:"%s";' % fs_replace_badchars(request_header)
+    synth = 'default > (content:"%s";' % request_header
 
     if 'payload_http_request_contentlength' in request.form:
-        # calculate request content length
+        # calculate request content length; doesn't add 'Content-Length: 0' if empty request body
         if (request_body != ""):
+            if "content-length" in request_header.lower():
+                logger.warn("Possible duplicate Content-Length headers!")
             synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, request_body_len)
 
     # add an 0d0a0d0a
     synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
     if (request_body != ""):
         # add http_client_body
-        synth = '%s content:"%s"; );\n' % (synth, fs_replace_badchars(request_body))
+        synth = '%s content:"%s"; );\n' % (synth, request_body)
     else:
         synth = '%s );\n' % synth
 
     if 'payload_http_response' in request.form:
         # include http response
-        response_header = unicode_safe(request.form.get('response_header')).strip("\r\n")
-        response_body = unicode_safe(request.form.get('response_body')).strip("\r\n")
-        response_body_len = len(response_body) - (response_body.count("\\x") * 3)
+        try:
+            response_header = fs_replace_badchars(unicode_safe(request.form.get('response_header')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+            response_body = fs_replace_badchars(unicode_safe(request.form.get('response_body')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+            response_body_len = len(response_body) - (response_body.count("\\x") * 3)
+        except Exception as e:
+            logger.error("Problem parsing HTTP Wizard payload response content: %s" % e)
+            return None
 
-        synth = '%sdefault < (content:"%s";' % (synth, fs_replace_badchars(response_header))
+        synth = '%sdefault < (content:"%s";' % (synth, response_header)
 
         if 'payload_http_response_contentlength' in request.form:
-            # calculate response content-length
-            if (response_body != ""):
-                synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, response_body_len)
+            # calculate response content-length; if body empty, still adds 'Content-Length: 0' if checkbox checked
+            if "content-length" in response_header.lower():
+                logger.warn("Possible duplicate Content-Length headers!")
+            synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, response_body_len)
 
         # add an 0d0a0d0a
         synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
         if (response_body != ""):
-            synth = '%s content:"%s"; );\n' % (synth, fs_replace_badchars(response_body))
+            synth = '%s content:"%s"; );\n' % (synth, response_body)
         else:
             synth = '%s );\n' % synth
 
@@ -192,6 +203,8 @@ def generate_fs():
         payload_cmds = payload_raw(request.form)
     elif (payload_fmt == 'http'):
         payload_cmds = payload_http(request)
+        if payload_cmds is None:
+            return render_template('/pcapwg/error.html', error_text = "Unable to process submitted HTTP Wizard content. See log for more details.")
     elif (payload_fmt == 'cert'):
         payload_cmds = payload_cert(request.form)
         if payload_cmds is None:
