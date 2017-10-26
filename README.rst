@@ -214,7 +214,7 @@ number of user-configurable options:
      members that have the ".pcap", ".pcapng", or ".cap" extensions will
      be included; the other files will be ignored.
 
-     If multiple pcaps are submitted for a Suricata job, they will be 
+   | If multiple pcaps are submitted for a Suricata job, they will be 
      combined into a single pcap on job submisison since Suricata can
      only read a single pcap in read pcap mode.
 
