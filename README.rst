@@ -214,6 +214,10 @@ number of user-configurable options:
      members that have the ".pcap", ".pcapng", or ".cap" extensions will
      be included; the other files will be ignored.
 
+     If multiple pcaps are submitted for a Suricata job, they will be 
+     combined into a single pcap on job submisison since Suricata can
+     only read a single pcap in read pcap mode.
+
 -  | **Sensor Version**
    | The specific sensor version to use to run the specified pcap(s)
      and rule(s).
@@ -888,6 +892,14 @@ Frequently Asked Questions
    | Right now, a programmatic submission must mimic a Web UI submission. In the
      future, a more streamlined and easier to use submission API may be exposed.
      Feel free to submit a pull request with this feature.
+
+#. | **When I submit jobs to Suricata Agents with multiple pcaps, the job zipfile
+     only has one pcap. What's going on?**
+   | In read pcap mode, which is how the Suricata and Snort engines process pcaps,
+     Suricata only supports the reading of a single pcap.  Therefore, to support 
+     multiple pcaps in the same Suricata job, the Dalton Controller will combine 
+     the pcaps into a single file before making the job available for Agents to
+     grab.  By default, the pcap merging is done with mergecap.
 
 #. | **Why is it that when I try to build a Snort 2.9.0 or 2.9.0.x container, it fails when
      configuring Snort saying it can't find the 'dnet' files?**
