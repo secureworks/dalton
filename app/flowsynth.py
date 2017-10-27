@@ -9,7 +9,6 @@ import sys
 import random
 import tempfile
 import re
-import logging
 from logging.handlers import RotatingFileHandler
 import certsynth
 
