@@ -64,10 +64,12 @@ def payload_http(request):
     synth = 'default > (content:"%s";' % request_header
 
     if 'payload_http_request_contentlength' in request.form:
-        # calculate request content length; doesn't add 'Content-Length: 0' if empty request body
-        if (request_body != ""):
-            if "content-length" in request_header.lower():
-                logger.warn("Possible duplicate Content-Length headers!")
+        # add or update request content length
+        # doesn't add 'Content-Length: 0' if empty request body unless POST
+        # will do inline update of Content-Length value if exists in submitted data
+        if re.search(r'\\x0d\\x0acontent-length\\x3a(\\x20)*\d+("|\\x0d\\x0a)', synth.lower()):
+            synth = re.sub(r'(\\x0d\\x0acontent-length\\x3a(?:\\x20)*)\d+("|\\x0d\\x0a)', "\g<1>%d\g<2>" % request_body_len, synth, flags=re.I)
+        elif (request_body != "" or request_header.lower().startswith("post\\x20")):
             synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, request_body_len)
 
     # add an 0d0a0d0a
@@ -88,13 +90,18 @@ def payload_http(request):
             logger.error("Problem parsing HTTP Wizard payload response content: %s" % e)
             return None
 
-        synth = '%sdefault < (content:"%s";' % (synth, response_header)
 
         if 'payload_http_response_contentlength' in request.form:
-            # calculate response content-length; if body empty, still adds 'Content-Length: 0' if checkbox checked
-            if "content-length" in response_header.lower():
-                logger.warn("Possible duplicate Content-Length headers!")
-            synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, response_body_len)
+            # add or update response content length; include "Content-Length: 0" if body empty
+            # will do inline update of Content-Length value if exists in submitted data
+            if re.search(r'\\x0d\\x0acontent-length\\x3a(\\x20)*\d+($|\\x0d\\x0a)', response_header.lower()):
+                response_header = re.sub(r'(\\x0d\\x0acontent-length\\x3a(?:\\x20)*)\d+($|\\x0d\\x0a)', "\g<1>%d\g<2>" % response_body_len, response_header, flags=re.I)
+                synth = '%sdefault < (content:"%s";' % (synth, response_header)
+            else:
+                synth = '%sdefault < (content:"%s";' % (synth, response_header)
+                synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, response_body_len)
+        else:
+            synth = '%sdefault < (content:"%s";' % (synth, response_header)
 
         # add an 0d0a0d0a
         synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
