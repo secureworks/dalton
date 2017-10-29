@@ -906,7 +906,7 @@ Frequently Asked Questions
      configuring Snort saying it can't find the 'dnet' files?**
    | Attempting to build Snort 2.9.0 and 2.9.0.x  will fail because 
      Autoconf can't find the dnet files. This was apparently fixed in 
-     Snort > 2.9.1. If 
+     Snort 2.9.1 and later. If 
      you really want a Snort 2.9.0 or 2.9.0.x Agent, you will have to build 
      one out yourself.  The Dalton Agent code should work
      fine on it.  If it turns out that there is a lot of demand for 
