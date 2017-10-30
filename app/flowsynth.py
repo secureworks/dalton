@@ -9,7 +9,6 @@ import sys
 import random
 import tempfile
 import re
-import logging
 from logging.handlers import RotatingFileHandler
 import certsynth
 
@@ -52,43 +51,61 @@ def payload_http(request):
     synth = ""
 
     # we must have a request header.
-    request_header = unicode_safe(request.form.get('request_header')).strip("\r\n")
-    request_body = unicode_safe(request.form.get('request_body')).strip("\r\n")
-    request_body_len = len(request_body) - (request_body.count("\\x") * 3)
+    try:
+        request_header = fs_replace_badchars(unicode_safe(request.form.get('request_header')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+        request_body = fs_replace_badchars(unicode_safe(request.form.get('request_body')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+        request_body_len = len(request_body) - (request_body.count("\\x") * 3)
+    except Exception as e:
+        logger.error("Problem parsing HTTP Wizard payload request content: %s" % e)
+        return None
 
     #the start of the flowsynth
-    synth = 'default > (content:"%s";' % fs_replace_badchars(request_header)
+    synth = 'default > (content:"%s";' % request_header
 
     if 'payload_http_request_contentlength' in request.form:
-        # calculate request content length
-        if (request_body != ""):
+        # add or update request content length
+        # doesn't add 'Content-Length: 0' if empty request body unless POST
+        # will do inline update of Content-Length value if exists in submitted data
+        if re.search(r'\\x0d\\x0acontent-length\\x3a(\\x20)*\d+("|\\x0d\\x0a)', synth.lower()):
+            synth = re.sub(r'(\\x0d\\x0acontent-length\\x3a(?:\\x20)*)\d+("|\\x0d\\x0a)', "\g<1>%d\g<2>" % request_body_len, synth, flags=re.I)
+        elif (request_body != "" or request_header.lower().startswith("post\\x20")):
             synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, request_body_len)
 
     # add an 0d0a0d0a
     synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
     if (request_body != ""):
         # add http_client_body
-        synth = '%s content:"%s"; );\n' % (synth, fs_replace_badchars(request_body))
+        synth = '%s content:"%s"; );\n' % (synth, request_body)
     else:
         synth = '%s );\n' % synth
 
     if 'payload_http_response' in request.form:
         # include http response
-        response_header = unicode_safe(request.form.get('response_header')).strip("\r\n")
-        response_body = unicode_safe(request.form.get('response_body')).strip("\r\n")
-        response_body_len = len(response_body) - (response_body.count("\\x") * 3)
+        try:
+            response_header = fs_replace_badchars(unicode_safe(request.form.get('response_header')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+            response_body = fs_replace_badchars(unicode_safe(request.form.get('response_body')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+            response_body_len = len(response_body) - (response_body.count("\\x") * 3)
+        except Exception as e:
+            logger.error("Problem parsing HTTP Wizard payload response content: %s" % e)
+            return None
 
-        synth = '%sdefault < (content:"%s";' % (synth, fs_replace_badchars(response_header))
 
         if 'payload_http_response_contentlength' in request.form:
-            # calculate response content-length
-            if (response_body != ""):
+            # add or update response content length; include "Content-Length: 0" if body empty
+            # will do inline update of Content-Length value if exists in submitted data
+            if re.search(r'\\x0d\\x0acontent-length\\x3a(\\x20)*\d+($|\\x0d\\x0a)', response_header.lower()):
+                response_header = re.sub(r'(\\x0d\\x0acontent-length\\x3a(?:\\x20)*)\d+($|\\x0d\\x0a)', "\g<1>%d\g<2>" % response_body_len, response_header, flags=re.I)
+                synth = '%sdefault < (content:"%s";' % (synth, response_header)
+            else:
+                synth = '%sdefault < (content:"%s";' % (synth, response_header)
                 synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, response_body_len)
+        else:
+            synth = '%sdefault < (content:"%s";' % (synth, response_header)
 
         # add an 0d0a0d0a
         synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
         if (response_body != ""):
-            synth = '%s content:"%s"; );\n' % (synth, fs_replace_badchars(response_body))
+            synth = '%s content:"%s"; );\n' % (synth, response_body)
         else:
             synth = '%s );\n' % synth
 
@@ -192,6 +209,8 @@ def generate_fs():
         payload_cmds = payload_raw(request.form)
     elif (payload_fmt == 'http'):
         payload_cmds = payload_http(request)
+        if payload_cmds is None:
+            return render_template('/pcapwg/error.html', error_text = "Unable to process submitted HTTP Wizard content. See log for more details.")
     elif (payload_fmt == 'cert'):
         payload_cmds = payload_cert(request.form)
         if payload_cmds is None:
