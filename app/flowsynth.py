@@ -9,6 +9,7 @@ import sys
 import random
 import tempfile
 import re
+from logging.handlers import RotatingFileHandler
 import certsynth
 
 from flask import Blueprint, render_template, request, Response, redirect
@@ -17,6 +18,15 @@ from dalton import FS_PCAP_PATH as PCAP_PATH
 
 # setup the flowsynth blueprint
 flowsynth_blueprint = Blueprint('flowsynth_blueprint', __name__, template_folder='templates/')
+
+# logging
+file_handler = RotatingFileHandler('/var/log/flowsynth.log', 'a', 1 * 1024 * 1024, 10)
+file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+logger = logging.getLogger("flowsynth")
+logger.addHandler(file_handler)
+logger.setLevel(logging.INFO)
+
+logger.info("Logging started")
 
 def payload_raw(formobj):
     """parse and format a raw payload"""
@@ -41,66 +51,85 @@ def payload_http(request):
     synth = ""
 
     # we must have a request header.
-    request_header = unicode_safe(request.form.get('request_header')).strip("\r\n")
-    request_body = unicode_safe(request.form.get('request_body')).strip("\r\n")
-    request_body_len = len(request_body) - (request_body.count("\\x") * 3)
+    try:
+        request_header = fs_replace_badchars(unicode_safe(request.form.get('request_header')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+        request_body = fs_replace_badchars(unicode_safe(request.form.get('request_body')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+        request_body_len = len(request_body) - (request_body.count("\\x") * 3)
+    except Exception as e:
+        logger.error("Problem parsing HTTP Wizard payload request content: %s" % e)
+        return None
 
     #the start of the flowsynth
-    synth = 'default > (content:"%s";' % fs_replace_badchars(request_header)
+    synth = 'default > (content:"%s";' % request_header
 
     if 'payload_http_request_contentlength' in request.form:
-        # calculate request content length
-        if (request_body != ""):
+        # add or update request content length
+        # doesn't add 'Content-Length: 0' if empty request body unless POST
+        # will do inline update of Content-Length value if exists in submitted data
+        if re.search(r'\\x0d\\x0acontent-length\\x3a(\\x20)*\d+("|\\x0d\\x0a)', synth.lower()):
+            synth = re.sub(r'(\\x0d\\x0acontent-length\\x3a(?:\\x20)*)\d+("|\\x0d\\x0a)', "\g<1>%d\g<2>" % request_body_len, synth, flags=re.I)
+        elif (request_body != "" or request_header.lower().startswith("post\\x20")):
             synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, request_body_len)
 
     # add an 0d0a0d0a
     synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
     if (request_body != ""):
         # add http_client_body
-        synth = '%s content:"%s"; );\n' % (synth, fs_replace_badchars(request_body))
+        synth = '%s content:"%s"; );\n' % (synth, request_body)
     else:
         synth = '%s );\n' % synth
 
     if 'payload_http_response' in request.form:
         # include http response
-        response_header = unicode_safe(request.form.get('response_header')).strip("\r\n")
-        response_body = unicode_safe(request.form.get('response_body')).strip("\r\n")
-        response_body_len = len(response_body) - (response_body.count("\\x") * 3)
+        try:
+            response_header = fs_replace_badchars(unicode_safe(request.form.get('response_header')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+            response_body = fs_replace_badchars(unicode_safe(request.form.get('response_body')).strip("\r\n")).replace("\r", '\\x0d\\x0a').replace("\n", '\\x0d\\x0a')
+            response_body_len = len(response_body) - (response_body.count("\\x") * 3)
+        except Exception as e:
+            logger.error("Problem parsing HTTP Wizard payload response content: %s" % e)
+            return None
 
-        synth = '%sdefault < (content:"%s";' % (synth, fs_replace_badchars(response_header))
 
         if 'payload_http_response_contentlength' in request.form:
-            # calculate response content-length
-            if (response_body != ""):
+            # add or update response content length; include "Content-Length: 0" if body empty
+            # will do inline update of Content-Length value if exists in submitted data
+            if re.search(r'\\x0d\\x0acontent-length\\x3a(\\x20)*\d+($|\\x0d\\x0a)', response_header.lower()):
+                response_header = re.sub(r'(\\x0d\\x0acontent-length\\x3a(?:\\x20)*)\d+($|\\x0d\\x0a)', "\g<1>%d\g<2>" % response_body_len, response_header, flags=re.I)
+                synth = '%sdefault < (content:"%s";' % (synth, response_header)
+            else:
+                synth = '%sdefault < (content:"%s";' % (synth, response_header)
                 synth = '%s content:"\\x0d\\x0aContent-Length\x3a\x20%s";' % (synth, response_body_len)
+        else:
+            synth = '%sdefault < (content:"%s";' % (synth, response_header)
 
         # add an 0d0a0d0a
         synth = '%s content:"\\x0d\\x0a\\x0d\\x0a";' % synth
         if (response_body != ""):
-            synth = '%s content:"%s"; );\n' % (synth, fs_replace_badchars(response_body))
+            synth = '%s content:"%s"; );\n' % (synth, response_body)
         else:
             synth = '%s );\n' % synth
 
     return synth
 
 def payload_cert(formobj):
-    empty_synth = 'default > (content:"";);'
-
     # make sure we have stuff we need
     if not ('cert_file_type' in formobj and 'cert_file' in request.files):
-        return empty_synth
+        logger.error("No cert submitted")
+        return None
 
     file_content = request.files['cert_file'].read()
     if formobj.get('cert_file_type') == 'pem':
         if certsynth.pem_cert_validate(file_content.strip()):
             return certsynth.cert_to_synth(file_content.strip(), 'PEM')
         else:
-            return empty_synth
+            logger.error("Unable to validate submitted pem file.")
+            return None
     elif formobj.get('cert_file_type') == 'der':
         return certsynth.cert_to_synth(file_content, 'DER')
     else:
         # this shouldn't happen if people are behaving
-        return empty_synth
+        logger.error("Unable to validate submitted der file.")
+        return None
 
 
 def fs_replace_badchars(payload):
@@ -179,9 +208,14 @@ def generate_fs():
     if payload_fmt == 'raw':
         payload_cmds = payload_raw(request.form)
     elif (payload_fmt == 'http'):
-        payload_cmds = payload_http(request)  # TODO
+        payload_cmds = payload_http(request)
+        if payload_cmds is None:
+            return render_template('/pcapwg/error.html', error_text = "Unable to process submitted HTTP Wizard content. See log for more details.")
     elif (payload_fmt == 'cert'):
-        payload_cmds = payload_cert(request.form)  # TODO
+        payload_cmds = payload_cert(request.form)
+        if payload_cmds is None:
+            return render_template('/pcapwg/error.html', error_text = "Unable to process submitted certificate. See log for more details.")
+
     synth = "%s\n%s" % (synth, payload_cmds)
     return render_template('/pcapwg/compile.html', page='compile', flowsynth_code=synth)
 
@@ -219,6 +253,7 @@ def compile_fs():
         synthstatus = json.loads(output)
     except ValueError:
         #there was a problem producing output.
+        logger.error("Problem processing Flowsynth output: %s" % output)
         return render_template('/pcapwg/error.html', error_text = output)
 
     #delete the tempfile
@@ -238,11 +273,13 @@ def about_page():
 @flowsynth_blueprint.route('/pcap/get_pcap/<pcapid>')
 def retrieve_pcap(pcapid):
     """returns a PCAP to the user"""
-    global PCAP_PATH
+    global PCAP_PATH, logger
     if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", pcapid):
+        logger.error("Bad pcapid in get_pcap request: '%s'" % pcapid)
         return render_template('/pcapwg/error.html', error_text = "Bad pcapid: '%s'" % pcapid)
     path = '%s/%s.pcap' % (PCAP_PATH, os.path.basename(pcapid))
     if not os.path.isfile(path):
+        logger.error("In get_pcap request: file not found: '%s'" % os.path.basename(path))
         return render_template('/pcapwg/error.html', error_text = "File not found: '%s'" % os.path.basename(path))
     filedata = open(path,'r').read()
     return Response(filedata,mimetype="application/vnd.tcpdump.pcap", headers={"Content-Disposition":"attachment;filename=%s.pcap" % pcapid})
