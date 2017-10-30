@@ -34,7 +34,7 @@ $('#payload_raw').click (function ()
 $('#payload_area').on( "click", "input", function () {
     var myId = $(this).attr('id');
     if (myId == "payload_http_response") {
-        if $(this).prop('checked') {
+        if ($(this).prop('checked')) {
             $('#include_http_response').show();
         } else {
             $('#include_http_response').hide();
