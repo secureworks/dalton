@@ -32,10 +32,14 @@ $('#payload_raw').click (function ()
   });
 
 $('#payload_area').on( "click", "input", function () {
-    alert("can I set visibility of dynamic div?");
-    var thisCheck = $(this);
-    alert('chekced: ' + thisCheck);
-    $('#include_http_response').hide();
+    var myId = $(this).attr('id');
+    if (myId == "payload_http_response") {
+        if $(this).prop('checked') {
+            $('#include_http_response').show();
+        } else {
+            $('#include_http_response').hide();
+        }
+    }
 });
     
 {% endblock %}
