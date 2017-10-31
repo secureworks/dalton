@@ -522,7 +522,7 @@ def check_pcaps():
                                         "an established connection.\nYou will need to provide a more complete "
                                         "pcap if you want accurate results." 
                                         "\n\n"
-                                        "If you need help crafting a pcap, FlowSynth may be able to help --\n"
+                                        "If you need help crafting a pcap, Flowsynth may be able to help --\n"
                                         "http://flowsynth/pcap/build - (TODO: link needed)" 
                                         "\n\n"
                                         "And, \"there's always barber college....\"" % os.path.basename(pcap))

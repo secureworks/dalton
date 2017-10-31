@@ -3,12 +3,8 @@ from flask_cache import Cache
 from flask_compress import Compress
 from app.dalton import dalton_blueprint
 from app.flowsynth import flowsynth_blueprint
-import logging
-from logging.handlers import RotatingFileHandler
-
 
 # create
-#daltonfs = Flask(__name__)
 daltonfs = Flask(__name__, static_folder='app/static')
 
 # register modules
