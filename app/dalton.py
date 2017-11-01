@@ -1453,7 +1453,7 @@ def page_coverage_summary():
                         # Update: apparently in Suri 4 and > 3.1 you CAN have multiple tls loggers....
                         # doing this one at a time (two passes) since we are iterating over the structure
                         # we want to edit AND we are using list indexes.
-                        # Also, the yaml will be represented differenlty based on the values (e.g. string vs ordered dict).
+                        # Also, the yaml will be represented differently based on the values (e.g. string vs ordered dict).
                         # Instead of trying to check everything every time, just catch the exception(s) and move on. The
                         # stuff we want disabled will still get disabled despite the exceptions along the way.
                         for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
