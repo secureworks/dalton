@@ -834,11 +834,54 @@ variable has debugging set, debug logging will be enabled.
 Flowsynth WebUI
 ===============
 
-Dalton included a Web UI for 
+Dalton includes a Web UI for
 `Flowsynth <https://github.com/secureworks/flowsynth>`__ , a tool that 
-facilitates network packet capture creation. ... 
+facilitates network packet capture creation. The flowsynth Web UI makes it trivial
+to model network traffic and test it against a Dalton sensor.
 
-TODO
+To access Flowsynth click the 'Flowsynth' link in the Dalton toolbar, or visit
+the /flowsynth URI in your docker container. The flowsynth UI has two modes of
+operation, Build and Compile. The build mode provides a wizard-like interface for
+creating certain types of PCAPs. The compile mode provides a direct interface to
+the flowsynth compiler allowing you to build synth files directly in the UI.
+
+Build Mode
+-----------
+The Flowsynth Build mode allows you to quickly generate a PCAP using some sensible
+defaults. On the Network Layer tab you can select source and destination IP ranges.
+An IP address is chosen at random from these ranges. On the Transport Layer tab
+you can choose between TCP and UDP, and optionally establish the TCP connection
+with a three-way handshake. Destination and Source ports are chosen at random,
+or can be set explicitly. The Payload tab allows you to easily build some common
+payloads. The wizards generate flowsynth syntax language, and populate the 'Compile'
+tab with the content to allow you to make any last minute changes prior to compilation.
+
+Raw Payload
+````````````
+The raw payload wizard allows you to rapidly model two-way communication between
+a client and server. It is most often used to model binary protocols, such as
+TLS.
+
+HTTP Payload
+````````````
+The HTTP  wizard makes it simple to build HTTP client requests and HTTP
+server responses. The payload prompts for two types of input, an HTTP header section
+and a HTTP body section. The wizard will also optionally compute the
+Content-Length header which can be valuable when working with long client request
+bodies or server response bodies.
+
+Certificate Payload
+````````````````````
+The Certificate wizard makes it trivial to generate a partial SSL/TLS handshake
+using a user-supplied certificate.
+
+Compile Mode
+-------------
+Compile mode provides a direct interface to the flowsynth compiler, allowing you
+ to build synth files directly in the UI. The compile mode UI is populated by the
+build mode wizards. After the synth has been submitted, a PCAP will be generated
+and a download link is provided. You can also optionally submit the PCAP directly
+to Snort or Suricata from the web interface.
 
 
 Frequently Asked Questions
