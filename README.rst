@@ -998,7 +998,6 @@ Contributors
 ------------
 
 -  Rob Vinson
-
 -  George P. Burdell
  
 
