@@ -994,6 +994,13 @@ Authors
    
 -  Will Urbanski
    
+Contributors
+------------
+
+-  Rob Vinson
+
+-  George P. Burdell
+ 
 
 Feedback including bug reports, suggestions, improvements, questions,
 etc. is welcome.
