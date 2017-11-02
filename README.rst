@@ -839,49 +839,61 @@ Dalton includes a Web UI for
 facilitates network packet capture creation. The flowsynth Web UI makes it trivial
 to model network traffic and test it against a Dalton sensor.
 
-To access Flowsynth click the 'Flowsynth' link in the Dalton toolbar, or visit
-the /flowsynth URI in your docker container. The flowsynth UI has two modes of
-operation, Build and Compile. The build mode provides a wizard-like interface for
-creating certain types of PCAPs. The compile mode provides a direct interface to
-the flowsynth compiler allowing you to build synth files directly in the UI.
+Accessing the Flowsynth WebUI can be done via the 'Flowsynth' link in the Dalton toolbar, or directly
+using the '/flowsynth' URI path.
+The flowsynth UI has two modes of
+operation: Build and Compile. The build mode provides a wizard-like interface for
+creating certain types of pcaps. The compile mode provides a direct interface to
+the flowsynth compiler, allowing for the building of synth files directly in the UI.
 
 Build Mode
------------
-The Flowsynth Build mode allows you to quickly generate a PCAP using some sensible
-defaults. On the Network Layer tab you can select source and destination IP ranges.
-An IP address is chosen at random from these ranges. On the Transport Layer tab
-you can choose between TCP and UDP, and optionally establish the TCP connection
+----------
+The Flowsynth Build mode allows for quick pcap generation using some sensible
+defaults. On the 'Network Layer' vertical tab, the source and destination IP ranges can be selected.
+An IP address is chosen at random from these ranges. On the 'Transport Layer' vertical tab
+is the ability to choose between TCP and UDP, and optionally establish the TCP connection
 with a three-way handshake. Destination and Source ports are chosen at random,
-or can be set explicitly. The Payload tab allows you to easily build some common
+or can be set explicitly. The 'Payload' vertical tab allows the user to easily build some common
 payloads. The wizards generate flowsynth syntax language, and populate the 'Compile'
-tab with the content to allow you to make any last minute changes prior to compilation.
+tab with the content to allow for any last minute changes prior to compilation.
+
+Binary, non-printable, and printable bytes can be represented using Hexadecimal escape sequences 
+(\xhh).  Such encoding are converted to their representative bytes when the pcap is compiled. 
+For example, '\x41' becomes 'A'.
+
 
 Raw Payload
-````````````
-The raw payload wizard allows you to rapidly model two-way communication between
-a client and server. It is most often used to model binary protocols, such as
-TLS.
+```````````
+The raw payload wizard allows a user to rapidly model two-way communication between
+a client and server.  
+It is often useful for modeling custom protocols and/or binary protocols.
 
 HTTP Payload
 ````````````
 The HTTP  wizard makes it simple to build HTTP client requests and HTTP
 server responses. The payload prompts for two types of input, an HTTP header section
-and a HTTP body section. The wizard will also optionally compute the
-Content-Length header which can be valuable when working with long client request
-bodies or server response bodies.
+and a HTTP body section.
+
+If the 'Autocompute request Content-Length header' and/or 
+'Autocompute response Content-Length header' is selected, the wizard will compute and add a
+Content-Length header based on the HTTP body data.  If a Content-Length header already
+exists in the HTTP Header data, it will be updated to reflect the correct size of the 
+corresponding HTTP body.  If the request body is empty, a "Content-Length: 0" header 
+will *not* be added; if a response body is empty, a "Content-Length: 0" header *will* be 
+added.
 
 Certificate Payload
-````````````````````
+```````````````````
 The Certificate wizard makes it trivial to generate a partial SSL/TLS handshake
 using a user-supplied certificate.
 
 Compile Mode
--------------
-Compile mode provides a direct interface to the flowsynth compiler, allowing you
- to build synth files directly in the UI. The compile mode UI is populated by the
-build mode wizards. After the synth has been submitted, a PCAP will be generated
-and a download link is provided. You can also optionally submit the PCAP directly
-to Snort or Suricata from the web interface.
+------------
+Compile mode provides a direct interface to the flowsynth compiler, allowing for 
+the building of synth files directly in the UI. The compile mode UI is populated by the
+build mode wizards. After the synth has been submitted, a pcap will be generated
+and a download link provided. The pcap can also be directly submitted from the web interface 
+to Dalton, to be used in a Suricata or Snort job.
 
 
 Frequently Asked Questions
@@ -909,7 +921,7 @@ Frequently Asked Questions
      it should be possible to get containers working on a Windows host.  But
      this has not been tested.
    
-#. | **Is there Dalton Agent support for Snort < v2.9.1?**
+#. | **Is there Dalton Agent support for Snort version < 2.9?**
    | Currently no.  Dalton Agents that run Snort utilize the 'dump' DAQ to replay pcaps
      and DAQ wasn't introduced until Snort 2.9.  Dalton Agents for older Snort
      versions (e.g. 2.4) have been written in the past but are not part of this 
