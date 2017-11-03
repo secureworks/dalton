@@ -243,6 +243,11 @@ number of user-configurable options:
         done on the Dalton controller; submitting invalid rules will
         result in verbose errors from the Dalton Agent (sensor engine)
         being used, which can facilitate rule syntax troubleshooting.
+        Custom rules are added to a ``custom.rules`` file and included in the job
+        so valid format is supported such as multiple rules (one on
+        each line), and comments (ignored lines) beginning with a pound
+        ('#') sign. If a 'sid' is not provided for a custom rule, one will be added
+        when the job is submitted.
 
 -  **Logs**
 
