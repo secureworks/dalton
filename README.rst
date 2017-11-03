@@ -140,7 +140,7 @@ Requirements
 
 -  `Docker <https://www.docker.com/get-docker>`__
 -  `Docker Compose <https://docs.docker.com/compose/install/>`__
--  Internet connection
+-  Internet connection (to build)
 
 Installing and Running Dalton
 =============================
