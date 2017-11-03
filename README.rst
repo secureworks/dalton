@@ -853,7 +853,7 @@ Flowsynth WebUI
 Dalton includes a Web UI for
 `Flowsynth <https://github.com/secureworks/flowsynth>`__ , a tool that 
 facilitates network packet capture creation. The flowsynth Web UI makes it trivial
-to model network traffic and test it against a Dalton sensor.
+to model network traffic and test it against a Dalton Agent.
 
 Accessing the Flowsynth WebUI can be done via the 'Flowsynth' link in the Dalton toolbar, or directly
 using the '/flowsynth' URI path.
