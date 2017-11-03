@@ -233,7 +233,7 @@ number of user-configurable options:
          | Enable all disabled rules. This may cause engine errors if
            variables in disabled rules are not defined.
       -  | **Show all flowbit alerts**
-         | Rules that have, "flowbit:noalert" will have that directive
+         | Rules that have, ``flowbit:noalert`` will have that directive
            removed so that they show up in the sensor alerts.
 
    -  | **Use custom rules**
@@ -246,7 +246,7 @@ number of user-configurable options:
         Custom rules are added to a ``dalton-custom.rules`` file and included in the job
         so valid format is supported such as multiple rules (one on
         each line), and comments (ignored lines) beginning with a pound
-        ('#') sign. If a 'sid' is not provided for a custom rule, one will be added
+        ('#') sign. If a ``sid`` is not provided for a custom rule, one will be added
         when the job is submitted.
 
 -  **Logs**
