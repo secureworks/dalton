@@ -45,6 +45,7 @@ import traceback
 import subprocess
 import random
 from threading import Thread
+import tempfile
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -928,11 +929,16 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
     # Note: archivename already sanitized
     logger.debug("Attempting to extract pcaps from  file '%s'" % os.path.basename(archivename))
     if archivename.lower().endswith('.zip'):
+        # Apparently python zipfile module does extraction using Python and not something
+        #  like C and it is super slow for a zipfile that isn't small in size. So
+        #  to speed things up, kick out to 7z on the system which is quite fast but not my
+        #  first choice. Still use zipfile module to process archive and get filenames.
         try:
             if not zipfile.is_zipfile(archivename):
                 msg = "File '%s' is not recognized as a valid zip file." % os.path.basename(archivename)
                 logger.error(msg)
                 return msg
+            files_to_extract = []
             zf = zipfile.ZipFile(archivename, mode='r')
             for file in zf.namelist():
                 logger.debug("Processing file '%s' from ZIP archive" % file)
@@ -943,14 +949,37 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     logger.warn("Not adding file '%s' from archive '%s': '.pcap', '.cap', or '.pcapng' extension required." % (file, os.path.basename(archivename)))
                     # just skip the file, and move on (and log it)
                     continue
-                filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
-                pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
-                fh = open(pcappath, 'wb')
-                # if archive is password protected, try using 'infected' as password
-                fh.write(zf.read(file, pwd='infected'))
-                fh.close()
-                pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                files_to_extract.append(file)
             zf.close()
+
+            if len(files_to_extract) > 0:
+                # make temporary location for extracting with 7z
+                tempd = tempfile.mkdtemp()
+                logger.debug("temp directory for 7z: %s" % tempd)
+                # try password 'infected' if password on archive
+                p7z_command = ['7z', 'x', archivename, '-pinfected', '-y', "-o%s" % tempd] + files_to_extract
+                # does 7z handle invalid/filenames or should more sanitization be attempted?
+                logger.debug("7z command: %s" % p7z_command)
+                # I'm not convinced that 7z outputs to stderr
+                p7z_out = subprocess.Popen(p7z_command, shell=False, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
+                if "Everything is Ok" not in p7z_out and "Errors: " in p7z_out:
+                    logger.error("Problem extracting ZIP archive '%s': %s" % (os.path.basename(archivename), p7z_out))
+                    raise Exception("p7zip error. See logs for details")
+                logger.debug("7z out: %s" % p7z_out)
+
+                # move files; handle duplicate filenames
+                for file in files_to_extract:
+                    filename = clean_filename(os.path.basename(file))
+                    filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
+                    pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                    pcapsrc = os.path.join(tempd, file)
+                    # copy
+                    shutil.move(pcapsrc, pcappath)
+                    pcap_files.append({'filename': filename, 'pcappath': pcappath})
+                    logger.debug("Successfully extracted and added pcap file '%s'" % os.path.basename(filename))
+                # cleanup
+                shutil.rmtree(tempd)
+
         except Exception as e:
             msg = "Problem extracting ZIP file '%s': %s" % (os.path.basename(archivename), e)
             logger.error(msg)
