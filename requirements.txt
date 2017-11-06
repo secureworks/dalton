@@ -4,7 +4,6 @@ Flask-Script==2.0.5
 Flask-Cache==0.13.1
 Flask-Compress==1.4.0
 redis==2.10.6
-eventlet==0.21.0
 # have to go with 0.14 b/c 0.15 won't output fully
 #  compatible YAML 1.1 and Suri doesn't like it
 ruamel.yaml==0.14.12
