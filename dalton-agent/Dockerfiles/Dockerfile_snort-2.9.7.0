@@ -9,7 +9,7 @@ RUN apt-get update -y && apt-get install -y \
     tcpdump
 
 # for debugging agent
-RUN apt-get install less
+#RUN apt-get install less
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y snort=2.9.7.0-5
 

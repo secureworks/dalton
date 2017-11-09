@@ -199,7 +199,7 @@ if IDS_BINARY is None:
         logger.critical("No IDS binary specified or found.  Cannot continue.")
         sys.exit(1)
 
-# if Suricata version 4.0.0, this value would be "4.0.0"
+# Example: if Suricata version 4.0.0, this value would be "4.0.0"
 SENSOR_VERSION = get_engine_version(IDS_BINARY)
 
 if SENSOR_TECHNOLOGY == 'auto':

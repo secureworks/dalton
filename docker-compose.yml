@@ -171,11 +171,6 @@ services:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
-#    # for debugging; can remove for prod
-#    
-#volumes:
-#      - ./dalton-agent:/opt/dalton-agent
-
 # Snort 2.9.7.5 from source
 #  agent-snort-2.9.7.5:
 #    build:
