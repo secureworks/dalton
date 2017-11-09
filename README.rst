@@ -974,7 +974,7 @@ Frequently Asked Questions
      `mergecap <https://www.wireshark.org/docs/man-pages/mergecap.html>`__.
 
 #. | **Can I have more than one Agent with the same engine/version? For example, can
-     I have multiple Agents running Suricata 4.0.1?
+     I have multiple Agents running Suricata 4.0.1?**
    | Of course.  If you use the Agent containers and Docker Compose, make sure that
      the service and container name are unique between sensors.  Agents poll a
      queue on the Dalton controller for jobs based on their "TECHNOLOGY"
