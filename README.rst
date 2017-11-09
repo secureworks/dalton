@@ -973,6 +973,14 @@ Frequently Asked Questions
      grab.  By default, the pcap merging is done with 
      `mergecap <https://www.wireshark.org/docs/man-pages/mergecap.html>`__.
 
+#. | **Can I have more than one Agent with the same engine/version? For example, can
+     I have multiple Agents running Suricata 4.0.1?
+   | Of course.  If you use the Agent containers and Docker Compose, make sure that
+     the service and container name are unique between sensors.  Agents poll a
+     queue on the Dalton controller for jobs based on their "TECHNOLOGY"
+     (typically engine and version) and multiple Agents can poll the same queue.
+     Pending jobs are given to the first Agent that requests them.
+
 #. | **Why is it that when I try to build a Snort 2.9.0 or 2.9.0.x container, it fails when
      configuring Snort saying it can't find the 'dnet' files?**
    | Attempting to build Snort 2.9.0 and 2.9.0.x  will fail because 
