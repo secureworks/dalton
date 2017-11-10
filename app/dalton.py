@@ -112,6 +112,7 @@ except Exception as e:
     logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
 
 # if there are no rules, use idstools rulecat to download a set for Suri and Snort
+# if rulecat fails (eaten by proxy), empty rules file(s) may be created
 if os.path.exists(RULECAT_SCRIPT):
     for engine in ['suricata', 'snort']:
         ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
