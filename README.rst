@@ -15,7 +15,7 @@ custom pcap creation.
 
 .. code:: bash
 
-    start-dalton.sh
+    ./start-dalton.sh
 
 or this which does the same thing:
 
@@ -28,6 +28,9 @@ Then navigate to ``http://<docker-host>/dalton/``
 To configure what sensors are available, see 
 `Adding Sensors <#adding-sensors>`__.
 
+If you are building behind a proxy, see
+`Building Behind A Proxy <#building-behind-a-proxy>`__
+
 Contents
 ========
 
@@ -35,6 +38,9 @@ Contents
 -  `Design <#design>`__
 -  `Requirements <#requirements>`__
 -  `Installing and Running Dalton <#installing-and-running-dalton>`__
+
+   -  `Building Behind A Proxy <#building-behind-a-proxy>`__
+
 -  `Using Dalton <#using-dalton>`__
 
    -  `Launching A New Job <#launching-a-new-job>`__
@@ -151,7 +157,7 @@ the root of the repository, run:
 
 .. code:: bash
 
-    start-dalton.sh
+    ./start-dalton.sh
 
 or this which does the same thing:
 
@@ -171,6 +177,51 @@ Configuration options for the Dalton Controller can be found in ``dalton.conf``;
 Configuration options for Dalton Agents can be found in 
 ``dalton-agent/dalton-agent.conf``.  See the inline comments in those files for 
 more details.
+
+
+Building Behind A Proxy
+-----------------------
+
+It is recognized that getting systems to work behind a corporate proxy can be an endless source of
+acute frustration and ongoing consternation.  However, a small attempt
+has been made to make it easier for Dalton to be built behind a proxy. Note that
+it comes with no guarantees.
+
+To build Dalton behind a proxy, most likely Docker and
+the containers will need to be set up to use the proxy.
+
+Configuring Docker to use a proxy will vary depending on the platform
+Docker is run on.  For Linux, it usually involves editing the
+``/etc/default/docker`` file, or if systemd is used (as it is in Ubuntu 16.04),
+see `https://docs.docker.com/engine/admin/systemd/ <https://docs.docker.com/engine/admin/systemd/>`__.
+This is for *Docker*, not the
+Docker containers.  This allows Docker to do things like pull (external) images
+from the Docker Hub Registry.
+
+To build the Dalton containers behind a proxy, edit the ``.env`` file
+in the Dalton repository root and set the ``http_proxy``, ``https_proxy``, and/or ``no_proxy``
+variables accordingly.  Example:
+
+.. code:: bash
+
+    http_proxy=http://192.168.1.50:3128
+    https_proxy=http://192.168.1.50:3128
+    no_proxy=
+
+Be aware that DNS may not work in which case the IP of the
+proxy will need to be used.
+
+These environment variables will be used when containers are
+*built*.  This will allow the container to do things like
+'apt-get install...'; they are used *inside* the container,
+not by docker to pull (external) images.
+
+Note that these environment variables do not persist after the
+container is built.  This means that if there are no rulesets,
+and Dalton attempts to download default rulesets, it will most
+likely fail and result in an empty file.  In this case rulesets
+will need to bee added (and the empty files removed);
+see `Adding Rulesets <#adding-rulesets>`__.
 
 Using Dalton
 ============
@@ -669,6 +720,9 @@ For example, here is the specification for Suricata 3.2.3:
           dockerfile: Dockerfiles/Dockerfile_suricata
           args:
             - SURI_VERSION=3.2.3
+            - http_proxy=${http_proxy}
+            - https_proxy=${https_proxy}
+            - no_proxy=${no_proxy}
         image: suricata-3.2.3:latest
         container_name: suricata-3.2.3
         environment:
@@ -676,10 +730,13 @@ For example, here is the specification for Suricata 3.2.3:
         restart: always
 
 To add a specification for Suricata 4.0.2 (if it exists) just change the
-SURI_VERSION arg value from '3.2.3' to '4.0.2'.  The other places the version is used here
-('image', 'container_name', etc.) are there to provide useful labels for 
-easier management of the Dalton Agent containers.  Example Suricata 4.0.2
-specification:
+``SURI_VERSION`` arg value from '3.2.3' to '4.0.2'.  This will cause that version
+of Suricata to be downloaded and built.  The service name (e.g. 'agent-suricata-3.2.3')
+container name, and image name should also be updated to be unique.  Multiple Agents with
+the same engine/version can be run by keeping the ``SURI_VERSION`` and image name
+the same but using different service and container names.
+
+Example Suricata 4.0.2 specification:
 
 .. code:: yaml
 
@@ -689,12 +746,15 @@ specification:
           dockerfile: Dockerfiles/Dockerfile_suricata
           args:
             - SURI_VERSION=4.0.2
+            - http_proxy=${http_proxy}
+            - https_proxy=${https_proxy}
+            - no_proxy=${no_proxy}
         image: suricata-4.0.2:latest
         container_name: suricata-4.0.2
         environment:
           - AGENT_DEBUG=${AGENT_DEBUG}
         restart: always
-        
+
 Suricata can also have ``SURI_VERSION=current`` in which case the latest 
 Suricata version will be used to build the Agent.  Having a 'current' Suricata 
 version specification in the ``docker-compose.yml`` file is especially convenient 
@@ -708,16 +768,19 @@ Snort agents are the same way but the args to customize are ``SNORT_VERSION`` an
 .. code:: yaml
 
       # Snort 2.9.11 from source
-        agent-snort-2.9.11:
-          build:
-            context: ./dalton-agent
-            dockerfile: Dockerfiles/Dockerfile_snort
-            args:
-              - SNORT_VERSION=2.9.11
-              - DAQ_VERSION=2.0.6
-          image: snort-2.9.11:latest
-          container_name: snort-2.9.11
-          environment:
+      agent-snort-2.9.11:
+        build:
+          context: ./dalton-agent
+          dockerfile: Dockerfiles/Dockerfile_snort
+          args:
+            - SNORT_VERSION=2.9.11
+            - DAQ_VERSION=2.0.6
+            - http_proxy=${http_proxy}
+            - https_proxy=${https_proxy}
+            - no_proxy=${no_proxy}
+        image: snort-2.9.11:latest
+        container_name: snort-2.9.11
+        environment:
             - AGENT_DEBUG=${AGENT_DEBUG}
           restart: always
 
