@@ -730,11 +730,11 @@ For example, here is the specification for Suricata 3.2.3:
         restart: always
 
 To add a specification for Suricata 4.0.2 (if it exists) just change the
-SURI_VERSION arg value from '3.2.3' to '4.0.2'.  This will cause that version
+``SURI_VERSION`` arg value from '3.2.3' to '4.0.2'.  This will cause that version
 of Suricata to be downloaded and built.  The service name (e.g. 'agent-suricata-3.2.3')
 container name, and image name should also be updated to be unique.  Multiple Agents with
 the same engine/version can be run by keeping the ``SURI_VERSION`` and image name
-the same but 
+the same but using different service and container names.
 
 Example Suricata 4.0.2 specification:
 
