@@ -196,7 +196,7 @@ Docker containers.  This allows Docker to do things like pull (external) images
 from the Docker Hub Registry.
 
 To build the Dalton containers behind a proxy, edit the ``.env`` file
-in the Dalton repo root and set the ``http_proxy``, ``https_proxy``, and/or ``no_proxy``
+in the Dalton repository root and set the ``http_proxy``, ``https_proxy``, and/or ``no_proxy``
 variables accordingly.  Example:
 
 .. code:: bash
@@ -206,18 +206,18 @@ variables accordingly.  Example:
     no_proxy=
 
 Be aware that DNS may not work in which case the IP of the
-proxy will need to be supplied.
+proxy will need to be used.
 
 These environment variables will be used when containers are
-*built*.  This will allow the container to do things like 
-'apt-get install...'; they are used *inside* the container, 
+*built*.  This will allow the container to do things like
+'apt-get install...'; they are used *inside* the container,
 not by docker to pull (external) images.
 
 Note that these environment variables do not persist after the
 container is built.  This means that if there are no rulesets,
 and Dalton attempts to download default rulesets, it will most
 likey fail and result in an empty file.  In this case rulesets
-will need to bee added; see `Adding Rulesets <#adding-rulesets>`__
+will need to bee added; see `Adding Rulesets <#adding-rulesets>`__.
 
 Using Dalton
 ============
