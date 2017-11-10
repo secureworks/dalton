@@ -28,6 +28,9 @@ Then navigate to ``http://<docker-host>/dalton/``
 To configure what sensors are available, see 
 `Adding Sensors <#adding-sensors>`__.
 
+If you are building behind a proxy, see
+`Building Behind A Proxy <#building-behind-a-proxy>`__
+
 Contents
 ========
 
@@ -151,7 +154,7 @@ the root of the repository, run:
 
 .. code:: bash
 
-    start-dalton.sh
+    ./start-dalton.sh
 
 or this which does the same thing:
 
@@ -171,6 +174,50 @@ Configuration options for the Dalton Controller can be found in ``dalton.conf``;
 Configuration options for Dalton Agents can be found in 
 ``dalton-agent/dalton-agent.conf``.  See the inline comments in those files for 
 more details.
+
+
+Building Behind A Proxy
+-----------------------
+
+It is recognized that getting systems to work behind a corporate proxy can be an endless source of
+acute frustration and ongoing consternation.  However, a small attempt
+has been made to make it easier for Dalton to be built behind a proxy. Note that
+it comes with no guarantees.
+
+To build Dalton behind a proxy, most likey Docker and
+the containers will need to be set up to use the proxy.
+
+Configuring Docker to use a proxy will vary depending on the platform
+Docker is run on.  For Linux, it usually involves editing the
+``/etc/default/docker`` file, or if systemd is used (as it is in Ubuntu 16.04),
+see `https://docs.docker.com/engine/admin/systemd/ <https://docs.docker.com/engine/admin/systemd/>`__.
+This is for *Docker*, not the
+Docker containers.  This allows Docker to do things like pull (external) images
+from the Docker Hub Registry.
+
+To build the Dalton containers behind a proxy, edit the ``.env`` file
+in the Dalton repo root and set the ``http_proxy``, ``https_proxy``, and/or ``no_proxy``
+variables accordingly.  Example:
+
+.. code:: bash
+
+    http_proxy=http://192.168.1.50:3128
+    https_proxy=http://192.168.1.50:3128
+    no_proxy=
+
+Be aware that DNS may not work in which case the IP of the
+proxy will need to be supplied.
+
+These environment variables will be used when containers are
+*built*.  This will allow the container to do things like 
+'apt-get install...'; they are used *inside* the container, 
+not by docker to pull (external) images.
+
+Note that these environment variables do not persist after the
+container is built.  This means that if there are no rulesets,
+and Dalton attempts to download default rulesets, it will most
+likey fail and result in an empty file.  In this case rulesets
+will need to bee added; see `Adding Rulesets <#adding-rulesets>`__
 
 Using Dalton
 ============
