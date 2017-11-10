@@ -324,6 +324,9 @@ ability to edit the configuration file(s) for the sensor:
 
 -  | **Variables**
    |  The variables that can be used by the rules.
+      If the ``Override EXTERNAL_NET (set to 'any')`` option is selected
+      (on by default), then the ``EXTERNAL_NET`` IP variable will be set to
+      ``any`` when the job is submitted.
 
 -  | **Configuration File**
    | The engine configuration file, minus rule the variables, that the
