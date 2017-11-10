@@ -38,6 +38,9 @@ Contents
 -  `Design <#design>`__
 -  `Requirements <#requirements>`__
 -  `Installing and Running Dalton <#installing-and-running-dalton>`__
+
+   -  `Building Behind A Proxy <#building-behind-a-proxy>`__
+
 -  `Using Dalton <#using-dalton>`__
 
    -  `Launching A New Job <#launching-a-new-job>`__
@@ -716,6 +719,9 @@ For example, here is the specification for Suricata 3.2.3:
           dockerfile: Dockerfiles/Dockerfile_suricata
           args:
             - SURI_VERSION=3.2.3
+            - http_proxy=${http_proxy}
+            - https_proxy=${https_proxy}
+            - no_proxy=${no_proxy}
         image: suricata-3.2.3:latest
         container_name: suricata-3.2.3
         environment:
@@ -723,10 +729,13 @@ For example, here is the specification for Suricata 3.2.3:
         restart: always
 
 To add a specification for Suricata 4.0.2 (if it exists) just change the
-SURI_VERSION arg value from '3.2.3' to '4.0.2'.  The other places the version is used here
-('image', 'container_name', etc.) are there to provide useful labels for 
-easier management of the Dalton Agent containers.  Example Suricata 4.0.2
-specification:
+SURI_VERSION arg value from '3.2.3' to '4.0.2'.  This will cause that version
+of Suricata to be downloaded and built.  The service name (e.g. 'agent-suricata-3.2.3')
+container name, and image name should also be updated to be unique.  Multiple Agents with
+the same engine/version can be run by keeping the ``SURI_VERSION`` and image name
+the same but 
+
+Example Suricata 4.0.2 specification:
 
 .. code:: yaml
 
@@ -736,12 +745,15 @@ specification:
           dockerfile: Dockerfiles/Dockerfile_suricata
           args:
             - SURI_VERSION=4.0.2
+            - http_proxy=${http_proxy}
+            - https_proxy=${https_proxy}
+            - no_proxy=${no_proxy}
         image: suricata-4.0.2:latest
         container_name: suricata-4.0.2
         environment:
           - AGENT_DEBUG=${AGENT_DEBUG}
         restart: always
-        
+
 Suricata can also have ``SURI_VERSION=current`` in which case the latest 
 Suricata version will be used to build the Agent.  Having a 'current' Suricata 
 version specification in the ``docker-compose.yml`` file is especially convenient 
@@ -755,16 +767,19 @@ Snort agents are the same way but the args to customize are ``SNORT_VERSION`` an
 .. code:: yaml
 
       # Snort 2.9.11 from source
-        agent-snort-2.9.11:
-          build:
-            context: ./dalton-agent
-            dockerfile: Dockerfiles/Dockerfile_snort
-            args:
-              - SNORT_VERSION=2.9.11
-              - DAQ_VERSION=2.0.6
-          image: snort-2.9.11:latest
-          container_name: snort-2.9.11
-          environment:
+      agent-snort-2.9.11:
+        build:
+          context: ./dalton-agent
+          dockerfile: Dockerfiles/Dockerfile_snort
+          args:
+            - SNORT_VERSION=2.9.11
+            - DAQ_VERSION=2.0.6
+            - http_proxy=${http_proxy}
+            - https_proxy=${https_proxy}
+            - no_proxy=${no_proxy}
+        image: snort-2.9.11:latest
+        container_name: snort-2.9.11
+        environment:
             - AGENT_DEBUG=${AGENT_DEBUG}
           restart: always
 
