@@ -187,7 +187,7 @@ acute frustration and ongoing consternation.  However, a small attempt
 has been made to make it easier for Dalton to be built behind a proxy. Note that
 it comes with no guarantees.
 
-To build Dalton behind a proxy, most likey Docker and
+To build Dalton behind a proxy, most likely Docker and
 the containers will need to be set up to use the proxy.
 
 Configuring Docker to use a proxy will vary depending on the platform
@@ -219,7 +219,7 @@ not by docker to pull (external) images.
 Note that these environment variables do not persist after the
 container is built.  This means that if there are no rulesets,
 and Dalton attempts to download default rulesets, it will most
-likey fail and result in an empty file.  In this case rulesets
+likely fail and result in an empty file.  In this case rulesets
 will need to bee added; see `Adding Rulesets <#adding-rulesets>`__.
 
 Using Dalton
