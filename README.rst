@@ -220,7 +220,8 @@ Note that these environment variables do not persist after the
 container is built.  This means that if there are no rulesets,
 and Dalton attempts to download default rulesets, it will most
 likely fail and result in an empty file.  In this case rulesets
-will need to bee added; see `Adding Rulesets <#adding-rulesets>`__.
+will need to bee added (and the empty files removed);
+see `Adding Rulesets <#adding-rulesets>`__.
 
 Using Dalton
 ============
