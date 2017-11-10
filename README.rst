@@ -15,7 +15,7 @@ custom pcap creation.
 
 .. code:: bash
 
-    start-dalton.sh
+    ./start-dalton.sh
 
 or this which does the same thing:
 
