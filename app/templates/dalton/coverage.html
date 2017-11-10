@@ -277,7 +277,11 @@
 							<span id="custom_vars" class="span11";>
 								<textarea rows='25' cols='50' style='width: 100%;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
 							</span>
-							
+                            <p>
+							<label class="checkbox inline">
+                                <input type="checkbox" name="overrideExternalNet" id="overrideExternalNet" value="eoverride" checked>
+								Override EXTERNAL_NET - set to 'any'
+							</label>
                             <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration File</div>
                                 <input type="checkbox" name="optionCustomEngineConf" id="optionCustomEngineConf" value="custom" style="display:none;">
                                 Modify {{ sensor_tech.split('-')[0]|title }} configuration{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}

@@ -1319,6 +1319,14 @@ def page_coverage_summary():
             delete_temp_files(job_id)
             return render_template('/dalton/error.html', jid="<not_defined>", msg=["Variable \'sensor_tech\' not specified.  Please reload the submission page and try again."])
 
+        # get 'Override External_NET - set to any' option
+        bOverrideExternalNet = False
+        try:
+            if request.form.get('overrideExternalNet'):
+                bOverrideExternalNet = True
+        except:
+            pass
+
         # get and write variables
         vars = request.form.get('custom_vars')
         if not vars:
@@ -1356,6 +1364,16 @@ def page_coverage_summary():
                             vars_config['vars']['address-groups'][v] = ipv2add[v]
                 except Exception as e:
                     logger.warn("(Not Fatal) Problem customizing Suricata variables; your YAML may be bad. %s" % e)
+                    logger.debug("%s" % traceback.format_exc())
+                # set EXTERNAL_NET to 'any' if option set
+                try:
+                    if bOverrideExternalNet:
+                        if not 'EXTERNAL_NET' in vars_config['vars']['address-groups']:
+                            logger.warn("EXTERNAL_NET IP variable not set in config; setting to 'any'")
+                        vars_config['vars']['address-groups']['EXTERNAL_NET'] = 'any'
+                        logger.debug("Set 'EXTERNAL_NET' IP variable to 'any'")
+                except Exception as e:
+                    logger.warn("(Not Fatal) Problem ovverriding EXTERNAL_NET: %s" % e)
                     logger.debug("%s" % traceback.format_exc())
                 config.update(vars_config)
                 # first, do rule includes
@@ -1546,23 +1564,32 @@ def page_coverage_summary():
             if sensor_tech.startswith('snort'):
                 # check variables
                 for line in vars.split('\n'):
-                    # strip out trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
-                    line = line.rstrip()
-                    # strip out leading whitespace to make subsequent matching easier (snort won't complain about leading whitespace though)
-                    line = line.lstrip()
+                    # strip out leading and trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
+                    line = line.strip()
                     # if empty or comment line, continue
-                    if line == '' or re.search(r'^\s+$', line) or re.search(r'^#', line):
+                    if line == '' or line.startswith('#'):
                         continue
                     if not re.search(r'^(var|portvar|ipvar)\s', line):
                         vars_fh.close()
                         delete_temp_files(job_id)
                         return render_template('/dalton/error.html', jid='', msg=["Invalid variable definition. Must be 'var', 'portvar', or 'ipvar':", "%s" % line])
+                    if bOverrideExternalNet:
+                        if line.startswith("ipvar EXTERNAL_NET "):
+                            line = "ipvar EXTERNAL_NET any"
+                            logger.debug("Set 'EXTERNAL_NET' ipvar to 'any'")
+                        if line.startswith("var EXTERNAL_NET "):
+                            line = "var EXTERNAL_NET any"
+                            logger.debug("Set 'EXTERNAL_NET' var to 'any'")
                     vars_fh.write("%s\n" % line)
+                # add 'ipvar EXTERNAL_NET any' if not present and Override EXTERNAL_NET option set
+                if bOverrideExternalNet and not "\nipvar EXTERNAL_NET " in vars and not vars.startswith("ipvar EXTERNAL_NET ") and not "\nvar EXTERNAL_NET " in vars and not vars.startswith("var EXTERNAL_NET "):
+                    logger.warn("No EXTERNAL_NET variable found in Snort config, adding 'ipvar EXTERNAL_NET any'")
+                    vars_fh.write("ipvar EXTERNAL_NET any\n")
                 # add some IP vars common to some rulesets
                 try:
                     for v in ipv2add:
-                        if not "\nipvar %s" % v in vars and not vars.startswith("ipvar %s" % v):
-                            vars_fh.write("ipvar %s %s" % (v, ipv2add[v]))
+                        if not "\nipvar %s " % v in vars and not vars.startswith("ipvar %s " % v):
+                            vars_fh.write("ipvar %s %s\n" % (v, ipv2add[v]))
                 except Exception as e:
                     logger.warn("(Not Fatal) Problem customizing Snort variables: %s" % e)
                     logger.debug("%s" % traceback.format_exc())
