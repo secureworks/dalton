@@ -523,7 +523,7 @@ def check_pcaps():
                                         "pcap if you want accurate results." 
                                         "\n\n"
                                         "If you need help crafting a pcap, Flowsynth may be able to help --\n"
-                                        "http://flowsynth/pcap/build - (TODO: link needed)" 
+                                        "https://github.com/secureworks/flowsynth" 
                                         "\n\n"
                                         "And, \"there's always barber college....\"" % os.path.basename(pcap))
             else:
@@ -956,13 +956,6 @@ def submit_job(job_id, job_directory):
             IDS_RULES_FILES.append(file)
         elif os.path.basename(file) == 'variables.conf':
             VARIABLES_FILE = file
-
-    # for now for testing in case the variables file isn't included in the .zip downloaded by the agent
-    if not VARIABLES_FILE:
-        #TODO: clean up
-        pass
-        #VARIABLES_FILE = '/opt/dalton/config/variables.conf'
-        #print_debug("variables.conf not defined, using %s" % VARIABLES_FILE)
 
     # input validation (sort of)
     if not PCAP_FILES:
