@@ -1003,6 +1003,14 @@ Frequently Asked Questions
      it should be possible to get containers working on a Windows host.  But
      this has not been tested.
    
+#. | **What is the difference between an "engine", "sensor", and "agent"?**
+   | In this context those terms, for the most part, mean the same thing.
+     Techically, you can think of "engine" as the IDS engine, in this
+     case Suricata or Snort; "sensor" as the system running the engine; and
+     "agent" as a specific system running the Dalton Agent code and checking in to
+     the Dalton Controller.  "Sensor" and "Agent" are very often used
+     interchangeably.
+
 #. | **Is there Dalton Agent support for Snort version < 2.9?**
    | Currently no.  Dalton Agents that run Snort utilize the 'dump' DAQ to replay pcaps
      and DAQ wasn't introduced until Snort 2.9.  Dalton Agents for older Snort
