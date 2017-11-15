@@ -2,8 +2,18 @@
 # Dalton
 # don't include rulesets
 rulesets/*.rules
-rulesets/snort/*.rules
-rulesets/suricata/*.rules
+rulesets/snort/
+rulesets/suricata/
+
+# don't include configs
+app/static/engine-configs/snort/
+app/static/engine-configs/suricata/
+
+# don't inlucde Dockerfiles/docker-compose
+docker-compose.yml
+Dockerfile*
+dalton-agent/Dockerfiles/Dockerfile*
+
 todo.txt
 notes.txt
 *.save
@@ -101,3 +111,6 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+*.iml
+.idea
