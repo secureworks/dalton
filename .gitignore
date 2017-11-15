@@ -4,6 +4,11 @@
 rulesets/*.rules
 rulesets/snort/*.rules
 rulesets/suricata/*.rules
+
+# dont' include configs
+app/static/engine-configs/snort
+app/static/engine-configs/suricata
+
 todo.txt
 notes.txt
 *.save
