@@ -15,10 +15,9 @@ services:
       - CONTROLLER_DEBUG=${CONTROLLER_DEBUG}
     volumes:
       - ./app:/opt/dalton/app
-      - ./run.py:/opt/dalton/run.py
+#      - ./run.py:/opt/dalton/run.py
       - ./rulesets:/opt/dalton/rulesets
       - ./engine-configs:/opt/dalton/engine-configs
-      - ./flowsynth-gh:/opt/flowsynth
     restart: always
 
   nginx:

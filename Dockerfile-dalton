@@ -8,7 +8,7 @@ RUN apt-get update && \
     p7zip-full
 
 # for development; not needed by the app
-RUN apt-get install -y less nano net-tools
+#RUN apt-get install -y less nano net-tools
 
 RUN mkdir -p /opt/dalton
 
@@ -23,11 +23,10 @@ COPY dalton.conf /opt/dalton/dalton.conf
 COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
-#install flowsynth (REMOVE THIS NEXT LINE ONCE IN GH)
-COPY flowsynth-gh /opt/flowsynth
-# UNCOMMENT THESE LINES ONCE IN GH
-#ADD https://github.com/secureworks/flowsynth/raw/master/requirements.txt /opt/flowsynth/requirements.txt
-#ADD https://github.com/secureworks/flowsynth/raw/master/src/flowsynth.py /opt/flowsynth/src/flowsynth.py
+#install flowsynth
+ADD https://github.com/secureworks/flowsynth/raw/master/requirements.txt /opt/flowsynth/requirements.txt
+ADD https://github.com/secureworks/flowsynth/raw/master/src/flowsynth.py /opt/flowsynth/src/flowsynth.py
 RUN pip install -r /opt/flowsynth/requirements.txt
+RUN chmod +x /opt/flowsynth/src/flowsynth.py
 
 CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf
