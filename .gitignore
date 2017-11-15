@@ -9,6 +9,11 @@ rulesets/suricata/
 app/static/engine-configs/snort/
 app/static/engine-configs/suricata/
 
+# don't inlucde Dockerfiles/docker-compose
+docker-compose.yml
+Dockerfile*
+dalton-agent/Dockerfiles/Dockerfile*
+
 todo.txt
 notes.txt
 *.save
