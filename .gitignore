@@ -2,12 +2,14 @@
 # Dalton
 # don't include rulesets
 rulesets/*.rules
-rulesets/snort/*.rules
-rulesets/suricata/*.rules
+rulesets/snort
+rulesets/suricata
 
-# dont' include configs
+# don't include configs
 app/static/engine-configs/snort
+engine-configs/snort
 app/static/engine-configs/suricata
+engine-configs/suricata
 
 todo.txt
 notes.txt
