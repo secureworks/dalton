@@ -1077,7 +1077,7 @@ Frequently Asked Questions
      restricted/custom systems that only had Python 2.4 support and couldn't use 
      non-standard libraries.  This is especially noticeable (painful?) with 
      the use of urllib2 instead of urllib3 or Requests.  Therefore, if you 
-     do review the code, it is reqeusted that you approach it with a spirit of
+     do review the code, it is requested that you approach it with a spirit of
      charity.
 
 #. | **I found a bug in Dalton.  What should I do?**
