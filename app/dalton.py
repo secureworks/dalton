@@ -305,7 +305,8 @@ def delete_old_job_files():
     global REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, JOB_STORAGE_PATH, logger
     total_deleted = 0
 
-    # this coded but not enabled since I don't think any user should be able
+    # this coded but not enabled since there isn't any authentication and I don't think 
+    #  anyone should be able to delete jobs older than any arbitrary number of minutes
     if request:
         mmin = request.args.get('mmin')
         teapot_mmin = request.args.get('teapot_mmin')
@@ -314,6 +315,7 @@ def delete_old_job_files():
         if teapot_mmin is not None:
             logger.warn("Passing a teapot_mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for teapot jobs." % TEAPOT_REDIS_EXPIRE)
 
+    # these values represent number of minutes
     job_mmin = REDIS_EXPIRE
     teapot_mmin = TEAPOT_REDIS_EXPIRE
 
