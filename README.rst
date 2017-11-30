@@ -7,7 +7,7 @@ packet captures ("pcaps") against an intrusion detection system ("IDS")
 sensor of his choice (e.g. Snort, Suricata) using defined rulesets
 and/or bespoke rules.
 
-Dalton also includes wizard-like web interface for
+Dalton also includes a wizard-like web interface for
 `Flowsynth <https://github.com/secureworks/flowsynth>`__ to facilitate
 custom pcap creation.
 
