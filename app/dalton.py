@@ -354,7 +354,10 @@ def page_index():
     return render_template('/dalton/index.html', page='')
 
 
+# this is technically 'controller_api' but supporting 'sensor_api' since
+#  previous versions had that
 @dalton_blueprint.route('/dalton/sensor_api/request_engine_conf/<sensor>', methods=['GET'])
+@dalton_blueprint.route('/dalton/controller_api/request_engine_conf/<sensor>', methods=['GET'])
 #@auth_required()
 def get_engine_conf_file(sensor):
     """ return the corresponding configuration file for passed in sensor (engine and version) 
@@ -670,7 +673,9 @@ def post_job_results(jobid):
     set_job_status(jobid, STAT_CODE_DONE)
     return Response("OK", mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
 
+# older versions used 'sensor_api' but it really should be 'controller_api'
 @dalton_blueprint.route('/dalton/sensor_api/job_status/<jobid>', methods=['GET'])
+@dalton_blueprint.route('/dalton/controller_api/job_status/<jobid>', methods=['GET'])
 #@login_required()
 def get_ajax_job_status_msg(jobid):
     """return the job status msg (as a string)"""
@@ -690,8 +695,7 @@ def get_ajax_job_status_msg(jobid):
     else:
         return Response("Invalid Job ID: %s" % jobid, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
 
-
-@dalton_blueprint.route('/dalton/sensor_api/job_status_code/<jobid>', methods=['GET'])
+@dalton_blueprint.route('/dalton/controller_api/job_status_code/<jobid>', methods=['GET'])
 #@login_required()
 def get_ajax_job_status_code(jobid):
     """return the job status code (AS A STRING! -- you need to cast the return value as an int if you want to use it as an int)"""
@@ -747,7 +751,7 @@ def clear_old_agents():
 
 @dalton_blueprint.route('/dalton/sensor', methods=['GET'])
 #@login_required()
-def page_sensor_default():
+def page_sensor_default(return_dict = False):
     """the default sensor page"""
     global r
     sensors = {}
@@ -762,7 +766,10 @@ def page_sensor_default():
             sensors[sensor]['time'] = "%s (%d minutes ago)" % (r.get("%s-time" % sensor), minutes_ago)
             sensors[sensor]['tech'] = "%s" % r.get("%s-tech" % sensor)
             sensors[sensor]['agent_version'] = "%s" % r.get("%s-agent_version" % sensor)
-    return render_template('/dalton/sensor.html', page='', sensors=sensors)
+    if return_dict:
+        return sensors
+    else:
+        return render_template('/dalton/sensor.html', page='', sensors=sensors)
 
 # validates passed in filename (should be from Flowsynth) to verify
 # that it exists and isn't trying to do something nefarious like
@@ -1852,7 +1859,7 @@ def page_about_default():
     return render_template('/dalton/about.html', page='')
 
 #########################################
-# API handling code
+# API handling code (some of it)
 #########################################
 
 @dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>', methods=['GET'])
@@ -1913,3 +1920,39 @@ def controller_api_get_request(jid, requested_data):
     #print "raw response: %s" % json_response
 
 
+@dalton_blueprint.route('/dalton/controller_api/get-current-sensors/<tech>', methods=['GET'])
+def controller_api_get_current_sensors(tech):
+    """Returns a list of current active sensors"""
+    global r
+    valid_tech = ['suricata', 'snort']
+    sensors = []
+
+    if tech is None or tech == '' or tech not in valid_tech:
+        return Response("Invalid 'tech' supplied.  Must be one of %s.\nExample URI:\n\n/dalton/controller_api/get-current-sensors/suricata" % valid_tech, 
+                        status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
+
+    # first, clean out old sensors
+    clear_old_agents()
+
+    # get active sensors based on tech
+    if r.exists('sensors'):
+        for sensor in r.smembers('sensors'):
+            t = r.get("%s-tech" % sensor)
+            if t.lower().startswith(tech.lower()):
+                sensors.append(t)
+
+    # sort so highest version number is first
+    try:
+        sensors.sort(key=LooseVersion, reverse=True)
+    except Exception as e:
+        sensors.sort(reverse=True)
+
+    # return json
+    json_response = {'tech': sensors}
+    return Response(json.dumps(json_response), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
+
+@dalton_blueprint.route('/dalton/controller_api/get-current-sensors-json-full', methods=['GET'])
+def controller_api_get_current_sensors_json_full():
+    """Returns json with details about all the current active sensors"""
+    sensors = page_sensor_default(return_dict = True)
+    return Response(json.dumps(sensors), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})

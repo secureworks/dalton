@@ -5,7 +5,7 @@
         $(document).ready(function() {
             $.ajaxSetup({ cache: false }); // This part addresses an IE bug.  without it, IE will only load the first number and will never refresh
             setInterval(function() {
-		$.get('/dalton/sensor_api/job_status/{{job_id}}', function(data){
+		$.get('/dalton/controller_api/job_status/{{job_id}}', function(data){
 			if (data.indexOf("Click here") != -1) {
 				// job done
 				if (data.indexOf("ERROR") != -1) {

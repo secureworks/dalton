@@ -131,7 +131,7 @@
         <!-- called when sensor version changed.  Updates engine.conf data AND variables -->
         $('input[name="sensor_tech"]').change( function() {
             var version = $(this).attr("id")
-            var new_engine_conf = $.get("/dalton/sensor_api/request_engine_conf/" + version, function( data ) {
+            var new_engine_conf = $.get("/dalton/controller_api/request_engine_conf/" + version, function( data ) {
                 if (data && data != '') {
                     confs = JSON.parse(data)
                     document.getElementById('custom_engineconf_t').value = confs.conf;
