@@ -162,6 +162,9 @@ STAT_CODE_DONE = 2
 STAT_CODE_INTERRUPTED = 3
 STAT_CODE_TIMEOUT = 4
 
+# engine technologies supported; used for validation (sometimes)
+supported_engines = ['suricata', 'snort']
+
 logger.info("Dalton Started.")
 
 def delete_temp_files(job_id):
@@ -183,6 +186,23 @@ def verify_temp_storage_path():
         os.makedirs(TEMP_STORAGE_PATH)
     return True
 
+@dalton_blueprint.route('/dalton/controller_api/get-prod-rulesets/<engine>', methods=['GET'])
+def api_get_prod_rulesets(engine):
+    global supported_engines
+    if engine is None or engine == '' or engine not in supported_engines:
+        return Response("Invalid 'engine' supplied.  Must be one of %s.\nExample URI:\n\n/dalton/controller_api/get-prod-rulesets/suricata" % supported_engines, 
+                        status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
+    # return json
+    ruleset_list = []
+    # this is a 2D array with filename and full path for each rules file
+    #  but this function only returns a 1D array with full paths
+    current_rulesets = get_rulesets(engine)
+    for ruleset in current_rulesets:
+        if len(ruleset) > 1:
+            ruleset_list.append(ruleset[1])
+
+    json_response = {'prod-rulesets': ruleset_list}
+    return Response(json.dumps(json_response), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
 
 def get_rulesets(engine=''):
     """ return a list of locally stored ruleset for jobs to use """
@@ -359,6 +379,13 @@ def page_index():
 @dalton_blueprint.route('/dalton/sensor_api/request_engine_conf/<sensor>', methods=['GET'])
 @dalton_blueprint.route('/dalton/controller_api/request_engine_conf/<sensor>', methods=['GET'])
 #@auth_required()
+def api_get_engine_conf_file(sensor):
+    global supported_engines
+    if sensor is None:
+        return Response("Invalid 'sensor' supplied.", 
+                        status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
+    return Response(json.dumps(get_engine_conf_file(sensor)), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
+
 def get_engine_conf_file(sensor):
     """ return the corresponding configuration file for passed in sensor (engine and version) 
         also returns the variables (stripped out from config)
@@ -1920,25 +1947,24 @@ def controller_api_get_request(jid, requested_data):
     #print "raw response: %s" % json_response
 
 
-@dalton_blueprint.route('/dalton/controller_api/get-current-sensors/<tech>', methods=['GET'])
-def controller_api_get_current_sensors(tech):
+@dalton_blueprint.route('/dalton/controller_api/get-current-sensors/<engine>', methods=['GET'])
+def controller_api_get_current_sensors(engine):
     """Returns a list of current active sensors"""
-    global r
-    valid_tech = ['suricata', 'snort']
+    global r, supported_engines
     sensors = []
 
-    if tech is None or tech == '' or tech not in valid_tech:
-        return Response("Invalid 'tech' supplied.  Must be one of %s.\nExample URI:\n\n/dalton/controller_api/get-current-sensors/suricata" % valid_tech, 
+    if engine is None or engine == '' or engine not in supported_engines:
+        return Response("Invalid 'engine' supplied.  Must be one of %s.\nExample URI:\n\n/dalton/controller_api/get-current-sensors/suricata" % supported_engines, 
                         status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
 
     # first, clean out old sensors
     clear_old_agents()
 
-    # get active sensors based on tech
+    # get active sensors based on engine
     if r.exists('sensors'):
         for sensor in r.smembers('sensors'):
             t = r.get("%s-tech" % sensor)
-            if t.lower().startswith(tech.lower()):
+            if t.lower().startswith(engine.lower()):
                 sensors.append(t)
 
     # sort so highest version number is first
@@ -1948,7 +1974,7 @@ def controller_api_get_current_sensors(tech):
         sensors.sort(reverse=True)
 
     # return json
-    json_response = {'tech': sensors}
+    json_response = {'sensor_tech': sensors}
     return Response(json.dumps(json_response), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
 
 @dalton_blueprint.route('/dalton/controller_api/get-current-sensors-json-full', methods=['GET'])
