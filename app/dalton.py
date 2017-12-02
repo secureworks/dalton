@@ -162,6 +162,9 @@ STAT_CODE_DONE = 2
 STAT_CODE_INTERRUPTED = 3
 STAT_CODE_TIMEOUT = 4
 
+# engine technologies supported; used for validation (sometimes)
+supported_engines = ['suricata', 'snort']
+
 logger.info("Dalton Started.")
 
 def delete_temp_files(job_id):
@@ -183,6 +186,23 @@ def verify_temp_storage_path():
         os.makedirs(TEMP_STORAGE_PATH)
     return True
 
+@dalton_blueprint.route('/dalton/controller_api/get-prod-rulesets/<engine>', methods=['GET'])
+def api_get_prod_rulesets(engine):
+    global supported_engines
+    if engine is None or engine == '' or engine not in supported_engines:
+        return Response("Invalid 'engine' supplied.  Must be one of %s.\nExample URI:\n\n/dalton/controller_api/get-prod-rulesets/suricata" % supported_engines, 
+                        status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
+    # return json
+    ruleset_list = []
+    # this is a 2D array with filename and full path for each rules file
+    #  but this function only returns a 1D array with full paths
+    current_rulesets = get_rulesets(engine)
+    for ruleset in current_rulesets:
+        if len(ruleset) > 1:
+            ruleset_list.append(ruleset[1])
+
+    json_response = {'prod-rulesets': ruleset_list}
+    return Response(json.dumps(json_response), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
 
 def get_rulesets(engine=''):
     """ return a list of locally stored ruleset for jobs to use """
@@ -305,7 +325,8 @@ def delete_old_job_files():
     global REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, JOB_STORAGE_PATH, logger
     total_deleted = 0
 
-    # this coded but not enabled since I don't think any user should be able
+    # this coded but not enabled since there isn't any authentication and I don't think 
+    #  anyone should be able to delete jobs older than any arbitrary number of minutes
     if request:
         mmin = request.args.get('mmin')
         teapot_mmin = request.args.get('teapot_mmin')
@@ -314,6 +335,7 @@ def delete_old_job_files():
         if teapot_mmin is not None:
             logger.warn("Passing a teapot_mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for teapot jobs." % TEAPOT_REDIS_EXPIRE)
 
+    # these values represent number of minutes
     job_mmin = REDIS_EXPIRE
     teapot_mmin = TEAPOT_REDIS_EXPIRE
 
@@ -352,8 +374,18 @@ def page_index():
     return render_template('/dalton/index.html', page='')
 
 
+# this is technically 'controller_api' but supporting 'sensor_api' since
+#  previous versions had that
 @dalton_blueprint.route('/dalton/sensor_api/request_engine_conf/<sensor>', methods=['GET'])
+@dalton_blueprint.route('/dalton/controller_api/request_engine_conf/<sensor>', methods=['GET'])
 #@auth_required()
+def api_get_engine_conf_file(sensor):
+    global supported_engines
+    if sensor is None:
+        return Response("Invalid 'sensor' supplied.", 
+                        status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
+    return Response(json.dumps(get_engine_conf_file(sensor)), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
+
 def get_engine_conf_file(sensor):
     """ return the corresponding configuration file for passed in sensor (engine and version) 
         also returns the variables (stripped out from config)
@@ -668,7 +700,9 @@ def post_job_results(jobid):
     set_job_status(jobid, STAT_CODE_DONE)
     return Response("OK", mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
 
+# older versions used 'sensor_api' but it really should be 'controller_api'
 @dalton_blueprint.route('/dalton/sensor_api/job_status/<jobid>', methods=['GET'])
+@dalton_blueprint.route('/dalton/controller_api/job_status/<jobid>', methods=['GET'])
 #@login_required()
 def get_ajax_job_status_msg(jobid):
     """return the job status msg (as a string)"""
@@ -688,8 +722,7 @@ def get_ajax_job_status_msg(jobid):
     else:
         return Response("Invalid Job ID: %s" % jobid, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
 
-
-@dalton_blueprint.route('/dalton/sensor_api/job_status_code/<jobid>', methods=['GET'])
+@dalton_blueprint.route('/dalton/controller_api/job_status_code/<jobid>', methods=['GET'])
 #@login_required()
 def get_ajax_job_status_code(jobid):
     """return the job status code (AS A STRING! -- you need to cast the return value as an int if you want to use it as an int)"""
@@ -745,7 +778,7 @@ def clear_old_agents():
 
 @dalton_blueprint.route('/dalton/sensor', methods=['GET'])
 #@login_required()
-def page_sensor_default():
+def page_sensor_default(return_dict = False):
     """the default sensor page"""
     global r
     sensors = {}
@@ -760,7 +793,10 @@ def page_sensor_default():
             sensors[sensor]['time'] = "%s (%d minutes ago)" % (r.get("%s-time" % sensor), minutes_ago)
             sensors[sensor]['tech'] = "%s" % r.get("%s-tech" % sensor)
             sensors[sensor]['agent_version'] = "%s" % r.get("%s-agent_version" % sensor)
-    return render_template('/dalton/sensor.html', page='', sensors=sensors)
+    if return_dict:
+        return sensors
+    else:
+        return render_template('/dalton/sensor.html', page='', sensors=sensors)
 
 # validates passed in filename (should be from Flowsynth) to verify
 # that it exists and isn't trying to do something nefarious like
@@ -1850,7 +1886,7 @@ def page_about_default():
     return render_template('/dalton/about.html', page='')
 
 #########################################
-# API handling code
+# API handling code (some of it)
 #########################################
 
 @dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>', methods=['GET'])
@@ -1911,3 +1947,38 @@ def controller_api_get_request(jid, requested_data):
     #print "raw response: %s" % json_response
 
 
+@dalton_blueprint.route('/dalton/controller_api/get-current-sensors/<engine>', methods=['GET'])
+def controller_api_get_current_sensors(engine):
+    """Returns a list of current active sensors"""
+    global r, supported_engines
+    sensors = []
+
+    if engine is None or engine == '' or engine not in supported_engines:
+        return Response("Invalid 'engine' supplied.  Must be one of %s.\nExample URI:\n\n/dalton/controller_api/get-current-sensors/suricata" % supported_engines, 
+                        status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
+
+    # first, clean out old sensors
+    clear_old_agents()
+
+    # get active sensors based on engine
+    if r.exists('sensors'):
+        for sensor in r.smembers('sensors'):
+            t = r.get("%s-tech" % sensor)
+            if t.lower().startswith(engine.lower()):
+                sensors.append(t)
+
+    # sort so highest version number is first
+    try:
+        sensors.sort(key=LooseVersion, reverse=True)
+    except Exception as e:
+        sensors.sort(reverse=True)
+
+    # return json
+    json_response = {'sensor_tech': sensors}
+    return Response(json.dumps(json_response), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
+
+@dalton_blueprint.route('/dalton/controller_api/get-current-sensors-json-full', methods=['GET'])
+def controller_api_get_current_sensors_json_full():
+    """Returns json with details about all the current active sensors"""
+    sensors = page_sensor_default(return_dict = True)
+    return Response(json.dumps(sensors), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
