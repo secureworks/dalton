@@ -51,6 +51,10 @@ Contents
    -  `Sensors <#sensors>`__
 
 -  `Dalton API <#dalton-api>`__
+
+   -  `Job API <#job-api>`__
+   -  `Controller API <#controller-api>`__
+
 -  `Teapot Jobs <#teapot-jobs>`__
 -  `Adding Rulesets <#adding-rulesets>`__
 -  `Adding Sensors <#adding-sensors>`__
@@ -474,6 +478,9 @@ automatically (re)added and made available for job submissions.
 Dalton API
 ==========
 
+Job API
+-------
+
 The Dalton controller provides a RESTful API to retrieve data about
 submitted jobs.  API responses use JSON although the data returned in the values is, 
 in most cases, just the raw text that is displayed in the Dalton web interface.
@@ -624,9 +631,83 @@ Response:
 
 .. code:: javascript
 
-
     {"data": null, "error_msg": "value 'ninjalevel' invalid", "error": true}
  
+
+Controller API
+--------------
+
+In addition to providing information on sumbitted jobs, the Dalton API includes
+the ability to pull information from, and perform limited actions on, the Controller.
+The following routes can be accessed via HTTP GET requests.  Full examples are not
+provided here but can be easily obtained by making the request in a web browser.
+
+-  | **/dalton/controller_api/request_engine_conf/<sensor>**
+   | Returns JSON of the requested configuration file split out into ``variables``
+     and ``conf``.
+
+   | If no exact match is found for a config file on disk, the closest file
+     that matches is returned.
+
+   | <sensor> is the sensor technology, e.g. ``suricata-4.0.``
+
+-  | **/dalton/controller_api/delete-old-job-files**
+   | Deletes old job files from disk. Returns the number of
+     files deleted.
+     For more info see the `Job Queue <#job-queue>`__ section.
+
+-  | **/dalton/controller_api/job_status/<jobid>**
+   | Returns a string corresponding to the current status of a job.
+     This is used by the web browser primarily when a job is running.
+     See the 'status' key information in
+     the `Job API <#job-api>`__ section.
+
+-  | **/dalton/controller_api/job_status_code/<jobid>**
+   | Returns the job status code for the given jobid.
+     This is the job status code number, returned as string.
+
+   | For more details, see the information about 'statcode' in
+     the `Job API <#job-api>`__ section.
+
+-  | **/dalton/controller_api/get-current-sensors/<engine>**
+   | Returns a JSON response with 'sensor_tech' as the root element containing
+     an array of current active sensors, sorted from highest version
+     number to lowest.
+
+   | <engine> should be ``suricata`` or ``snort``.
+
+   | Example response:
+
+.. code:: javascript
+
+    {"sensor_tech": ["suricata-4.0.1", "suricata-3.2.4", "suricata-2.0.9"]}
+
+-  | **/dalton/controller_api/get-current-sensors-json-full**
+   | Response is a JSON payload with details about
+     all the current active sensors (agents). Info includes agent IP,
+     last check-in time, tech (e.g. ``suricata-4.0.1``), etc.
+
+-  | **/dalton/controller_api/get-prod-rulesets/<engine>**
+   | Returns a list of current available production rulesets on the
+     Controller for the given engine. The list contains the full path of
+     the rules files on the Controller.
+
+   | <engine> should be ``suricata`` or ``snort``
+
+   | Example response:
+
+.. code:: javascript
+
+    {"prod-rulesets": [
+        "/opt/dalton/rulesets/suricata/SCWX-20171024-suricata-security.rules",
+        "/opt/dalton/rulesets/suricata/SCWX-20171024-suricata-malware.rules",
+        "/opt/dalton/rulesets/suricata/ET-20171023-all-suricata.rules"
+        ]
+    }
+
+-  | **/dalton/sensor_api/get_job/<jobid>**
+   | Response is the job zip file which includes the pcap(s), rule(s),
+     config file, and manifest used by the job referenced by <jobid>.
 
 Teapot Jobs
 ===========
