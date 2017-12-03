@@ -273,7 +273,7 @@ number of user-configurable options:
      be included; the other files will be ignored.
 
    | If multiple pcaps are submitted for a Suricata job, they will be 
-     combined into a single pcap on job submisison since Suricata can
+     combined into a single pcap on job submission since Suricata can
      only read a single pcap in read pcap mode.
 
 -  | **Sensor Version**
@@ -640,7 +640,7 @@ Response:
 Controller API
 --------------
 
-In addition to providing information on sumbitted jobs, the Dalton API includes
+In addition to providing information on submitted jobs, the Dalton API includes
 the ability to pull information from, and perform limited actions on, the Controller.
 The following routes can be accessed via HTTP GET requests.  Full examples are not
 provided here but can be easily obtained by making the request in a web browser.
@@ -779,7 +779,7 @@ from `rules.emergingthreats.net <https://rules.emergingthreats.net>`__.
 Adding Sensors
 ==============
 
-Adding sensors to Dalton is a farily simple process.  If there isn't already 
+Adding sensors to Dalton is a fairly simple process.  If there isn't already 
 a corresponding or compatible configuration file for the new sensor, that 
 will also need to be added; see `Adding Sensor Configs <#adding-sensor-configs>`__.
 
@@ -1091,7 +1091,7 @@ Frequently Asked Questions
    
 #. | **What is the difference between an "engine", "sensor", and "agent"?**
    | In this context those terms, for the most part, mean the same thing.
-     Techically, you can think of "engine" as the IDS engine, in this
+     Technically, you can think of "engine" as the IDS engine, in this
      case Suricata or Snort; "sensor" as the system running the engine; and
      "agent" as a specific system running the Dalton Agent code and checking in to
      the Dalton Controller.  "Sensor" and "Agent" are very often used
@@ -1105,7 +1105,7 @@ Frequently Asked Questions
      adding support for older Snort versions will be reconsidered.
 
 #. | **Are other sensor engines supported such as Bro?**
-   | No; currenlty only Suricata and Snort are supported.
+   | No; currently only Suricata and Snort are supported.
 
 #. | **Does Dalton support authentication such as username/password/API tokens or 
      authorization enforcement like discretionary access control?**
