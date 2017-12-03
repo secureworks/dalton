@@ -7,7 +7,7 @@ packet captures ("pcaps") against an intrusion detection system ("IDS")
 sensor of his choice (e.g. Snort, Suricata) using defined rulesets
 and/or bespoke rules.
 
-Dalton also includes wizard-like web interface for
+Dalton also includes a wizard-like web interface for
 `Flowsynth <https://github.com/secureworks/flowsynth>`__ to facilitate
 custom pcap creation.
 
@@ -24,6 +24,9 @@ or this which does the same thing:
     docker-compose build && docker-compose up -d
 
 Then navigate to ``http://<docker-host>/dalton/``
+
+To configure what rulesets are available, see 
+`Adding Rulesets <#adding-rulesets>`__.
 
 To configure what sensors are available, see 
 `Adding Sensors <#adding-sensors>`__.
@@ -51,6 +54,10 @@ Contents
    -  `Sensors <#sensors>`__
 
 -  `Dalton API <#dalton-api>`__
+
+   -  `Job API <#job-api>`__
+   -  `Controller API <#controller-api>`__
+
 -  `Teapot Jobs <#teapot-jobs>`__
 -  `Adding Rulesets <#adding-rulesets>`__
 -  `Adding Sensors <#adding-sensors>`__
@@ -74,7 +81,7 @@ These are the most common use cases for Dalton:
      particular ruleset.
 
 -  | **Troubleshooting and Developing Signatures**
-   | User-provided pcaps can be tested against user-provided ad-hoc IDS
+   | User-provided pcaps can be tested against user-provided ad hoc IDS
      rules to quickly and easily see the IDS alerts and/or test for rule
      syntax errors.
 
@@ -266,7 +273,7 @@ number of user-configurable options:
      be included; the other files will be ignored.
 
    | If multiple pcaps are submitted for a Suricata job, they will be 
-     combined into a single pcap on job submisison since Suricata can
+     combined into a single pcap on job submission since Suricata can
      only read a single pcap in read pcap mode.
 
 -  | **Sensor Version**
@@ -288,7 +295,7 @@ number of user-configurable options:
            removed so that they show up in the sensor alerts.
 
    -  | **Use custom rules**
-      | This allows a user to specify specific ad-hoc rules to include
+      | This allows a user to specify specific ad hoc rules to include
         when testing the pcap(s). The user will need to ensure that any
         custom rules are valid since very little rule syntax validation is
         done on the Dalton controller; submitting invalid rules will
@@ -474,6 +481,9 @@ automatically (re)added and made available for job submissions.
 Dalton API
 ==========
 
+Job API
+-------
+
 The Dalton controller provides a RESTful API to retrieve data about
 submitted jobs.  API responses use JSON although the data returned in the values is, 
 in most cases, just the raw text that is displayed in the Dalton web interface.
@@ -624,9 +634,85 @@ Response:
 
 .. code:: javascript
 
-
     {"data": null, "error_msg": "value 'ninjalevel' invalid", "error": true}
  
+
+Controller API
+--------------
+
+In addition to providing information on submitted jobs, the Dalton API includes
+the ability to pull information from, and perform limited actions on, the Controller.
+The following routes can be accessed via HTTP GET requests.  Full examples are not
+provided here but can be easily obtained by making the request in a web browser.
+
+-  | **/dalton/controller_api/request_engine_conf/<sensor>**
+   | Returns JSON of the requested configuration file split out into ``variables``
+     and ``conf``.
+
+   | If no exact match is found for a config file on disk, the closest file
+     that matches is returned.
+
+   | <sensor> is the sensor technology, e.g. ``suricata-4.0.``
+
+-  | **/dalton/controller_api/delete-old-job-files**
+   | Deletes old job files from disk. Returns the number of
+     files deleted.
+     For more info see the `Job Queue <#job-queue>`__ section.
+
+-  | **/dalton/controller_api/job_status/<jobid>**
+   | Returns a string corresponding to the current status of a job.
+     This is used by the web browser primarily when a job is running.
+     See the 'status' key information in
+     the `Job API <#job-api>`__ section.
+
+-  | **/dalton/controller_api/job_status_code/<jobid>**
+   | Returns the job status code for the given jobid.
+     This is the job status code number, returned as string.
+
+   | For more details, see the information about 'statcode' in
+     the `Job API <#job-api>`__ section.
+
+-  | **/dalton/controller_api/get-current-sensors/<engine>**
+   | Returns a JSON response with 'sensor_tech' as the root element containing
+     an array of current active sensors, sorted descending based on ruleset
+     filename (just like the list in the web interface).
+
+   | <engine> should be ``suricata`` or ``snort``.
+
+   | Example response:
+
+.. code:: javascript
+
+    {"sensor_tech": ["suricata-4.0.1", "suricata-3.2.4", "suricata-2.0.9"]}
+
+-  | **/dalton/controller_api/get-current-sensors-json-full**
+   | Response is a JSON payload with details about
+     all the current active sensors (agents). Info includes agent IP,
+     last check-in time, tech (e.g. ``suricata-4.0.1``), etc.
+
+-  | **/dalton/controller_api/get-prod-rulesets/<engine>**
+   | Returns a list of current available production rulesets on the
+     Controller for the given engine. The list contains the full path of
+     the rules files on the Controller.
+
+   | <engine> should be ``suricata`` or ``snort``
+
+   | Example response:
+
+.. code:: javascript
+
+    {"prod-rulesets": [
+        "/opt/dalton/rulesets/suricata/SCWX-20171024-suricata-security.rules",
+        "/opt/dalton/rulesets/suricata/SCWX-20171024-suricata-malware.rules",
+        "/opt/dalton/rulesets/suricata/ET-20171023-all-suricata.rules"
+        ]
+    }
+
+-  | **/dalton/sensor_api/get_job/<jobid>**
+   | Returns the job zip file which includes the pcap(s), rule(s),
+     config file, and manifest used by the job referenced by <jobid>.
+     If the <jobid> is invalid or an error occurs, a HTML error page
+     is returned.
 
 Teapot Jobs
 ===========
@@ -693,7 +779,7 @@ from `rules.emergingthreats.net <https://rules.emergingthreats.net>`__.
 Adding Sensors
 ==============
 
-Adding sensors to Dalton is a farily simple process.  If there isn't already 
+Adding sensors to Dalton is a fairly simple process.  If there isn't already 
 a corresponding or compatible configuration file for the new sensor, that 
 will also need to be added; see `Adding Sensor Configs <#adding-sensor-configs>`__.
 
@@ -1005,7 +1091,7 @@ Frequently Asked Questions
    
 #. | **What is the difference between an "engine", "sensor", and "agent"?**
    | In this context those terms, for the most part, mean the same thing.
-     Techically, you can think of "engine" as the IDS engine, in this
+     Technically, you can think of "engine" as the IDS engine, in this
      case Suricata or Snort; "sensor" as the system running the engine; and
      "agent" as a specific system running the Dalton Agent code and checking in to
      the Dalton Controller.  "Sensor" and "Agent" are very often used
@@ -1019,7 +1105,7 @@ Frequently Asked Questions
      adding support for older Snort versions will be reconsidered.
 
 #. | **Are other sensor engines supported such as Bro?**
-   | No; currenlty only Suricata and Snort are supported.
+   | No; currently only Suricata and Snort are supported.
 
 #. | **Does Dalton support authentication such as username/password/API tokens or 
      authorization enforcement like discretionary access control?**
