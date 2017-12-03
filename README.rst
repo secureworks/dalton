@@ -25,6 +25,9 @@ or this which does the same thing:
 
 Then navigate to ``http://<docker-host>/dalton/``
 
+To configure what rulesets are available, see 
+`Adding Rulesets <#adding-rulesets>`__.
+
 To configure what sensors are available, see 
 `Adding Sensors <#adding-sensors>`__.
 
@@ -671,8 +674,8 @@ provided here but can be easily obtained by making the request in a web browser.
 
 -  | **/dalton/controller_api/get-current-sensors/<engine>**
    | Returns a JSON response with 'sensor_tech' as the root element containing
-     an array of current active sensors, sorted from highest version
-     number to lowest.
+     an array of current active sensors, sorted descending based on ruleset
+     filename (just like the list in the web interface).
 
    | <engine> should be ``suricata`` or ``snort``.
 
@@ -706,8 +709,10 @@ provided here but can be easily obtained by making the request in a web browser.
     }
 
 -  | **/dalton/sensor_api/get_job/<jobid>**
-   | Response is the job zip file which includes the pcap(s), rule(s),
+   | Returns the job zip file which includes the pcap(s), rule(s),
      config file, and manifest used by the job referenced by <jobid>.
+     If the <jobid> is invalid or an error occurs, a HTML error page
+     is returned.
 
 Teapot Jobs
 ===========
