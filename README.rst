@@ -81,7 +81,7 @@ These are the most common use cases for Dalton:
      particular ruleset.
 
 -  | **Troubleshooting and Developing Signatures**
-   | User-provided pcaps can be tested against user-provided ad-hoc IDS
+   | User-provided pcaps can be tested against user-provided ad hoc IDS
      rules to quickly and easily see the IDS alerts and/or test for rule
      syntax errors.
 
@@ -295,7 +295,7 @@ number of user-configurable options:
            removed so that they show up in the sensor alerts.
 
    -  | **Use custom rules**
-      | This allows a user to specify specific ad-hoc rules to include
+      | This allows a user to specify specific ad hoc rules to include
         when testing the pcap(s). The user will need to ensure that any
         custom rules are valid since very little rule syntax validation is
         done on the Dalton controller; submitting invalid rules will
