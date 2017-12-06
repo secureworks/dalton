@@ -54,6 +54,9 @@
 				}
 			}
 		}		
+        if ({{max_pcaps}} == 1) {
+		    $('#addpcap').hide();
+        }
 
 		$('#submitjob').submit( function() {
 			$('#uploadDialog').modal()
@@ -119,7 +122,9 @@
 					$('#pcap'+i).hide();
 				}
 			}
-			$('#addpcap').show();
+            if ({{max_pcaps}} > 1) {
+			    $('#addpcap').show();
+            }
 		});
 
 		function reset_file_input(id) {
