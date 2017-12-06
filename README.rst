@@ -708,6 +708,14 @@ provided here but can be easily obtained by making the request in a web browser.
         ]
     }
 
+-  | **/dalton/controller_api/get-max-pcap-files**
+   | Returns the maximum number of pcap (or archive) files the controller is configured
+     to process per job submission.  This is set by the ``max_pcap_files`` option
+     in dalton.conf and knowing this can be useful to ensure that all pcaps programmatically
+     submitted are going to be processed.
+     A single archive file, even though it can contain multiple
+     pcaps, is only considered a single file in this context.
+
 -  | **/dalton/sensor_api/get_job/<jobid>**
    | Returns the job zip file which includes the pcap(s), rule(s),
      config file, and manifest used by the job referenced by <jobid>.
