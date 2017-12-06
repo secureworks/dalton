@@ -144,7 +144,7 @@ if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
     logger.warn("teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis." % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE))
 
 # other checks
-if MAX_PCAP_FILES < 0:
+if MAX_PCAP_FILES < 1:
     default_max = 8
     logger.warn("max_pcap_files value of '%d' invalid.  Using '%d'" % (MAX_PCAP_FILES, default_max))
     MAX_PCAP_FILES = default_max
@@ -1982,3 +1982,12 @@ def controller_api_get_current_sensors_json_full():
     """Returns json with details about all the current active sensors"""
     sensors = page_sensor_default(return_dict = True)
     return Response(json.dumps(sensors), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
+
+@dalton_blueprint.route('/dalton/controller_api/get-max-pcap-files', methods=['GET'])
+def controller_api_get_max_pcap_files():
+    """Returns the config value of max_pcap_files (the number of
+       pcap or compressed that can be uploaded per job).
+       This could be useful for programmatic submissions where the
+       submitter can ensure all the files will be processed.
+    """
+    return str(MAX_PCAP_FILES)
