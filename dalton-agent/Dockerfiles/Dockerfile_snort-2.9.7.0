@@ -5,7 +5,7 @@ MAINTAINER David Wharton
 # tcpdump is for pcap analysis; not *required* for
 #  the agent but nice to have....
 RUN apt-get update -y && apt-get install -y \
-    python=2.7.11-1 \
+    python \
     tcpdump
 
 # for debugging agent
