@@ -121,7 +121,7 @@ if os.path.exists(RULECAT_SCRIPT):
             filename = "ET-%s-all-%s.rules" % (datetime.datetime.utcnow().strftime("%Y%m%d"), engine)
             logger.info("No rulesets for %s found. Downloading the latest ET set as '%s'" % (engine, filename))
             if engine == "suricata":
-                url = "https://rules.emergingthreats.net/open/suricata-1.3/emerging.rules.tar.gz"
+                url = "https://rules.emergingthreats.net/open/suricata-2.0/emerging.rules.tar.gz"
             if engine == "snort":
                 url = "https://rules.emergingthreats.net/open/snort-2.9.0/emerging.rules.tar.gz"
             command = "python %s --url %s --merged %s" % (RULECAT_SCRIPT, url, os.path.join(ruleset_dir, filename))
