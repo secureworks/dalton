@@ -17,7 +17,7 @@ RUN apt-get update -y && apt-get install -y \
     libpcap-dev libpcre3-dev \
     libcap-ng-dev libdumbnet-dev \
     zlib1g-dev liblzma-dev openssl libssl-dev \
-    libnghttp2-dev && ldconfig
+    libnghttp2-dev libluajit-5.1-dev && ldconfig
 
 # for debugging agent
 #RUN apt-get install -y less nano
