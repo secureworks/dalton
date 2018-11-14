@@ -84,7 +84,7 @@ outputs:
 
   # Extensible Event Format (nicknamed EVE) event log in JSON format
   - eve-log:
-      enabled: yes
+      enabled: no
       type: file #file|syslog|unix_dgram|unix_stream
       filename: eve.json
       # the following are valid when type: syslog above

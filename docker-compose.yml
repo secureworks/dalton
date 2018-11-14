@@ -71,21 +71,21 @@ services:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
-# Suricata 4.0.0 from source
-#  agent-suricata-4.0.0:
-#    build:
-#      context: ./dalton-agent
-#      dockerfile: Dockerfiles/Dockerfile_suricata
-#      args:
-#        - SURI_VERSION=4.0.0
-#        - http_proxy=${http_proxy}
-#        - https_proxy=${https_proxy}
-#        - no_proxy=${no_proxy}
-#    image: suricata-4.0.0:latest
-#    container_name: suricata-4.0.0
-#    environment:
-#      - AGENT_DEBUG=${AGENT_DEBUG}
-#    restart: always
+# Suricata 4.0.6 from source
+  agent-suricata-4.0.6:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_suricata
+      args:
+        - SURI_VERSION=4.0.6
+        - http_proxy=${http_proxy}
+        - https_proxy=${https_proxy}
+        - no_proxy=${no_proxy}
+    image: suricata-4.0.6:latest
+    container_name: suricata-4.0.6
+    environment:
+      - AGENT_DEBUG=${AGENT_DEBUG}
+    restart: always
 
 # Suricata 3.2.5 from source
   agent-suricata-3.2.5:
