@@ -253,12 +253,12 @@
 							</span>
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Logs</div>
 							<label class="checkbox">
-								<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed">
+								<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed" checked>
 							    Pcap records from alerts
                             </label>
                             {% if sensor_tech.startswith('suri') %}
                                 <label class="checkbox">
-                                    <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs">
+                                    <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs" checked>
                                     Other logs (Alert Debug, HTTP, TLS, DNS, etc.)
                                 </label>
                             {% endif %}
