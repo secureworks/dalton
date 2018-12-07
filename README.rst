@@ -856,8 +856,8 @@ since when a new version comes out, all that has to be done is run the
 ``start-dalton.sh`` script and a new Dalton Agent with the latest Suricata 
 version will be built and available.
 
-Snort agents are the same way but the args to customize are ``SNORT_VERSION`` and 
-(if changed) ``DAQ_VERSION``.  Example Snort specification:
+Snort agents are the same way but the args to customize are ``SNORT_VERSION`` and, 
+if changed, ``DAQ_VERSION``.  Example Snort specification:
 
 .. code:: yaml
 
@@ -911,7 +911,7 @@ Dalton Controller so it knows which configuration file to load and use for jobs
 related to that sensor.
 
 For more details on the Dalton Agent configuration options, see the inline 
-comments in the ``dalton-agent.py`` file.
+comments in the ``dalton-agent.conf`` file.
 
 To start the Dalton Agent, run dalton-agent.py::
         
@@ -951,7 +951,7 @@ Sensor configuration files
 are not automatically added when Agents are build or the Controller is run; 
 they must be manually added. 
 However, the Dalton Controller already comes with the default (from source) config files 
-for Suricata versions 0.8.1 thru 4.0.1 and for Snort 2.9.0 thru 2.9.11. 
+for Suricata versions 0.8.1 and later, and for Snort 2.9.0 and later. 
 Duplicate config files are not included.  For example, since all the Suricata 
 1.4.x versions have the same (default) .yaml file, only "suricata-1.4.yaml" 
 is included.
