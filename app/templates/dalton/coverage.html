@@ -1,5 +1,9 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
+    $(window).unload(function(){
+        $('#uploadDialog').modal('hide');
+    });
+
     function updateHeading(version) {
         var newstr = ''
         if (version == undefined) {
