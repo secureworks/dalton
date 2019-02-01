@@ -536,7 +536,7 @@ flow-timeouts:
 
 stream:
   memcap: 32mb
-  checksum-validation: yes      # reject wrong csums
+  checksum-validation: no      # reject wrong csums
   inline: no                    # no inline mode
   reassembly:
     memcap: 64mb
