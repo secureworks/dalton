@@ -252,7 +252,7 @@ flow-timeouts:
 #     depth: 1048576            # 1 MB reassembly depth
 stream:
   memcap: 33554432
-  checksum_validation: yes
+  checksum_validation: no
   reassembly:
     memcap: 67108864
     depth: 1048576
