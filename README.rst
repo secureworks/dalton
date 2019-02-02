@@ -1121,8 +1121,8 @@ Frequently Asked Questions
      before, including single sign on integration.  However, such enhancements 
      would require non-trivial code additions. There are some authentication 
      decorators commented out and scattered throughout the code and the Dalton 
-     Agents do send and API token as part of their requests but the Dalton 
-     Controller doesn't validate them.  The lack of authentication and 
+     Agents do send an API token as part of their requests but the Dalton 
+     Controller doesn't validate it.  The lack of authentication and 
      authorization does mean that it isn't difficult for malicious actors to 
      flood the Controller, submit malformed jobs, corrupt job results, dequeue
      jobs, and DoS the application.
