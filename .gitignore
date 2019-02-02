@@ -30,6 +30,7 @@ res/etc/apache/apache_conf/ssl/**
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
 # C extensions
 *.so
