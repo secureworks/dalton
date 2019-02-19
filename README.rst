@@ -11,7 +11,7 @@ Dalton also includes a wizard-like web interface for
 `Flowsynth <https://github.com/secureworks/flowsynth>`__ to facilitate
 custom pcap creation.
 
-![dalton](app/static/images/dalton.png)
+.. image:: app/static/images/dalton.png
 
 **Quickstart**:
 
