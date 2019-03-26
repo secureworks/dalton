@@ -26,11 +26,19 @@ services:
       dockerfile: Dockerfile-nginx
       args:
         - DALTON_EXTERNAL_PORT=${DALTON_EXTERNAL_PORT}
+        - DALTON_EXTERNAL_PORT_SSL=${DALTON_EXTERNAL_PORT_SSL}
     image: nginx-dalton:latest
     container_name: dalton_web
-    # to listen on a different port, edit the '.env' file
     ports:
+        # external HTTP listen port
+        # to change, set DALTON_EXTERNAL_PORT in the '.env' file (NOT here)
+        # default DALTON_EXTERNAL_PORT value: 80
       - "${DALTON_EXTERNAL_PORT}:80"
+
+        # uncomment below line to expose the external SSL/TLS listener
+        # to change port, set DALTON_EXTERNAL_PORT_SSL in the '.env' file (NOT here)
+        # default DALTON_EXTERNAL_PORT_SSL value: 443
+#      - "${DALTON_EXTERNAL_PORT_SSL}:443"
     restart: always
 
   redis:
