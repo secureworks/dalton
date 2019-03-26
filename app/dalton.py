@@ -365,10 +365,10 @@ def delete_old_job_files():
 @dalton_blueprint.route('/')
 def index():
     logger.debug("ENVIRON:\n%s" % request.environ)
-    # I could never get Werkzeug ProxyFix to work as expected using HTTP_X_FORWARDED_PROTO to set scheme on "Location" URL
+    # make sure redirect is set to use http or https as appropriate
     rurl = url_for('dalton_blueprint.page_index', _external=True)
     if rurl.startswith('http'):
-        if request.environ['HTTP_X_FORWARDED_PROTO']:
+        if "HTTP_X_FORWARDED_PROTO" in request.environ:
             # if original request was https, make sure redirect uses https
             rurl = rurl.replace('http', request.environ['HTTP_X_FORWARDED_PROTO'])
         else:
@@ -1811,10 +1811,10 @@ def page_coverage_summary():
         if bteapotJob:
             return jid
         else:
-            # Werkzeug ProxyFix never worked right for me so just doing it by hand
+            # make sure redirect is set to use http or https as appropriate
             rurl = url_for('dalton_blueprint.page_show_job', jid=jid, _external=True)
             if rurl.startswith('http'):
-                if request.environ['HTTP_X_FORWARDED_PROTO']:
+                if "HTTP_X_FORWARDED_PROTO" in request.environ:
                     # if original request was https, make sure redirect uses https
                     rurl = rurl.replace('http', request.environ['HTTP_X_FORWARDED_PROTO'])
                 else:
