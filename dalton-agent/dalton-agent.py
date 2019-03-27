@@ -213,6 +213,17 @@ logger.info("\tSENSOR_TECHNOLOGY: %s" % SENSOR_TECHNOLOGY)
 logger.info("\tIDS_BINARY: %s" % IDS_BINARY)
 logger.info("\tTCPDUMP_BINARY: %s" % TCPDUMP_BINARY)
 
+# just in case the Dalton Agent is set to use a proxy, exclude "dalton_web" which is the
+# web server container and communication with it shouldn't go thru a proxy; if the
+# agent is contacting the hostname "dalton_web", then the agent and web server are
+# containers on the same host.
+dalton_web_container = "dalton_web"
+if not 'no_proxy' in os.environ:
+    os.environ['no_proxy'] = dalton_web_container
+else:
+    os.environ['no_proxy'] = "%s,%s" % (os.environ['no_proxy'].rstrip(','), dalton_web_container)
+logger.info("Added '%s' to 'no_proxy' environment variable." % dalton_web_container)
+
 #************************
 #*** Global Variables ***
 #************************
