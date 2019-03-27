@@ -1077,7 +1077,7 @@ while True:
         if (job != None):
             start_time = int(time.time())
             JOB_ID = job['id']
-            logger.debug("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID))
+            logger.info("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID))
             send_update("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID), JOB_ID)
             zf_path = request_zip(JOB_ID)
             logger.debug("Downloaded zip for %s successfully. Extracting file %s" % (JOB_ID, zf_path))
@@ -1098,6 +1098,7 @@ while True:
 
             # submit the job!
             try:
+                logger.info("Job %s running" % JOB_ID)
                 submit_job(JOB_ID, JOB_DIRECTORY)
             except DaltonError, e:
                 # dalton errors should already be written to JOB_ERROR_LOG and sent back
@@ -1121,6 +1122,7 @@ while True:
             print_debug("Total Processing Time (includes job download time): %d seconds" % TOTAL_PROCESSING_TIME)
 
             # send results back to server
+            logger.info("Job %s done processing, sending back results" % JOB_ID)
             status = send_results()
 
             # clean up
@@ -1129,6 +1131,7 @@ while True:
             # remove job directory and contained files
             if not KEEP_JOB_FILES:
                 shutil.rmtree(JOB_DIRECTORY)
+            logger.info("Job %s complete" % JOB_ID)
             JOB_ID = None
         else:
             time.sleep(POLL_INTERVAL)
