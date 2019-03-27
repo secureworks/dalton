@@ -1077,7 +1077,7 @@ while True:
         if (job != None):
             start_time = int(time.time())
             JOB_ID = job['id']
-            logger.info("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID))
+            logger.info("Job %s accepted by %s" % (JOB_ID, SENSOR_UID))
             send_update("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID), JOB_ID)
             zf_path = request_zip(JOB_ID)
             logger.debug("Downloaded zip for %s successfully. Extracting file %s" % (JOB_ID, zf_path))
