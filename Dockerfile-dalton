@@ -1,4 +1,4 @@
-FROM python:2.7.14
+FROM python:2.7.16
 MAINTAINER David Wharton
 
 # wireshark needed for mergecap; statically compiled

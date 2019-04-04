@@ -213,6 +213,17 @@ logger.info("\tSENSOR_TECHNOLOGY: %s" % SENSOR_TECHNOLOGY)
 logger.info("\tIDS_BINARY: %s" % IDS_BINARY)
 logger.info("\tTCPDUMP_BINARY: %s" % TCPDUMP_BINARY)
 
+# just in case the Dalton Agent is set to use a proxy, exclude "dalton_web" which is the
+# web server container and communication with it shouldn't go thru a proxy; if the
+# agent is contacting the hostname "dalton_web", then the agent and web server are
+# containers on the same host.
+dalton_web_container = "dalton_web"
+if not 'no_proxy' in os.environ:
+    os.environ['no_proxy'] = dalton_web_container
+else:
+    os.environ['no_proxy'] = "%s,%s" % (os.environ['no_proxy'].rstrip(','), dalton_web_container)
+logger.info("Added '%s' to 'no_proxy' environment variable." % dalton_web_container)
+
 #************************
 #*** Global Variables ***
 #************************
@@ -1066,7 +1077,7 @@ while True:
         if (job != None):
             start_time = int(time.time())
             JOB_ID = job['id']
-            logger.debug("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID))
+            logger.info("Job %s accepted by %s" % (JOB_ID, SENSOR_UID))
             send_update("Job %s Accepted by %s" % (JOB_ID, SENSOR_UID), JOB_ID)
             zf_path = request_zip(JOB_ID)
             logger.debug("Downloaded zip for %s successfully. Extracting file %s" % (JOB_ID, zf_path))
@@ -1087,6 +1098,7 @@ while True:
 
             # submit the job!
             try:
+                logger.info("Job %s running" % JOB_ID)
                 submit_job(JOB_ID, JOB_DIRECTORY)
             except DaltonError, e:
                 # dalton errors should already be written to JOB_ERROR_LOG and sent back
@@ -1110,6 +1122,7 @@ while True:
             print_debug("Total Processing Time (includes job download time): %d seconds" % TOTAL_PROCESSING_TIME)
 
             # send results back to server
+            logger.info("Job %s done processing, sending back results" % JOB_ID)
             status = send_results()
 
             # clean up
@@ -1118,6 +1131,7 @@ while True:
             # remove job directory and contained files
             if not KEEP_JOB_FILES:
                 shutil.rmtree(JOB_DIRECTORY)
+            logger.info("Job %s complete" % JOB_ID)
             JOB_ID = None
         else:
             time.sleep(POLL_INTERVAL)
