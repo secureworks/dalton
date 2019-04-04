@@ -624,7 +624,7 @@ def post_job_results(jobid):
     r.set("%s-current_job" % SENSOR_HASH, None)
     r.expire("%s-current_job" % SENSOR_HASH, REDIS_EXPIRE)
 
-    logger.info("Dalton agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
+    logger.info("Dalton Agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
 
     #save results to db
     if 'ids' in result_obj:
