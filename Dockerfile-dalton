@@ -24,7 +24,7 @@ COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
 # install flowsynth
-RUN git clone -b add-packaging https://github.com/bac/flowsynth.git /opt/flowsynth/
+RUN git clone https://github.com/secureworks/flowsynth.git /opt/flowsynth/
 RUN pip install /opt/flowsynth
 # When a packaged version of flowsynth is available on https://pypi.org, the
 # above two lines can be replaced with:
