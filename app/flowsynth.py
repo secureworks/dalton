@@ -243,12 +243,12 @@ def compile_fs():
     fptr.close()
 
     #run the flowsynth command
-    command = "%s/src/flowsynth.py %s -f pcap -w %s --display json --no-filecontent" % (BIN_PATH, inpath, outpath)
+    command = "%s/src/flowsynth.py %s -f pcap -w %s --display json --no-filecontent" % (inpath, outpath)
     print command
     proc = subprocess.Popen(shlex.split(command), stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     output = proc.communicate()[0]
 
-	#parse flowsynth json
+    #parse flowsynth json
     try:
         synthstatus = json.loads(output)
     except ValueError:

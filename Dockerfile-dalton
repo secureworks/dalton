@@ -23,10 +23,11 @@ COPY dalton.conf /opt/dalton/dalton.conf
 COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
-#install flowsynth
-ADD https://github.com/secureworks/flowsynth/raw/master/requirements.txt /opt/flowsynth/requirements.txt
-ADD https://github.com/secureworks/flowsynth/raw/master/src/flowsynth.py /opt/flowsynth/src/flowsynth.py
-RUN pip install -r /opt/flowsynth/requirements.txt
-RUN chmod +x /opt/flowsynth/src/flowsynth.py
+# install flowsynth
+RUN git clone -b add-packaging https://github.com/bac/flowsynth.git /opt/flowsynth/
+RUN pip install /opt/flowsynth
+# When a packaged version of flowsynth is available on https://pypi.org, the
+# above two lines can be replaced with:
+# RUN pip install flowsynth
 
 CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf
