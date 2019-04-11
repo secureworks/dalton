@@ -24,10 +24,11 @@ COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
 # install flowsynth
+
+# When a packaged version of flowsynth is available on https://pypi.org, then
+# flowsynth can be added to Dalton's requirements.txt file and this section
+# removed.
 RUN git clone https://github.com/secureworks/flowsynth.git /opt/flowsynth/
 RUN pip install /opt/flowsynth
-# When a packaged version of flowsynth is available on https://pypi.org, the
-# above two lines can be replaced with:
-# RUN pip install flowsynth
 
 CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf
