@@ -180,19 +180,19 @@ services:
 #  fine on it.
 #
 
-# Snort 2.9.12 from source
-  agent-snort-2.9.12:
+# Snort 2.9.13 from source
+  agent-snort-2.9.13:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_snort
       args:
-        - SNORT_VERSION=2.9.12
+        - SNORT_VERSION=2.9.13
         - DAQ_VERSION=2.0.6
         - http_proxy=${http_proxy}
         - https_proxy=${https_proxy}
         - no_proxy=${no_proxy}
-    image: snort-2.9.12:latest
-    container_name: snort-2.9.12
+    image: snort-2.9.13:latest
+    container_name: snort-2.9.13
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
