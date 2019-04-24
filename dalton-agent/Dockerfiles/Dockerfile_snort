@@ -2,7 +2,7 @@
 # Works for Snort 2.9.1.1 and later; previous versions are more
 #  nuanced with libraries and compile dependencies so if you need
 #  a previous version, just build your own.
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 MAINTAINER David Wharton
 
 ARG SNORT_VERSION

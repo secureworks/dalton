@@ -1,5 +1,5 @@
 # Builds Suricata Dalton agent using Suricata source tarball
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 MAINTAINER David Wharton
 
 ARG SURI_VERSION
