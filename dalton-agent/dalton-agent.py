@@ -149,11 +149,12 @@ def get_engine_version(path):
         else:
             output = stdout
         # get version from output
-        result = regex.search(output)
+        result = regex.search(output.decode('utf-8'))
         if result:
             version = result.group('version')
     except:
         pass
+    logger.debug("identified 'version' from '%s': %s" % (path, version))
     return version
 
 #**************************
