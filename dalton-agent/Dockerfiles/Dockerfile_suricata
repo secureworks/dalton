@@ -7,7 +7,7 @@ ARG SURI_VERSION
 # tcpdump is for pcap analysis; not *required* for
 #  the agent but nice to have....
 RUN apt-get update -y && apt-get install -y \
-    python \
+    python3.7 \
     tcpdump \
     libpcre3 libpcre3-dbg libpcre3-dev \
     build-essential autoconf automake libtool libpcap-dev libnet1-dev \
