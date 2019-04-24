@@ -27,8 +27,8 @@ Dalton Agent - runs on IDS engine; receives jobs, runs them, and reports results
 import os
 import sys
 import traceback
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 import re
 import time
 import datetime
@@ -43,7 +43,7 @@ except ImportError:
     import simplejson as json
 import subprocess
 import zipfile
-import ConfigParser
+import configparser
 from optparse import OptionParser
 import struct
 import socket
@@ -67,18 +67,18 @@ parser.add_option("-c", "--config",
 dalton_config_file = options.configfile
 
 # get options from dalton config file
-config = ConfigParser.SafeConfigParser()
+config = configparser.SafeConfigParser()
 
 if not os.path.exists(dalton_config_file):
     # just print to stdout; logging hasn't started yet
-    print "Config file \'%s' does not exist.\n\nexiting." % dalton_config_file
+    print("Config file \'%s' does not exist.\n\nexiting." % dalton_config_file)
     sys.exit(1)
 
 try:
     config.read(dalton_config_file)
-except Exception, e:
+except Exception as e:
     # just print to stdout; logging hasn't started yet
-    print "Error reading config file, \'%s\'.\n\nexiting." % dalton_config_file
+    print("Error reading config file, \'%s\'.\n\nexiting." % dalton_config_file)
     sys.exit(1)
 
 try:
@@ -90,9 +90,9 @@ try:
     API_KEY = config.get('dalton', 'API_KEY')
     POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
     KEEP_JOB_FILES = config.getboolean('dalton', 'KEEP_JOB_FILES')
-except Exception, e:
+except Exception as e:
     # just print to stdout; logging hasn't started yet
-    print "Error parsing config file, \'%s\':\n\n%s\n\nexiting." % (dalton_config_file, e)
+    print("Error parsing config file, \'%s\':\n\n%s\n\nexiting." % (dalton_config_file, e))
     sys.exit(1)
 
 #***************
@@ -173,7 +173,7 @@ if SENSOR_UID == 'auto':
 TCPDUMP_BINARY = 'auto'
 try:
     TCPDUMP_BINARY = config.get('dalton', 'TCPDUMP_BINARY')
-except Exception, e:
+except Exception as e:
     pass
 if TCPDUMP_BINARY == 'auto':
     TCPDUMP_BINARY = find_file('tcpdump')
@@ -184,7 +184,7 @@ if not TCPDUMP_BINARY or not os.path.exists(TCPDUMP_BINARY):
 IDS_BINARY = 'auto'
 try:
     IDS_BINARY = config.get('dalton', 'IDS_BINARY')
-except Exception, e:
+except Exception as e:
     pass
 if IDS_BINARY == 'auto':
     IDS_BINARY = find_file('suricata')
@@ -274,10 +274,10 @@ def send_update(msg, job_id = None):
     params['msg'] = msg
     params['job'] = job_id
 
-    req = urllib2.Request(url, urllib.urlencode(params), HTTP_HEADERS)
+    req = urllib.request.Request(url, urllib.parse.urlencode(params), HTTP_HEADERS)
     try:
-        urllib2.urlopen(req)
-    except Exception, e:
+        urllib.request.urlopen(req)
+    except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
         except:
@@ -290,8 +290,8 @@ def request_job():
     url = "%s/request_job/%s/?SENSOR_UID=%s&AGENT_VERSION=%s&apikey=%s" % (DALTON_API, SENSOR_TECHNOLOGY, SENSOR_UID, AGENT_VERSION, API_KEY)
 
     try:
-        data = urllib2.urlopen(url).read()
-    except Exception, e:
+        data = urllib.request.urlopen(url).read()
+    except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
         except:
@@ -320,10 +320,10 @@ def request_zip(jid):
 
     params = {}
 
-    req = urllib2.Request(url, None, HTTP_HEADERS)
+    req = urllib.request.Request(url, None, HTTP_HEADERS)
     try:
-        zf = urllib2.urlopen(req)
-    except Exception, e:
+        zf = urllib.request.urlopen(req)
+    except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
         except:
@@ -437,10 +437,10 @@ def post_results(json_data):
     global DALTON_API, SENSOR_UID, HTTP_HEADERS, API_KEY
     #logger.debug("json_data:\n%s" % json_data)
     url = "%s/results/%s?SENSOR_UID=%s&apikey=%s" % (DALTON_API, JOB_ID, SENSOR_UID, API_KEY)
-    req = urllib2.Request(url, urllib.urlencode(json_data), HTTP_HEADERS)
+    req = urllib.request.Request(url, urllib.parse.urlencode(json_data), HTTP_HEADERS)
     try:
-        response = urllib2.urlopen(req)
-    except Exception, e:
+        response = urllib.request.urlopen(req)
+    except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
         except:
@@ -539,7 +539,7 @@ def check_pcaps():
                                         "And, \"there's always barber college....\"" % os.path.basename(pcap))
             else:
                 print_debug("In check_pcaps() -- no tcpdump binary found at %s" % TCPDUMP_BINARY)
-        except Exception, e:
+        except Exception as e:
             if not str(e).startswith("As Dalton says"):
                 print_debug("Error doing TCP SYN check in check_pcaps():\n%s" % e)
 
@@ -613,7 +613,7 @@ def check_pcaps():
                 warning_msg += "\n\nThis is just a warning message about the pcap. The job ran successfully and the generated alerts as well as other\n"
                 warning_msg += "results have been returned."
                 print_error(warning_msg)
-    except Exception, e:
+    except Exception as e:
         if not str(e).startswith("Warning:"):
             print_debug("Error doing snaplen check in check_pcaps():\n%s" % e)
 
@@ -647,7 +647,7 @@ def run_suricata():
         if LooseVersion(SENSOR_VERSION) > LooseVersion(2.0):
             # not sure if the '-k' option was added is Suri 2.0 or some other time but setting it to this for now
             add_options = "-k none"
-    except Exception, e:
+    except Exception as e:
         add_options = ""
     suricata_command = "%s -c %s -l %s %s -r %s" % (IDS_BINARY, IDS_CONFIG_FILE, IDS_LOG_DIRECTORY, add_options, PCAP_FILES[0])
     print_debug("Running suricata with the following command:\n%s" % suricata_command)
@@ -741,7 +741,7 @@ def check_for_errors(tech):
                     if "unknown file format" in line:
                         error_lines.append("Bad pcap file(s) submitted to Snort. Pcap files should be in libpcap or pcapng format.\n")
         ids_log_fh.close()
-    except Exception, e:
+    except Exception as e:
         print_error("Error reading IDS output file \'%s\'. Error:\n\n%s" % (JOB_IDS_LOG, e))
 
     if len(error_lines) > 0:
@@ -783,7 +783,7 @@ def process_unified2_logs():
             combined_fh.write(add_fh.read())
             add_fh.close()
         combined_fh.close()
-    except Exception, e:
+    except Exception as e:
         print_debug("Error processing unified2 files, bailing: %s" % e)
         return
 
@@ -794,7 +794,7 @@ def process_unified2_logs():
         job_alert_detailed_log_fh.write(base64.b64encode(u2_fh.read()))
         u2_fh.close()
         job_alert_detailed_log_fh.close()
-    except Exception, e:
+    except Exception as e:
         print_debug("Error processing unified2 files and base64 encoding them for transmission ... bailing. Error: %s" % e)
         return
 
@@ -1100,11 +1100,11 @@ while True:
             try:
                 logger.info("Job %s running" % JOB_ID)
                 submit_job(JOB_ID, JOB_DIRECTORY)
-            except DaltonError, e:
+            except DaltonError as e:
                 # dalton errors should already be written to JOB_ERROR_LOG and sent back
                 logger.error("DaltonError caught:\n%s" % e)
                 logger.debug("%s" % traceback.format_exc())
-            except Exception, e:
+            except Exception as e:
                 # not a DaltonError, perhaps a code bug? Try to write to JOB_ERROR_LOG
                 if JOB_ERROR_LOG:
                     msg = "Dalton Agent error in sensor \'%s\' while processing job %s. Exception in submit_job().  Please re-submit or contact admin with this message (see \'About\' page for contact info).  Error message:\n\n%s" % (SENSOR_UID, JOB_ID, e)
@@ -1138,9 +1138,9 @@ while True:
     except KeyboardInterrupt:
         logger.info("Keyboard Interrupt caught, exiting....")
         sys.exit(0)
-    except DaltonError, e:
+    except DaltonError as e:
         logger.debug("DaltonError caught (in while True loop):\n%s" % e)
-    except Exception, e:
+    except Exception as e:
         logger.debug("General Dalton Agent exeption caught. Error:\n%s\n%s" % (e, traceback.format_exc()))
         if JOB_ID:
             # unexpected error happened on agent when trying to process a job but there may not be job data so compile an empty response with the exception error message and try to send it
@@ -1148,7 +1148,7 @@ while True:
             try:
                 error_post_results(e)
                 logger.info("Successfully sent error message to controller for jobid %s" % JOB_ID)
-            except Exception, e:
+            except Exception as e:
                 logger.error("Could not communicate with controller to send error info for jobid %s; is the Dalton Controller accepting network communications? Error:\n%s" % (JOB_ID, e))
                 time.sleep(ERROR_SLEEP_TIME)
         else:
