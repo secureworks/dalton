@@ -252,6 +252,7 @@ IDS_LOG_DIRECTORY = None
 TOTAL_PROCESSING_TIME = ''
 # seconds
 ERROR_SLEEP_TIME = 5
+URLLIB_TIMEOUT = 120
 
 #**************************
 #*** Custom Error Class ***
@@ -277,7 +278,7 @@ def send_update(msg, job_id = None):
 
     req = urllib.request.Request(url, urllib.parse.urlencode(params).encode('utf-8'), HTTP_HEADERS)
     try:
-        urllib.request.urlopen(req)
+        urllib.request.urlopen(req, timeout=URLLIB_TIMEOUT)
     except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
@@ -291,7 +292,7 @@ def request_job():
     url = "%s/request_job/%s/?SENSOR_UID=%s&AGENT_VERSION=%s&apikey=%s" % (DALTON_API, SENSOR_TECHNOLOGY, SENSOR_UID, AGENT_VERSION, API_KEY)
 
     try:
-        data = urllib.request.urlopen(url).read().decode('utf-8')
+        data = urllib.request.urlopen(url, timeout=URLLIB_TIMEOUT).read().decode('utf-8')
     except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
@@ -323,7 +324,7 @@ def request_zip(jid):
 
     req = urllib.request.Request(url, None, HTTP_HEADERS)
     try:
-        zf = urllib.request.urlopen(req)
+        zf = urllib.request.urlopen(req, timeout=URLLIB_TIMEOUT)
     except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
@@ -438,7 +439,7 @@ def post_results(json_data):
     url = "%s/results/%s?SENSOR_UID=%s&apikey=%s" % (DALTON_API, JOB_ID, SENSOR_UID, API_KEY)
     req = urllib.request.Request(url, urllib.parse.urlencode(json_data).encode('utf-8'), HTTP_HEADERS)
     try:
-        response = urllib.request.urlopen(req)
+        response = urllib.request.urlopen(req, timeout=URLLIB_TIMEOUT)
     except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
