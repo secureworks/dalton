@@ -43,4 +43,4 @@ WORKDIR /opt/dalton-agent
 COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
 COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
 
-CMD python /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1
+CMD python3.7 /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1
