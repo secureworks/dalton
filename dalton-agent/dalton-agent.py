@@ -19,7 +19,7 @@ Dalton Agent - runs on IDS engine; receives jobs, runs them, and reports results
 """
 #
 # Note: originally written to run on Python 2.4 and up without the need for
-# non-standard libararies so that is why some things are written the way 
+# non-standard libararies so that is why some things are written the way
 # they are. This is especially noticeable (painful?) with the use of urllib2
 # instead of urllib3 or Requests.
 #
@@ -161,7 +161,7 @@ def get_engine_version(path):
 #*** Constant Variables ***
 #**************************
 
-AGENT_VERSION = "2.0.0"
+AGENT_VERSION = "3.0.0"
 HTTP_HEADERS = {
     "User-Agent" : "Dalton Agent %s" % AGENT_VERSION
 }
