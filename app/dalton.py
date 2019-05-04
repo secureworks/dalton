@@ -398,7 +398,10 @@ def get_engine_conf_file(sensor):
         epath = os.path.join(CONF_STORAGE_PATH, engine)
         filelist = [f for f in os.listdir(epath) if os.path.isfile(os.path.join(epath, f))]
         # assumes an extension (e.g. '.yaml', '.conf') on engine config files
-        files = [f for f in filelist if LooseVersion(os.path.splitext(f)[0]) <= LooseVersion(sensor)]
+        # if exact match, just use that instead of relying on LooseVersion
+        files = [f for f in filelist if os.path.splitext(f)[0] == sensor]
+        if len(files) == 0:
+            files = [f for f in filelist if LooseVersion(os.path.splitext(f)[0]) <= LooseVersion(sensor)]
         if len(files) > 0:
             files.sort(key=lambda v:LooseVersion(os.path.splitext(v)[0]), reverse=True)
             conf_file = os.path.join(epath, files[0])
