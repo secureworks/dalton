@@ -861,7 +861,7 @@ Example Suricata 4.1.4 specification with Rust support:
 
 .. code:: yaml
 
-      agent-suricata-4.1.4:
+      agent-suricata-4.1.4-rust:
         build:
           context: ./dalton-agent
           dockerfile: Dockerfiles/Dockerfile_suricata_rust
@@ -871,7 +871,7 @@ Example Suricata 4.1.4 specification with Rust support:
             - https_proxy=${https_proxy}
             - no_proxy=${no_proxy}
         image: suricata-4.1.4-rust:latest
-        container_name: suricata-4.1.4
+        container_name: suricata-4.1.4-rust
         environment:
           - AGENT_DEBUG=${AGENT_DEBUG}
         restart: always
