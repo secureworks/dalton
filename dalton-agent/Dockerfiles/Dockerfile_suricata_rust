@@ -1,7 +1,9 @@
-# Builds Suricata Dalton agent using Suricata source tarball
+# Builds Suricata Dalton agent using Suricata source tarball.
 # Compiles with Rust support.  Should only be used with Suricata version 4
 # agents where Rust support is desired.  (Rust was not supported in 
-# Suricata before version 4, and starting with version 5, Rust is required.
+# Suricata before version 4.)
+# Should always be used for Suricata 5.0 and later agents since for
+# those, Rust is required.
 FROM ubuntu:16.04
 MAINTAINER David Wharton
 
