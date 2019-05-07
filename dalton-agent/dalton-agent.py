@@ -152,6 +152,14 @@ def get_engine_version(path):
         result = regex.search(output)
         if result:
             version = result.group('version')
+
+        # if Suricata version 4, see if Rust is enabled and add to version string
+        if "suricata" in path.lower()  and version.split('.')[0] == "4":
+            process = subprocess.Popen('%s --build-info | grep "Rust support"' % path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            stdout, stderr = process.communicate()
+            if "yes" in stdout:
+                # rust support exists
+                version = "rust_%s" % version
     except:
         pass
     return version
@@ -160,7 +168,7 @@ def get_engine_version(path):
 #*** Constant Variables ***
 #**************************
 
-AGENT_VERSION = "2.0.0"
+AGENT_VERSION = "2.0.1"
 HTTP_HEADERS = {
     "User-Agent" : "Dalton Agent %s" % AGENT_VERSION
 }
