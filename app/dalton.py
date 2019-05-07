@@ -880,6 +880,9 @@ def page_coverage_default(sensor_tech, error=None):
             except Exception, e:
                 return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
         try:
+            # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
+            #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
+            sensors.sort(reverse=False)
             # sort by version number; ignore "rust_" prefix
             sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('-', 1)[1], prefix="rust_")), reverse=True)
         except Exception as e:
@@ -891,7 +894,7 @@ def page_coverage_default(sensor_tech, error=None):
     # get conf or yaml file if sensor supports it
     engine_conf = None
     # return the engine.conf from the first sensor in the list which is sorted (see above)
-    # and should be the most recent sensor version (depends on lexical sort done above). It 
+    # and should be the most recent sensor version (depends on lexical sort done above). It
     # is also the sensor version that is checked by default on the job submission page.
     # this also handles populating ip/port variables
     if len(sensors) > 0:
