@@ -349,6 +349,7 @@ number of user-configurable options:
            line represents the HTTP request and response all in one.
       -  | **DNS Log**
          | A log of DNS requests and responses as provided by Suricata.
+           This won't be availble if Suricata is compiled with Rust support.
       -  | **TLS Log**
          | A log of SSL/TLS traffic as provided by Suricata.
       -  | **EVE Log**
@@ -851,6 +852,30 @@ Example Suricata 4.0.2 specification:
           - AGENT_DEBUG=${AGENT_DEBUG}
         restart: always
 
+Rust support was added in Suricata 4.0 but is optional.  Starting with Suricata 5.0,
+Rust is manditory.  Suricata 4.0 and later agents wishing to use Rust, and all
+Suricata 5.0 and later agents, should specify the appropriate Dockerfile --
+``Dockerfiles/Dockerfile_suricata_rust``.
+
+Example Suricata 4.1.4 specification with Rust support:
+
+.. code:: yaml
+
+      agent-suricata-4.1.4-rust:
+        build:
+          context: ./dalton-agent
+          dockerfile: Dockerfiles/Dockerfile_suricata_rust
+          args:
+            - SURI_VERSION=4.1.4
+            - http_proxy=${http_proxy}
+            - https_proxy=${https_proxy}
+            - no_proxy=${no_proxy}
+        image: suricata-4.1.4-rust:latest
+        container_name: suricata-4.1.4-rust
+        environment:
+          - AGENT_DEBUG=${AGENT_DEBUG}
+        restart: always
+
 Suricata can also have ``SURI_VERSION=current`` in which case the latest 
 Suricata version will be used to build the Agent.  Having a 'current' Suricata 
 version specification in the ``docker-compose.yml`` file is especially convenient 
@@ -880,8 +905,13 @@ if changed, ``DAQ_VERSION``.  Example Snort specification:
             - AGENT_DEBUG=${AGENT_DEBUG}
           restart: always
 
-Suricata agents should build off the suricata Dockerfile -- 
-``Dockerfiles/Dockerfile_suricata``; and Snort agents should build off the 
+Suricata 4.0 and earlier agents *without* Rust support should build off the Suricata Dockerfile,
+``Dockerfiles/Dockerfile_suricata``; Suricata 4.0 and later agents *with* Rust
+support should build off the Suricata Dockerfile, ``Dockerfiles/Dockerfile_suricata_rust``.
+Suricata 5.0 and later agents must always use ``Dockerfiles/Dockerfile_suricata_rust``
+since Rust is no longer optional.
+
+Snort agents should build off the
 Snort Dockerfile at ``Dockerfiles/Dockerfile_snort``.
 
 Non-Docker Sensors
