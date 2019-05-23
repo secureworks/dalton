@@ -91,7 +91,7 @@
                             {% if "Perf" in log_description or "Stats" in log_description %}
                                 <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
                             {% elif "EVE" in log_description  %}
-                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]|tojson}}</pre></div>
+                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
                             {% else %}
                                 <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre>{{other_logs[log_description]}}</pre></div>
                             {% endif %}
