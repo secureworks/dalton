@@ -50,6 +50,7 @@ import socket
 import logging
 from logging.handlers import RotatingFileHandler
 from distutils.version import LooseVersion
+import binascii
 
 # urllib2 in Python < 2.6 doesn't support setting a timeout so doing it like this
 socket.setdefaulttimeout(120)
@@ -560,17 +561,16 @@ def check_pcaps():
             snaplen = 65535
 
             # get first 40 bytes of pcap file
-            fh = open(pcap, 'rb')
-            bytes = fh.read(44)
-            fh.close()
+            with open(pcap, 'rb') as fh:
+                bytes = fh.read(44)
 
-            magic = ''.join(b.encode('hex') for b in bytes[0:4])
+            magic = binascii.hexlify(bytes[0:4]).decode('ascii')
             if magic.lower() == '0a0d0d0a':
                 # this is pcapng and these aren't the byte-order magic bytes
                 snaplen_offset = 40
                 pcapng = True
                 # get the correct byte-order magic bytes for pcapng
-                magic = ''.join(b.encode('hex') for b in bytes[8:12])
+                magic = binascii.hexlify(bytes[8:12]).decode('ascii')
             else:
                 # this is libpcap, we have the magic
                 pcapng = False
@@ -623,7 +623,7 @@ def check_pcaps():
                 print_error(warning_msg)
     except Exception as e:
         if not str(e).startswith("Warning:"):
-            print_debug("Error doing snaplen check in check_pcaps():\n%s" % e)
+            print_debug("Error doing snaplen check in check_pcaps(): %s" % e)
 
 #*************************
 #**** Snort Functions ****
@@ -797,11 +797,9 @@ def process_unified2_logs():
 
     # b64 it and write!
     try:
-        job_alert_detailed_log_fh = open(JOB_ALERT_DETAILED_LOG, "w")
-        u2_fh = open(u2_combined_file, "rb")
-        job_alert_detailed_log_fh.write(base64.b64encode(u2_fh.read()))
-        u2_fh.close()
-        job_alert_detailed_log_fh.close()
+        with open(JOB_ALERT_DETAILED_LOG, 'wb') as job_alert_detailed_log_fh:
+            with  open(u2_combined_file, 'rb') as u2_fh:
+                job_alert_detailed_log_fh.write(base64.b64encode(u2_fh.read()))
     except Exception as e:
         print_debug("Error processing unified2 files and base64 encoding them for transmission ... bailing. Error: %s" % e)
         return
