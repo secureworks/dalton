@@ -19,7 +19,7 @@ Dalton Agent - runs on IDS engine; receives jobs, runs them, and reports results
 """
 #
 # Note: originally written to run on Python 2.4 and up without the need for
-# non-standard libararies so that is why some things are written the way 
+# non-standard libararies so that is why some things are written the way
 # they are. This is especially noticeable (painful?) with the use of urllib2
 # instead of urllib3 or Requests.
 #
@@ -27,8 +27,8 @@ Dalton Agent - runs on IDS engine; receives jobs, runs them, and reports results
 import os
 import sys
 import traceback
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 import re
 import time
 import datetime
@@ -43,7 +43,7 @@ except ImportError:
     import simplejson as json
 import subprocess
 import zipfile
-import ConfigParser
+import configparser
 from optparse import OptionParser
 import struct
 import socket
@@ -67,18 +67,18 @@ parser.add_option("-c", "--config",
 dalton_config_file = options.configfile
 
 # get options from dalton config file
-config = ConfigParser.SafeConfigParser()
+config = configparser.SafeConfigParser()
 
 if not os.path.exists(dalton_config_file):
     # just print to stdout; logging hasn't started yet
-    print "Config file \'%s' does not exist.\n\nexiting." % dalton_config_file
+    print("Config file \'%s' does not exist.\n\nexiting." % dalton_config_file)
     sys.exit(1)
 
 try:
     config.read(dalton_config_file)
-except Exception, e:
+except Exception as e:
     # just print to stdout; logging hasn't started yet
-    print "Error reading config file, \'%s\'.\n\nexiting." % dalton_config_file
+    print("Error reading config file, \'%s\'.\n\nexiting." % dalton_config_file)
     sys.exit(1)
 
 try:
@@ -90,9 +90,9 @@ try:
     API_KEY = config.get('dalton', 'API_KEY')
     POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
     KEEP_JOB_FILES = config.getboolean('dalton', 'KEEP_JOB_FILES')
-except Exception, e:
+except Exception as e:
     # just print to stdout; logging hasn't started yet
-    print "Error parsing config file, \'%s\':\n\n%s\n\nexiting." % (dalton_config_file, e)
+    print("Error parsing config file, \'%s\':\n\n%s\n\nexiting." % (dalton_config_file, e))
     sys.exit(1)
 
 #***************
@@ -125,7 +125,7 @@ def find_file(name):
         if stderr:
             raise
         else:
-            ret_path = stdout.strip()
+            ret_path = stdout.decode('utf-8').strip()
     except:
         # file not in PATH, try manually searching
         paths = ['/usr/sbin', '/usr/bin', '/usr/local/bin', '/usr/local/sbin']
@@ -149,7 +149,7 @@ def get_engine_version(path):
         else:
             output = stdout
         # get version from output
-        result = regex.search(output)
+        result = regex.search(output.decode('utf-8'))
         if result:
             version = result.group('version')
 
@@ -162,13 +162,14 @@ def get_engine_version(path):
                 version = "rust_%s" % version
     except:
         pass
+    logger.debug("identified 'version' from '%s': %s" % (path, version))
     return version
 
 #**************************
 #*** Constant Variables ***
 #**************************
 
-AGENT_VERSION = "2.0.1"
+AGENT_VERSION = "3.0.0"
 HTTP_HEADERS = {
     "User-Agent" : "Dalton Agent %s" % AGENT_VERSION
 }
@@ -181,7 +182,7 @@ if SENSOR_UID == 'auto':
 TCPDUMP_BINARY = 'auto'
 try:
     TCPDUMP_BINARY = config.get('dalton', 'TCPDUMP_BINARY')
-except Exception, e:
+except Exception as e:
     pass
 if TCPDUMP_BINARY == 'auto':
     TCPDUMP_BINARY = find_file('tcpdump')
@@ -192,7 +193,7 @@ if not TCPDUMP_BINARY or not os.path.exists(TCPDUMP_BINARY):
 IDS_BINARY = 'auto'
 try:
     IDS_BINARY = config.get('dalton', 'IDS_BINARY')
-except Exception, e:
+except Exception as e:
     pass
 if IDS_BINARY == 'auto':
     IDS_BINARY = find_file('suricata')
@@ -259,6 +260,7 @@ IDS_LOG_DIRECTORY = None
 TOTAL_PROCESSING_TIME = ''
 # seconds
 ERROR_SLEEP_TIME = 5
+URLLIB_TIMEOUT = 120
 
 #**************************
 #*** Custom Error Class ***
@@ -282,10 +284,10 @@ def send_update(msg, job_id = None):
     params['msg'] = msg
     params['job'] = job_id
 
-    req = urllib2.Request(url, urllib.urlencode(params), HTTP_HEADERS)
+    req = urllib.request.Request(url, urllib.parse.urlencode(params).encode('utf-8'), HTTP_HEADERS)
     try:
-        urllib2.urlopen(req)
-    except Exception, e:
+        urllib.request.urlopen(req, timeout=URLLIB_TIMEOUT)
+    except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
         except:
@@ -298,8 +300,8 @@ def request_job():
     url = "%s/request_job/%s/?SENSOR_UID=%s&AGENT_VERSION=%s&apikey=%s" % (DALTON_API, SENSOR_TECHNOLOGY, SENSOR_UID, AGENT_VERSION, API_KEY)
 
     try:
-        data = urllib2.urlopen(url).read()
-    except Exception, e:
+        data = urllib.request.urlopen(url, timeout=URLLIB_TIMEOUT).read().decode('utf-8')
+    except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
         except:
@@ -328,10 +330,10 @@ def request_zip(jid):
 
     params = {}
 
-    req = urllib2.Request(url, None, HTTP_HEADERS)
+    req = urllib.request.Request(url, None, HTTP_HEADERS)
     try:
-        zf = urllib2.urlopen(req)
-    except Exception, e:
+        zf = urllib.request.urlopen(req, timeout=URLLIB_TIMEOUT)
+    except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
         except:
@@ -340,7 +342,7 @@ def request_zip(jid):
 
     zf_path = "%s/%s.zip" % (STORAGE_PATH, jid)
 
-    f = open(zf_path,'w')
+    f = open(zf_path,'wb')
     f.write(zf.read())
     f.close()
     return zf_path
@@ -348,9 +350,7 @@ def request_zip(jid):
 # takes a re match object (should be a single byte) and returns it
 # as printable.  Example: byte 0x13 becomes string "\x13".
 def hexescape(matchobj):
-    # apparently str.format wasn't added until python 2.6 so in case this is something like 2.4....
-    #return r'\x{0:02x}'.format(ord(matchobj.group()))
-    return r'\x%02x' % ord(matchobj.group())
+    return r'\x{0:02x}'.format(ord(matchobj.group()))
 
 # send results back to server.  Returns value of 'status' in results dictionary
 def send_results():
@@ -366,7 +366,7 @@ def send_results():
     results_dict = {}
 
     # populate error and status
-    fh = open(JOB_ERROR_LOG, 'rb')
+    fh = open(JOB_ERROR_LOG, 'r')
     results = fh.read()
     results_dict['error'] = results
     # if JOB_ERROR_LOG contains data
@@ -378,7 +378,7 @@ def send_results():
 
     # populate ids log
     results = ''
-    fh = open(JOB_IDS_LOG, 'rb')
+    fh = open(JOB_IDS_LOG, 'r')
     results = fh.read()
     # make sure we have only ASCII
     results_dict['ids'] = ""
@@ -387,7 +387,7 @@ def send_results():
     fh.close()
 
     # populate alert
-    fh = open(JOB_ALERT_LOG, 'rb')
+    fh = open(JOB_ALERT_LOG, 'r')
     results = fh.read()
     if not results:
         results_dict['alert'] = "*** No Alerts ***\n"
@@ -396,7 +396,7 @@ def send_results():
     fh.close()
 
     # populate alert detailed
-    fh = open(JOB_ALERT_DETAILED_LOG, 'rb')
+    fh = open(JOB_ALERT_DETAILED_LOG, 'r')
     results = fh.read()
     fh.close()
     if not results: # or error identified in results?
@@ -405,13 +405,13 @@ def send_results():
         results_dict['alert_detailed'] = results
 
     # populate performance
-    fh = open(JOB_PERFORMANCE_LOG, 'rb')
+    fh = open(JOB_PERFORMANCE_LOG, 'r')
     results = fh.read()
     results_dict['performance'] = results
     fh.close()
 
     # populate debug
-    fh = open(JOB_DEBUG_LOG, 'rb')
+    fh = open(JOB_DEBUG_LOG, 'r')
     results = fh.read()
     results_dict['debug'] = results
     fh.close()
@@ -422,19 +422,19 @@ def send_results():
     # populate other logs (Suricata only for now)
     # this file actually contains json; Dalton controller will have to (double) decode since
     # results_dict is json encoded before it is sent
-    fh = open(JOB_OTHER_LOGS, 'rb')
+    fh = open(JOB_OTHER_LOGS, 'r')
     results = fh.read()
     results_dict['other_logs'] = results
     fh.close()
+
+    #comment this out for prod
+    #logger.debug(results_dict)
 
     # convert the dictionary to json
     json_results_dict = json.dumps(results_dict)
 
     #comment this out for prod
-    #if DEBUG:
-    #    fh = open('/tmp/dictionary.txt', 'wb')
-    #    fh.write(json_results_dict)
-    #    fh.close()
+    #logger.debug(json_results_dict)
 
     payload = {'json_data': json_results_dict}
     # send results back to server
@@ -445,10 +445,10 @@ def post_results(json_data):
     global DALTON_API, SENSOR_UID, HTTP_HEADERS, API_KEY
     #logger.debug("json_data:\n%s" % json_data)
     url = "%s/results/%s?SENSOR_UID=%s&apikey=%s" % (DALTON_API, JOB_ID, SENSOR_UID, API_KEY)
-    req = urllib2.Request(url, urllib.urlencode(json_data), HTTP_HEADERS)
+    req = urllib.request.Request(url, urllib.parse.urlencode(json_data).encode('utf-8'), HTTP_HEADERS)
     try:
-        response = urllib2.urlopen(req)
-    except Exception, e:
+        response = urllib.request.urlopen(req, timeout=URLLIB_TIMEOUT)
+    except Exception as e:
         try:
             truncated_url = re.search('(^[^\?]*)', url).group(1)
         except:
@@ -506,9 +506,9 @@ def process_snort_alerts():
     print_msg("Processing alerts")
     os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
 
-    job_alert_log_fh = open(JOB_ALERT_LOG, "wb")
+    job_alert_log_fh = open(JOB_ALERT_LOG, "w")
     for alert_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "alert-full_dalton-agent*")):
-        alert_filehandle = open(alert_file, "rb")
+        alert_filehandle = open(alert_file, "r")
         print_debug("Processing snort alert file %s" % alert_file)
         job_alert_log_fh.write(alert_filehandle.read())
         alert_filehandle.close()
@@ -547,7 +547,7 @@ def check_pcaps():
                                         "And, \"there's always barber college....\"" % os.path.basename(pcap))
             else:
                 print_debug("In check_pcaps() -- no tcpdump binary found at %s" % TCPDUMP_BINARY)
-        except Exception, e:
+        except Exception as e:
             if not str(e).startswith("As Dalton says"):
                 print_debug("Error doing TCP SYN check in check_pcaps():\n%s" % e)
 
@@ -621,7 +621,7 @@ def check_pcaps():
                 warning_msg += "\n\nThis is just a warning message about the pcap. The job ran successfully and the generated alerts as well as other\n"
                 warning_msg += "results have been returned."
                 print_error(warning_msg)
-    except Exception, e:
+    except Exception as e:
         if not str(e).startswith("Warning:"):
             print_debug("Error doing snaplen check in check_pcaps():\n%s" % e)
 
@@ -635,7 +635,7 @@ def run_snort():
     snort_command = "%s -Q --daq dump --daq-dir /usr/lib/daq/ --daq-var load-mode=read-file --daq-var file=/tmp/inline-out.pcap -l %s -c %s -k none -X --conf-error-out --process-all-events --treat-drop-as-alert --pcap-list=\"%s\" 2>&1" % (IDS_BINARY, IDS_LOG_DIRECTORY, IDS_CONFIG_FILE, ' '.join(PCAP_FILES))
     print_msg("Starting Snort and Running Pcap(s)...")
     print_debug("Running Snort with the following command command:\n%s" % snort_command)
-    snort_output_fh = open(JOB_IDS_LOG, "wb")
+    snort_output_fh = open(JOB_IDS_LOG, "w")
     subprocess.call(snort_command, shell =  True, stderr=subprocess.STDOUT, stdout=snort_output_fh)
     snort_output_fh.close()
 
@@ -655,11 +655,11 @@ def run_suricata():
         if LooseVersion(SENSOR_VERSION) > LooseVersion(2.0):
             # not sure if the '-k' option was added is Suri 2.0 or some other time but setting it to this for now
             add_options = "-k none"
-    except Exception, e:
+    except Exception as e:
         add_options = ""
     suricata_command = "%s -c %s -l %s %s -r %s" % (IDS_BINARY, IDS_CONFIG_FILE, IDS_LOG_DIRECTORY, add_options, PCAP_FILES[0])
     print_debug("Running suricata with the following command:\n%s" % suricata_command)
-    suri_output_fh = open(JOB_IDS_LOG, "wb")
+    suri_output_fh = open(JOB_IDS_LOG, "w")
     subprocess.call(suricata_command, shell = True, stderr=subprocess.STDOUT, stdout=suri_output_fh)
     suri_output_fh.close()
 
@@ -685,8 +685,8 @@ def process_suri_alerts():
     print_msg("Processing alerts")
     alerts_file = "%s/dalton-fast.log" % IDS_LOG_DIRECTORY
     if os.path.exists(alerts_file):
-        job_alert_log_fh = open(JOB_ALERT_LOG, "wb")
-        alert_filehandle = open(alerts_file, "rb")
+        job_alert_log_fh = open(JOB_ALERT_LOG, "w")
+        alert_filehandle = open(alerts_file, "r")
         for line in alert_filehandle:
             # can do alert formatting here if we want
             # for now just add newline between alerts
@@ -713,7 +713,7 @@ def process_other_logs(other_logs):
                     print_debug("Log file \'%s\' not present, trying \'%s\'..." % (other_logs[log_name], log_name_new))
                     other_logs[log_name] = log_name_new
             if os.path.exists("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name])):
-                log_fh = open("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name]), "rb")
+                log_fh = open("%s/%s" % (IDS_LOG_DIRECTORY, other_logs[log_name]), "r")
                 all_other_logs[log_name] = log_fh.read()
                 log_fh.close()
                 if all_other_logs[log_name] == "":
@@ -721,7 +721,7 @@ def process_other_logs(other_logs):
                     del all_other_logs[log_name]
             else:
                 print_debug("Requested log file \'%s\' not present, skipping." % other_logs[log_name])
-        other_logs_fh = open(JOB_OTHER_LOGS, "wb")
+        other_logs_fh = open(JOB_OTHER_LOGS, "w")
         other_logs_fh.write(json.dumps(all_other_logs))
         other_logs_fh.close()
     else:
@@ -736,7 +736,7 @@ def check_for_errors(tech):
         print_debug("\'tech\' variable not passed to check_for_errors(), using \'%s\'" % tech)
     error_lines = []
     try:
-        ids_log_fh = open(JOB_IDS_LOG, "rb")
+        ids_log_fh = open(JOB_IDS_LOG, "r")
         for line in ids_log_fh:
             if tech.startswith('suri'):
                 if (" - <Error> - " in line or line.startswith("ERROR") or line.startswith("Failed to parse configuration file")):
@@ -749,7 +749,7 @@ def check_for_errors(tech):
                     if "unknown file format" in line:
                         error_lines.append("Bad pcap file(s) submitted to Snort. Pcap files should be in libpcap or pcapng format.\n")
         ids_log_fh.close()
-    except Exception, e:
+    except Exception as e:
         print_error("Error reading IDS output file \'%s\'. Error:\n\n%s" % (JOB_IDS_LOG, e))
 
     if len(error_lines) > 0:
@@ -791,18 +791,18 @@ def process_unified2_logs():
             combined_fh.write(add_fh.read())
             add_fh.close()
         combined_fh.close()
-    except Exception, e:
+    except Exception as e:
         print_debug("Error processing unified2 files, bailing: %s" % e)
         return
 
     # b64 it and write!
     try:
-        job_alert_detailed_log_fh = open(JOB_ALERT_DETAILED_LOG, "wb")
+        job_alert_detailed_log_fh = open(JOB_ALERT_DETAILED_LOG, "w")
         u2_fh = open(u2_combined_file, "rb")
         job_alert_detailed_log_fh.write(base64.b64encode(u2_fh.read()))
         u2_fh.close()
         job_alert_detailed_log_fh.close()
-    except Exception, e:
+    except Exception as e:
         print_debug("Error processing unified2 files and base64 encoding them for transmission ... bailing. Error: %s" % e)
         return
 
@@ -812,10 +812,10 @@ def process_performance_logs():
     print_debug("process_performance_logs() called")
     print_msg("Processing performance logs")
     os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
-    job_performance_log_fh = open(JOB_PERFORMANCE_LOG, "wb")
+    job_performance_log_fh = open(JOB_PERFORMANCE_LOG, "w")
     if len(glob.glob(os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf*"))) > 0:
         for perf_file in glob.glob(os.path.join(IDS_LOG_DIRECTORY, "dalton-rule_perf*")):
-            perf_filehandle = open(perf_file, "rb")
+            perf_filehandle = open(perf_file, "r")
             print_debug("Processing rule performance log file %s" % perf_file)
             job_performance_log_fh.write(perf_filehandle.read())
             job_performance_log_fh.write("\n")
@@ -876,13 +876,13 @@ def submit_job(job_id, job_directory):
     IDS_CONFIG_FILE = '%s/snort.conf' % JOB_DIRECTORY
 
     # touch log files
-    open(JOB_ERROR_LOG, "wb").close()
-    open(JOB_IDS_LOG, "wb").close()
-    open(JOB_DEBUG_LOG, "wb").close()
-    open(JOB_ALERT_LOG, "wb").close()
-    open(JOB_ALERT_DETAILED_LOG, "wb").close()
-    open(JOB_OTHER_LOGS, "wb").close()
-    open(JOB_PERFORMANCE_LOG, "wb").close()
+    open(JOB_ERROR_LOG, "w").close()
+    open(JOB_IDS_LOG, "w").close()
+    open(JOB_DEBUG_LOG, "w").close()
+    open(JOB_ALERT_LOG, "w").close()
+    open(JOB_ALERT_DETAILED_LOG, "w").close()
+    open(JOB_OTHER_LOGS, "w").close()
+    open(JOB_PERFORMANCE_LOG, "w").close()
 
     print_debug(datetime.datetime.now().strftime("%b %d %Y %H:%M:%S"))
     print_debug("Agent Name: %s\nAgent Version: %s\nSensor Type: %s\nDalton API: %s" % (SENSOR_UID, AGENT_VERSION, SENSOR_TECHNOLOGY, DALTON_API))
@@ -892,7 +892,7 @@ def submit_job(job_id, job_directory):
     # read manifest file
     manifest_data = []
     if os.path.exists("%s/manifest.json" % JOB_DIRECTORY):
-        manifest_file = open("%s/manifest.json" % JOB_DIRECTORY, "rb")
+        manifest_file = open("%s/manifest.json" % JOB_DIRECTORY, "r")
         for line in manifest_file:
             manifest_data.append(json.loads(line))
         manifest_file.close()
@@ -1108,11 +1108,11 @@ while True:
             try:
                 logger.info("Job %s running" % JOB_ID)
                 submit_job(JOB_ID, JOB_DIRECTORY)
-            except DaltonError, e:
+            except DaltonError as e:
                 # dalton errors should already be written to JOB_ERROR_LOG and sent back
                 logger.error("DaltonError caught:\n%s" % e)
                 logger.debug("%s" % traceback.format_exc())
-            except Exception, e:
+            except Exception as e:
                 # not a DaltonError, perhaps a code bug? Try to write to JOB_ERROR_LOG
                 if JOB_ERROR_LOG:
                     msg = "Dalton Agent error in sensor \'%s\' while processing job %s. Exception in submit_job().  Please re-submit or contact admin with this message (see \'About\' page for contact info).  Error message:\n\n%s" % (SENSOR_UID, JOB_ID, e)
@@ -1146,9 +1146,9 @@ while True:
     except KeyboardInterrupt:
         logger.info("Keyboard Interrupt caught, exiting....")
         sys.exit(0)
-    except DaltonError, e:
+    except DaltonError as e:
         logger.debug("DaltonError caught (in while True loop):\n%s" % e)
-    except Exception, e:
+    except Exception as e:
         logger.debug("General Dalton Agent exeption caught. Error:\n%s\n%s" % (e, traceback.format_exc()))
         if JOB_ID:
             # unexpected error happened on agent when trying to process a job but there may not be job data so compile an empty response with the exception error message and try to send it
@@ -1156,7 +1156,7 @@ while True:
             try:
                 error_post_results(e)
                 logger.info("Successfully sent error message to controller for jobid %s" % JOB_ID)
-            except Exception, e:
+            except Exception as e:
                 logger.error("Could not communicate with controller to send error info for jobid %s; is the Dalton Controller accepting network communications? Error:\n%s" % (JOB_ID, e))
                 time.sleep(ERROR_SLEEP_TIME)
         else:

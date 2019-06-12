@@ -1,5 +1,5 @@
 # Builds Suricata Dalton agent using Suricata source tarball
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 MAINTAINER David Wharton
 
 ARG SURI_VERSION
@@ -7,7 +7,7 @@ ARG SURI_VERSION
 # tcpdump is for pcap analysis; not *required* for
 #  the agent but nice to have....
 RUN apt-get update -y && apt-get install -y \
-    python \
+    python3.7 \
     tcpdump \
     libpcre3 libpcre3-dbg libpcre3-dev \
     build-essential autoconf automake libtool libpcap-dev libnet1-dev \
@@ -30,4 +30,4 @@ WORKDIR /opt/dalton-agent
 COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
 COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
 
-CMD python /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1
+CMD python3.7 /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1
