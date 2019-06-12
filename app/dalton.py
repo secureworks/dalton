@@ -167,6 +167,15 @@ supported_engines = ['suricata', 'snort']
 
 logger.info("Dalton Started.")
 
+
+def prefix_strip(mystring, prefix="rust_"):
+    """ strip passed in prefix from the beginning of passed in string and return it
+    """
+    if mystring.startswith(prefix):
+        return mystring[len(prefix):]
+    else:
+        return mystring
+
 def delete_temp_files(job_id):
     """ deletes temp files for given job ID"""
     global TEMP_STORAGE_PATH
@@ -398,9 +407,12 @@ def get_engine_conf_file(sensor):
         epath = os.path.join(CONF_STORAGE_PATH, engine)
         filelist = [f for f in os.listdir(epath) if os.path.isfile(os.path.join(epath, f))]
         # assumes an extension (e.g. '.yaml', '.conf') on engine config files
-        files = [f for f in filelist if LooseVersion(os.path.splitext(f)[0]) <= LooseVersion(sensor)]
+        # if exact match, just use that instead of relying on LooseVersion
+        files = [f for f in filelist if os.path.splitext(f)[0] == sensor]
+        if len(files) == 0:
+            files = [f for f in filelist if LooseVersion(prefix_strip(os.path.splitext(f)[0], prefix="rust_")) <= LooseVersion(sensor)]
         if len(files) > 0:
-            files.sort(key=lambda v:LooseVersion(os.path.splitext(v)[0]), reverse=True)
+            files.sort(key=lambda v:LooseVersion(prefix_strip(os.path.splitext(v)[0], prefix="rust_")), reverse=True)
             conf_file = os.path.join(epath, files[0])
         logger.debug("in get_engine_conf_file: passed sensor value: '%s', conf file used: '%s'" % (sensor, os.path.basename(conf_file)))
 
@@ -868,15 +880,21 @@ def page_coverage_default(sensor_tech, error=None):
             except Exception, e:
                 return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
         try:
-            # sort by version number
-            sensors.sort(key=LooseVersion, reverse=True)
+            # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
+            #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
+            sensors.sort(reverse=False)
+            # sort by version number; ignore "rust_" prefix
+            sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('-', 1)[1], prefix="rust_")), reverse=True)
         except Exception as e:
-            sensors.sort(reverse=True)
+            try:
+                sensors.sort(key=LooseVersion, reverse=True)
+            except Exception as ee:
+                sensors.sort(reverse=True)
 
     # get conf or yaml file if sensor supports it
     engine_conf = None
     # return the engine.conf from the first sensor in the list which is sorted (see above)
-    # and should be the most recent sensor version (depends on lexical sort done above). It 
+    # and should be the most recent sensor version (depends on lexical sort done above). It
     # is also the sensor version that is checked by default on the job submission page.
     # this also handles populating ip/port variables
     if len(sensors) > 0:
@@ -1967,11 +1985,14 @@ def controller_api_get_current_sensors(engine):
             if t.lower().startswith(engine.lower()):
                 sensors.append(t)
 
-    # sort so highest version number is first
+    # sort so highest version number is first; ignore "rust_" prefix
     try:
-        sensors.sort(key=LooseVersion, reverse=True)
+        sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('-', 1)[1], prefix="rust_")), reverse=True)
     except Exception as e:
-        sensors.sort(reverse=True)
+        try:
+            sensors.sort(key=LooseVersion, reverse=True)
+        except Exception as ee:
+            sensors.sort(reverse=True)
 
     # return json
     json_response = {'sensor_tech': sensors}
