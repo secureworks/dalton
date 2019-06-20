@@ -85,7 +85,9 @@ except Exception as e:
 try:
     DEBUG = config.getboolean('dalton', 'DEBUG')
     STORAGE_PATH = config.get('dalton', 'STORAGE_PATH')
-    SENSOR_TECHNOLOGY = config.get('dalton', 'SENSOR_TECHNOLOGY').lower()
+    SENSOR_CONFIG = config.get('dalton', 'SENSOR_CONFIG').lower()
+    SENSOR_ENGINE = config.get('dalton', 'SENSOR_ENGINE').lower()
+    SENSOR_ENGINE_VERSION = config.get('dalton', 'SENSOR_ENGINE_VERSION').lower()
     SENSOR_UID = config.get('dalton', 'SENSOR_UID')
     DALTON_API = config.get('dalton', 'DALTON_API')
     API_KEY = config.get('dalton', 'API_KEY')
@@ -139,7 +141,8 @@ def find_file(name):
 
 ''' returns the version of the engine given full path to binary (e.g. Suricata, Snort) '''
 def get_engine_version(path):
-    version = 'unknown'
+    engine = "unknown"
+    version = "unknown"
     try:
         process = subprocess.Popen("%s -V" % path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         stdout, stderr = process.communicate()
@@ -149,13 +152,24 @@ def get_engine_version(path):
             output = stderr
         else:
             output = stdout
+        # get engine from out put
+        if "Suricata" in output.decode('utf-8'):
+            engine = "suricata"
+        elif "Snort" in output.decode('utf-8'):
+            engine = "snort"
+        else:
+            # use filenname of binary
+            engine = os.path.basename(path).lower()
+            logger.warn("Could not determine engine name, using '%s' from IDS_BINARY path" % engine)
+
         # get version from output
         result = regex.search(output.decode('utf-8'))
         if result:
             version = result.group('version')
 
         # if Suricata version 4, see if Rust is enabled and add to version string
-        if "suricata" in path.lower()  and version.split('.')[0] == "4":
+        # TODO: change for Dalton2
+        if "suricata" in engine  and version.split('.')[0] == "4":
             process = subprocess.Popen('%s --build-info | grep "Rust support"' % path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
             stdout, stderr = process.communicate()
             if "yes" in stdout:
@@ -163,8 +177,8 @@ def get_engine_version(path):
                 version = "rust_%s" % version
     except:
         pass
-    logger.debug("identified 'version' from '%s': %s" % (path, version))
-    return version
+    logger.debug("Using IDS binary '%s': engine: '%s', version '%s'" % (path, engine, version))
+    return (engine, version)
 
 #**************************
 #*** Constant Variables ***
@@ -209,17 +223,23 @@ if IDS_BINARY is None:
         logger.critical("No IDS binary specified or found.  Cannot continue.")
         sys.exit(1)
 
-# Example: if Suricata version 4.0.0, this value would be "4.0.0"
-SENSOR_VERSION = get_engine_version(IDS_BINARY)
+(eng, eng_ver) = get_engine_version(IDS_BINARY)
+if SENSOR_ENGINE == "auto":
+    SENSOR_ENGINE = eng
+if SENSOR_ENGINE_VERSION == "auto":
+    SENSOR_ENGINE_VERSION = eng_ver
+if SENSOR_CONFIG == "auto":
+    SENSOR_CONFIG = "%s-%s" % (SENSOR_ENGINE, SENSOR_ENGINE_VERSION)
 
-if SENSOR_TECHNOLOGY == 'auto':
-    base = os.path.basename(IDS_BINARY)
-    SENSOR_TECHNOLOGY = "%s-%s" % (base, SENSOR_VERSION)
+# set/keep for now
+SENSOR_TECHNOLOGY = "%s-%s" % (SENSOR_ENGINE, SENSOR_ENGINE_VERSION)
 
 logger.info("\n*******************")
 logger.info("Starting Dalton Agent version %s:"% AGENT_VERSION)
 logger.info("\tSENSOR_UID: %s" % SENSOR_UID)
-logger.info("\tSENSOR_TECHNOLOGY: %s" % SENSOR_TECHNOLOGY)
+logger.info("\tSENSOR_ENGINE: %s" % SENSOR_ENGINE)
+logger.info("\tSENSOR_ENGINE_VERSION: %s" % SENSOR_ENGINE_VERSION)
+logger.info("\tSENSOR_CONFIG: %s" % SENSOR_CONFIG)
 logger.info("\tIDS_BINARY: %s" % IDS_BINARY)
 logger.info("\tTCPDUMP_BINARY: %s" % TCPDUMP_BINARY)
 
