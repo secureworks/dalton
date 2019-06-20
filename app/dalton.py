@@ -34,13 +34,13 @@ import bz2
 import sys
 import shutil
 from distutils.version import LooseVersion
-import ConfigParser
+import configparser
 import logging
 from logging.handlers import RotatingFileHandler
 import subprocess
 from ruamel import yaml
 import base64
-import  cStringIO
+#import  cStringIO
 import traceback
 import subprocess
 import random
@@ -61,7 +61,7 @@ logger.info("Logging started")
 
 try:
     dalton_config_filename = 'dalton.conf'
-    dalton_config = ConfigParser.SafeConfigParser()
+    dalton_config = configparser.SafeConfigParser()
     dalton_config.read(dalton_config_filename)
     # user-configurable variables; see comments in dalton.conf for details.
     TEMP_STORAGE_PATH = dalton_config.get('dalton', 'temp_path')
@@ -496,7 +496,7 @@ def get_engine_conf_file(sensor):
         results = {'conf': engine_config, 'variables': variables}
         return json.dumps(results)
 
-    except Exception, e:
+    except Exception as e:
         logger.error("Problem getting configuration file for sensor '%s'.  Error: %s\n%s" % (sensor, e, traceback.format_exc()))
         engine_config = "# Exception getting configuration file for sensor '%s'." % sensor
         variables = engine_config
@@ -534,7 +534,7 @@ def sensor_request_job(sensor_tech):
     SENSOR_UID = 'unknown'
     try:
         SENSOR_UID = request.args['SENSOR_UID']
-    except Exception, e:
+    except Exception as e:
         SENSOR_UID = 'unknown'
 
     SENSOR_IP = request.remote_addr
@@ -542,7 +542,7 @@ def sensor_request_job(sensor_tech):
     AGENT_VERSION = 'unknown'
     try:
         AGENT_VERSION = request.args['AGENT_VERSION']
-    except Exception, e:
+    except Exception as e:
         AGENT_VERSION = 'unknown'
 
     # update check-in data; use md5 hash of SENSOR_UID.SENSOR_IP
@@ -627,7 +627,7 @@ def post_job_results(jobid):
     SENSOR_UID = 'unknown'
     try:
         SENSOR_UID = request.args['SENSOR_UID']
-    except Exception, e:
+    except Exception as e:
         SENSOR_UID = 'unknown'
     hash = hashlib.md5()
     hash.update(SENSOR_UID)
@@ -877,7 +877,7 @@ def page_coverage_default(sensor_tech, error=None):
                 if tech.startswith(sensor_tech):
                     if tech not in sensors:
                         sensors.append(tech)
-            except Exception, e:
+            except Exception as e:
                 return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
         try:
             # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
@@ -940,7 +940,7 @@ def page_show_job(jid):
             # this gets passed as json with log description as key and log contents as value
             # attempt to load it as json before we pass it to job.html
             other_logs = json.loads(r.get("%s-other_logs" % jid))
-        except Exception, e:
+        except Exception as e:
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
             #logger.error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
@@ -949,7 +949,7 @@ def page_show_job(jid):
         custom_rules = False
         try:
             debug = r.get("%s-debug" % jid)
-        except Exception, e:
+        except Exception as e:
             debug = ''
         overview = {}
         if (alert != None):
@@ -1456,8 +1456,8 @@ def page_coverage_summary():
                     config['outputs'] = []
 
                 # apparently with this version of ruamel.yaml and the round trip load, outputs isn't
-                #  and ordered dict but a list...
-                olist =[config['outputs'][i].keys()[0] for i in range(0, len(config['outputs']))]
+                #  an ordered dict but a list...
+                olist =[list(config['outputs'][i].keys())[0] for i in range(0, len(config['outputs']))]
 
                 # fast.log
                 fast_config = {'fast': {'enabled': True, \
@@ -1560,7 +1560,7 @@ def page_coverage_summary():
                         # stuff we want disabled will still get disabled despite the exceptions along the way.
                         for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
                             try:
-                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'alert':
+                                if list(config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys())[0] == 'alert':
                                     # apparently this is supported -- http://suricata.readthedocs.io/en/latest/output/eve/eve-json-output.html
                                     config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
                                     logger.debug("Removed outputs->eve-log->types->alert->tls")
@@ -1571,7 +1571,7 @@ def page_coverage_summary():
 
                         for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
                             try:
-                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
+                                if list(config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys())[0] == 'tls':
                                     del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
                                     logger.debug("Removed outputs->eve-log->types->tls")
                                     break
