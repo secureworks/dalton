@@ -107,7 +107,9 @@ else:
 
 #connect to the datastore
 try:
-    r = redis.Redis(REDIS_HOST)
+    # redis values are retured as byte objects by default. Automatically
+    # decode them to utf-8.
+    r = redis.Redis(REDIS_HOST, charset="utf-8", decode_responses=True)
 except Exception as e:
     logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
 
@@ -550,16 +552,16 @@ def sensor_request_job(sensor_tech):
     # when it has not checked in in <x> amount of time (expire time configurable via
     # 'agent_purge_time' parameter in dalton.conf).
     hash = hashlib.md5()
-    hash.update(SENSOR_UID)
-    hash.update(SENSOR_IP)
+    hash.update(SENSOR_UID.encode('utf-8'))
+    hash.update(SENSOR_IP.encode('utf-8'))
     SENSOR_HASH = hash.hexdigest()
     r.sadd("sensors", SENSOR_HASH)
-    r.set("%s-uid" % SENSOR_HASH, SENSOR_UID)
-    r.set("%s-ip" % SENSOR_HASH, SENSOR_IP)
-    r.set("%s-time" % SENSOR_HASH, datetime.datetime.now().strftime("%b %d %H:%M:%S"))
-    r.set("%s-epoch" % SENSOR_HASH, int(time.mktime(time.localtime())))
-    r.set("%s-tech" % SENSOR_HASH, sensor_tech)
-    r.set("%s-agent_version" % SENSOR_HASH, AGENT_VERSION)
+    r.set(f"{SENSOR_HASH}-uid", SENSOR_UID)
+    r.set(f"{SENSOR_HASH}-ip", SENSOR_IP)
+    r.set(f"{SENSOR_HASH}-time", datetime.datetime.now().strftime("%b %d %H:%M:%S"))
+    r.set(f"{SENSOR_HASH}-epoch", int(time.mktime(time.localtime())))
+    r.set(f"{SENSOR_HASH}-tech", sensor_tech)
+    r.set(f"{SENSOR_HASH}-agent_version", AGENT_VERSION)
 
     #grab a job! If it dosen't exist, return sleep.
     response = r.lpop(sensor_tech)
@@ -630,13 +632,13 @@ def post_job_results(jobid):
     except Exception as e:
         SENSOR_UID = 'unknown'
     hash = hashlib.md5()
-    hash.update(SENSOR_UID)
-    hash.update(SENSOR_IP)
+    hash.update(SENSOR_UID.encode('utf-8'))
+    hash.update(SENSOR_IP.encode('utf-8'))
     SENSOR_HASH = hash.hexdigest()
-    r.set("%s-current_job" % SENSOR_HASH, None)
-    r.expire("%s-current_job" % SENSOR_HASH, REDIS_EXPIRE)
+    r.set(f"{SENSOR_HASH}-current_job", None)
+    r.expire(f"{SENSOR_HASH}-current_job", REDIS_EXPIRE)
 
-    logger.info("Dalton Agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
+    logger.info("Dalton Agent %s submitted results for job %s. Result: %s", SENSOR_UID, jobid, result_obj['status'])
 
     #save results to db
     if 'ids' in result_obj:
@@ -776,15 +778,21 @@ def clear_old_agents():
     global r, AGENT_PURGE_TIME
     if r.exists('sensors'):
         for sensor in r.smembers('sensors'):
-            minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
+            try:
+                minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get(f"{sensor}-epoch"))) / 60))
+#                minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
+#                minutes_ago = AGENT_PURGE_TIME
+            except Exception as e:
+                logger.error("Error in clear_old_agents(): %s", e)
+                # screwed something up, perhaps with Python3 strings...
             if minutes_ago >= AGENT_PURGE_TIME:
                 # delete old agents
-                r.delete("%s-uid" % sensor)
-                r.delete("%s-ip" % sensor)
-                r.delete("%s-time" % sensor)
-                r.delete("%s-epoch" % sensor)
-                r.delete("%s-tech" % sensor)
-                r.delete("%s-agent_version" % sensor)
+                r.delete(f"{sensor}-uid")
+                r.delete(f"{sensor}-ip")
+                r.delete(f"{sensor}-time")
+                r.delete(f"{sensor}-epoch")
+                r.delete(f"{sensor}-tech")
+                r.delete(f"{sensor}-agent_version")
                 r.srem("sensors", sensor)
 
 
@@ -798,13 +806,14 @@ def page_sensor_default(return_dict = False):
     clear_old_agents()
     if r.exists('sensors'):
         for sensor in r.smembers('sensors'):
-            minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
+            # looks like redis keys are byte
+            minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get(f"{sensor}-epoch"))) / 60))
             sensors[sensor] = {}
-            sensors[sensor]['uid'] = "%s" % r.get("%s-uid" % sensor)
-            sensors[sensor]['ip'] = "%s" % r.get("%s-ip" % sensor)
-            sensors[sensor]['time'] = "%s (%d minutes ago)" % (r.get("%s-time" % sensor), minutes_ago)
-            sensors[sensor]['tech'] = "%s" % r.get("%s-tech" % sensor)
-            sensors[sensor]['agent_version'] = "%s" % r.get("%s-agent_version" % sensor)
+            sensors[sensor]['uid'] = r.get(f"{sensor}-uid")
+            sensors[sensor]['ip'] = r.get(f"{sensor}-ip")
+            sensors[sensor]['time'] = "{} ({} minutes ago)".format(r.get(f"{sensor}-time"), minutes_ago)
+            sensors[sensor]['tech'] = "{}".format(r.get(f"{sensor}-tech"))
+            sensors[sensor]['agent_version'] = "{}".format(r.get(f"{sensor}-agent_version"))
     if return_dict:
         return sensors
     else:
@@ -1138,8 +1147,8 @@ def page_coverage_summary():
     user = "undefined"
 
     #generate job_id based of pcap filenames and timestamp
-    digest.update(str(datetime.datetime.now()))
-    digest.update(str(random.randrange(96313375)))
+    digest.update(str(datetime.datetime.now()).encode('utf-8'))
+    digest.update(str(random.randrange(96313375)).encode('utf-8'))
     job_id = digest.hexdigest()[0:16]   #this is a temporary job id for the filename
 
     #store the pcaps offline temporarily
@@ -1686,8 +1695,8 @@ def page_coverage_summary():
 
         # create jid (job identifier) value
         digest = hashlib.md5()
-        digest.update(job_id)
-        digest.update(sensor_tech)
+        digest.update(job_id.encode('utf-8'))
+        digest.update(sensor_tech.encode('utf-8'))
         jid = digest.hexdigest()[0:16]
 
         #Create the job zipfile. This will contain the file 'manifest.json', which is also queued.
