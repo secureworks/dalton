@@ -143,7 +143,9 @@ def fs_replace_badchars(payload):
 
 def unicode_safe(string):
     """return an ascii repr of the string"""
-    return string.encode('ascii', 'ignore')
+    # Jun 21, 2019 - DRW - I'm not sure the reason for this
+    # or if it is still necessary in Python3....
+    return string.encode('ascii', 'ignore').decode('ascii')
 
 
 @flowsynth_blueprint.route('/index.html', methods=['GET', 'POST'])
@@ -231,7 +233,7 @@ def compile_fs():
     #write flowsynth data to file
     fs_code = str(request.form.get('code'))
     hashobj = hashlib.md5()
-    hashobj.update("%s%s" % (fs_code, random.randint(1,10000)))
+    hashobj.update(f"{fs_code}{random.randint(1,10000)}".encode('utf-8'))
     fname = hashobj.hexdigest()[0:15]
     output_url = "get_pcap/%s" % (fname)
     inpath = tempfile.mkstemp()[1]
