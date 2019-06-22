@@ -425,7 +425,7 @@ def get_engine_conf_file(sensor):
             # open, read, return
             # Unix newline is \n but for display on web page, \r\n is desired in some
             #  browsers/OSes.  Note: currently not converted back on job submit.
-            fh = open(conf_file, 'rb')
+            fh = open(conf_file, 'r')
             if engine.lower().startswith('suri'):
                 # need the read() method to load the yaml
                 contents = fh.read()
@@ -760,18 +760,18 @@ def sensor_get_job(id):
     # user or agent requesting a job zip file
     global JOB_STORAGE_PATH
     # get the user (for logging)
-    logger.debug("Dalton in sensor_get_job(): request for job zip file %s" % (id))
+    logger.debug("Dalton in sensor_get_job(): request for job zip file %s", id)
     if not validate_jobid(id):
-        logger.error("Bad jobid given: '%s'. Possible hacking attempt." % id)
-        return render_template('/dalton/error.html', jid=id, msg=["Bad jobid, invalid characters in: '%s'" % (id)])
-    path = "%s/%s.zip" % (JOB_STORAGE_PATH, id)
+        logger.error("Bad jobid given: '%s'. Possible hacking attempt.", id)
+        return render_template('/dalton/error.html', jid=id, msg=[f"Bad jobid, invalid characters in: '{id}'"])
+    path = f"{JOB_STORAGE_PATH}/{id}.zip"
     if os.path.exists(path):
-        filedata = open(path,'r').read()
-        logger.debug("Dalton in sensor_get_job(): sending job zip file %s" % (id))
-        return Response(filedata,mimetype="application/zip", headers={"Content-Disposition":"attachment;filename=%s.zip" % id})
+        with open(path, 'rb') as fh:
+            logger.debug(f"Dalton in sensor_get_job(): sending job zip file {id}")
+            return Response(fh.read(),mimetype="application/zip", headers={"Content-Disposition":f"attachment;filename={id}.zip"})
     else:
-        logger.error("Dalton in sensor_get_job(): could not find job %s at %s." % (id, path))
-        return render_template('/dalton/error.html', jid=id, msg=["Job %s does not exist on disk.  It is either invalid or has been deleted." % id])
+        logger.error(f"Dalton in sensor_get_job(): could not find job {id} at {path}.")
+        return render_template('/dalton/error.html', jid=id, msg=[f"Job {id} does not exist on disk.  It is either invalid or has been deleted."])
 
 
 def clear_old_agents():
@@ -780,7 +780,6 @@ def clear_old_agents():
         for sensor in r.smembers('sensors'):
             try:
                 minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get(f"{sensor}-epoch"))) / 60))
-#                minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
 #                minutes_ago = AGENT_PURGE_TIME
             except Exception as e:
                 logger.error("Error in clear_old_agents(): %s", e)
@@ -939,16 +938,16 @@ def page_show_job(jid):
         return render_template('/dalton/coverage-summary.html', page='', job_id=jid, tech=tech)
     else:
         # job exists and is done
-        ids = r.get("%s-ids" % jid)
-        perf = r.get("%s-perf" % jid)
-        alert = r.get("%s-alert" % jid)
-        error = r.get("%s-error" % jid)
-        total_time = r.get("%s-time" % jid)
-        alert_detailed = r.get("%s-alert_detailed" % jid)
+        ids = r.get(f"{jid}-ids")
+        perf = r.get(f"{jid}-perf")
+        alert = r.get(f"{jid}-alert")
+        error = r.get(f"{jid}-error")
+        total_time = r.get(f"{jid}-time")
+        alert_detailed = r.get(f"{jid}-alert_detailed")
         try:
             # this gets passed as json with log description as key and log contents as value
             # attempt to load it as json before we pass it to job.html
-            other_logs = json.loads(r.get("%s-other_logs" % jid))
+            other_logs = json.loads(r.get(f"{jid}-other_logs"))
         except Exception as e:
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
@@ -1332,7 +1331,7 @@ def page_coverage_summary():
             sid_offset = 1
 
             # file we will write the custom rules to
-            fh = open(custom_rules_file, 'wb')
+            fh = open(custom_rules_file, 'w')
             # check for rule errors (very simple right now)
             for line in custom_rules.split('\n'):
                 # strip out trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
@@ -1613,7 +1612,7 @@ def page_coverage_summary():
                                                            'append': True}
                 # write out
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
-                engine_conf_fh = open(engine_conf_file, "wb")
+                engine_conf_fh = open(engine_conf_file, "w")
                 engine_conf_fh.write(yaml.round_trip_dump(config, version=(1,1), explicit_start=True))
                 engine_conf_fh.close()
             except Exception as e:
@@ -1624,7 +1623,7 @@ def page_coverage_summary():
         else:
             engine_conf_file = None
             vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
-            vars_fh = open(vars_file, "wb")
+            vars_fh = open(vars_file, "w")
             if sensor_tech.startswith('snort'):
                 # check variables
                 for line in vars.split('\n'):
@@ -1689,7 +1688,7 @@ def page_coverage_summary():
                 vars_fh.write(vars)
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_engine.conf" % job_id)
             vars_fh.close()
-            engine_conf_fh = open(engine_conf_file, "wb")
+            engine_conf_fh = open(engine_conf_file, "w")
             engine_conf_fh.write(conf_file)
             engine_conf_fh.close()
 
@@ -1735,8 +1734,8 @@ def page_coverage_summary():
                     if bEnableAllRules or bShowFlowbitAlerts:
                         modified_rules_path = "%s/%s_prod_modified.rules" % (TEMP_STORAGE_PATH, job_id)
                         regex = re.compile(r"^#+\s*(alert|log|pass|activate|dynamic|drop|reject|sdrop)\s")
-                        prod_rules_fh = open(ruleset_path, 'rb')
-                        modified_rules_fh = open(modified_rules_path, 'wb')
+                        prod_rules_fh = open(ruleset_path, 'r')
+                        modified_rules_fh = open(modified_rules_path, 'w')
                         for line in prod_rules_fh:
                             # if Enable disabled rules checked, do the needful
                             if bEnableAllRules:
