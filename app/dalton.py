@@ -486,8 +486,17 @@ def get_engine_conf_file(sensor):
                 #  can't be multiple version directives. So just in case, strip it out.
                 if variables.startswith("%YAML 1.1\n---\n"):
                     variables = variables[14:]
-                # dump engine_config
-                engine_config = yaml.round_trip_dump(config, version=(1,1), explicit_start=True)
+                # ***dump engine_config***
+                # because Dalton reads in yaml config and outputs it, the indentation of
+                # comments may not always line up as they were originally, especially if
+                # comments are in nested collections, asvit may not be clear what the desired
+                # indentation level shoule be.  Structurally, the indentation of comments does not
+                # matter but if a valid config line is commented out and then uncommented
+                # by the user, the indentation of that yaml entry may not be correct, causing
+                # the yaml parser to error when reading it, so be aware. Setting indent=4 and
+                # block_seq_indent=2 here, as it may minimize errors when config lines are
+                # carelessly uncommented.
+                engine_config = yaml.round_trip_dump(config, version=(1,1), explicit_start=True, indent=4, block_seq_indent=2)
             else:
                 engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
                 variables = ''
@@ -1459,7 +1468,7 @@ def page_coverage_summary():
 
                 # set outputs
                 if 'outputs' not in config:
-                    logger.warn("No 'outputs' seciton in Suricata YAML. This may be a problem....")
+                    logger.warn("No 'outputs' section in Suricata YAML. This may be a problem....")
                     # going to try to build this from scratch but Suri still may not like it
                     config['outputs'] = []
 
