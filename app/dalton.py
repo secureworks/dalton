@@ -40,7 +40,6 @@ from logging.handlers import RotatingFileHandler
 import subprocess
 from ruamel import yaml
 import base64
-#import  cStringIO
 import traceback
 import subprocess
 import random
@@ -90,6 +89,7 @@ except Exception as e:
 
 if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
     logger.setLevel(logging.DEBUG)
+    DEBUG = True
     logger.debug("DEBUG logging enabled")
 
 if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
@@ -401,6 +401,7 @@ def get_engine_conf_file(sensor):
     """ return the corresponding configuration file for passed in sensor (engine and version) 
         also returns the variables (stripped out from config)
     """
+    # AAAAA TODO: get rid of variables separation
     # user's browser should be making request to dynamically update 'coverage' submission page
     try:
         conf_file = None
@@ -416,7 +417,7 @@ def get_engine_conf_file(sensor):
         if len(files) > 0:
             files.sort(key=lambda v:LooseVersion(prefix_strip(os.path.splitext(v)[0], prefix="rust_")), reverse=True)
             conf_file = os.path.join(epath, files[0])
-        logger.debug("in get_engine_conf_file: passed sensor value: '%s', conf file used: '%s'" % (sensor, os.path.basename(conf_file)))
+        logger.debug("in get_engine_conf_file: passed sensor value: '%s', conf file used: '%s'", sensor, os.path.basename(conf_file))
 
         engine_config = ''
         variables = ''
@@ -425,91 +426,29 @@ def get_engine_conf_file(sensor):
             # open, read, return
             # Unix newline is \n but for display on web page, \r\n is desired in some
             #  browsers/OSes.  Note: currently not converted back on job submit.
-            fh = open(conf_file, 'r')
-            if engine.lower().startswith('suri'):
-                # need the read() method to load the yaml
-                contents = fh.read()
-            else:
+            with open(conf_file, 'r') as fh:
                 # want to parse each line so put it in to a list
                 contents = fh.readlines()
-            fh.close()
-            #  extract out variables
-            if engine.lower().startswith('snort'):
-                ignore_vars = ("RULE_PATH", "SO_RULE_PATH", "PREPROC_RULE_PATH", "WHITE_LIST_PATH", "BLACK_LIST_PATH")
-                lines = iter(contents)
-                while True:
-                    try:
-                        line = next(lines).rstrip('\r\n')
-                        if not (line.startswith("var ") or line.startswith("portvar ") or line.startswith("ipvar ")):
-                            engine_config += "%s\r\n" % line
-                            # comment out (other) rule includes .. actually I don't want to do this here.
-                            #  The engine config file is the place to do this.
-                            #if line.startswith("include ") and line.endswith(".rules"):
-                            #    engine_config += "#%s\r\n" % line
-                            #else:
-                            #    engine_config += "%s\r\n" % line
-                        else:
-                            if line.startswith("var ") and len([x for x in ignore_vars if x in line]) > 0:
-                                engine_config += "%s\r\n" % line
-                            else:
-                                variables += "%s\r\n" % line
-                    except StopIteration:
-                        break
-            elif engine.lower().startswith('suri'):
-                # read in yaml with ruamel python lib, extract out vars
-                # doing it like this adds a little load time but preserves
-                # comments (for the most part). Can't use ruamel >= 0.15.x
-                # b/c it won't preserve the inputted YAML 1.1 on dump (e.g.
-                # quoted sexagesimals, unquoted 'yes', 'no', etc.
-                logger.debug("Loading YAML for %s" % conf_file)
-                # so apparently the default Suri config has what are interpreted
-                #  as (unquoted) booleans and it uses yes/no. But if you change from
-                #  yes/no to true/false, Suri will throw an error when parsing the YAML
-                #  even though true/false are valid boolean valued for YAML 1.1.  ruamel.yaml
-                #  will normalize unquoted booleans to true/false so quoting them here to
-                #  preserve the yes/no.  This also done on submission..
-                contents = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', contents)
-                # suri uses YAML 1.1
-                config = yaml.round_trip_load(contents, version=(1,1), preserve_quotes=True)
-                # usually I try not to mess with the config here since the user should set
-                # desired defaults in the yaml on disk.  But if the logging level is 'notice',
-                # that is next to useless and setting it to 'info' won't hurt anything and will
-                # provide some useful info such as number of rules loaded.
-                if "logging" in config and "default-log-level" in config['logging'] and config['logging']['default-log-level']  == "notice":
-                    config['logging']['default-log-level']  = "info"
+            logger.debug("Loading config file %s", conf_file)
 
-                # pull out vars and dump
-                variables = yaml.round_trip_dump({'vars': config.pop('vars', None)})
-                # (depending on how you do it) the YAML verison gets added back
-                # in when YAML of just vars is dumped.
-                #  This data (variables) is concatenated with the rest of the config and there
-                #  can't be multiple version directives. So just in case, strip it out.
-                if variables.startswith("%YAML 1.1\n---\n"):
-                    variables = variables[14:]
-                # ***dump engine_config***
-                # because Dalton reads in yaml config and outputs it, the indentation of
-                # comments may not always line up as they were originally, especially if
-                # comments are in nested collections, asvit may not be clear what the desired
-                # indentation level shoule be.  Structurally, the indentation of comments does not
-                # matter but if a valid config line is commented out and then uncommented
-                # by the user, the indentation of that yaml entry may not be correct, causing
-                # the yaml parser to error when reading it, so be aware. Setting indent=4 and
-                # block_seq_indent=2 here, as it may minimize errors when config lines are
-                # carelessly uncommented.
-                engine_config = yaml.round_trip_dump(config, version=(1,1), explicit_start=True, indent=4, block_seq_indent=2)
-            else:
-                engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
-                variables = ''
+                # TODO: move to job submission
+                #if "logging" in config and "default-log-level" in config['logging'] and config['logging']['default-log-level']  == "notice":
+                #    config['logging']['default-log-level']  = "info"
+
+            engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
+            variables = '' # TODO: delete this line
         else:
-            logger.warn("No suitable configuration file found for sensor '%s'." % sensor)
-            engine_config = "# No suitable configuration file found for sensor '%s'." % sensor
-            variables = "# No variables in config for sensor '%s'." % sensor
+            logger.warn("No suitable configuration file found for sensor '%s'.", sensor)
+            engine_config = "# No suitable configuration file found for sensor '%s'.", sensor
+            variables = "# No variables in config for sensor '%s'.", sensor #TODO: delete this line
         results = {'conf': engine_config, 'variables': variables}
         return json.dumps(results)
 
     except Exception as e:
-        logger.error("Problem getting configuration file for sensor '%s'.  Error: %s\n%s" % (sensor, e, traceback.format_exc()))
-        engine_config = "# Exception getting configuration file for sensor '%s'." % sensor
+        logger.error("Problem getting configuration file for sensor '%s'.  Error: %s\n%s", sensor, e, traceback.format_exc())
+        engine_config = f"# Exception getting configuration file for sensor '{sensor}'."
+        if DEBUG:
+            engine_config += f"  Error: {e}\r\n{traceback.format_exc()}"
         variables = engine_config
         results = {'conf': engine_config, 'variables': variables}
         return json.dumps(results)
