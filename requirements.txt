@@ -6,5 +6,6 @@ Flask-Compress==1.4.0
 redis==2.10.6
 # have to go with 0.14 b/c 0.15 won't output fully
 #  compatible YAML 1.1 and Suri doesn't like it
-ruamel.yaml==0.14.12
+#ruamel.yaml==0.14.12
+ruamel.yaml==0.15.97
 idstools

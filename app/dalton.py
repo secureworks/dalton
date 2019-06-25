@@ -34,13 +34,13 @@ import bz2
 import sys
 import shutil
 from distutils.version import LooseVersion
-import ConfigParser
+import configparser
 import logging
 from logging.handlers import RotatingFileHandler
 import subprocess
 from ruamel import yaml
 import base64
-import  cStringIO
+#import  cStringIO
 import traceback
 import subprocess
 import random
@@ -61,7 +61,7 @@ logger.info("Logging started")
 
 try:
     dalton_config_filename = 'dalton.conf'
-    dalton_config = ConfigParser.SafeConfigParser()
+    dalton_config = configparser.SafeConfigParser()
     dalton_config.read(dalton_config_filename)
     # user-configurable variables; see comments in dalton.conf for details.
     TEMP_STORAGE_PATH = dalton_config.get('dalton', 'temp_path')
@@ -107,7 +107,9 @@ else:
 
 #connect to the datastore
 try:
-    r = redis.Redis(REDIS_HOST)
+    # redis values are retured as byte objects by default. Automatically
+    # decode them to utf-8.
+    r = redis.Redis(REDIS_HOST, charset="utf-8", decode_responses=True)
 except Exception as e:
     logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
 
@@ -423,7 +425,7 @@ def get_engine_conf_file(sensor):
             # open, read, return
             # Unix newline is \n but for display on web page, \r\n is desired in some
             #  browsers/OSes.  Note: currently not converted back on job submit.
-            fh = open(conf_file, 'rb')
+            fh = open(conf_file, 'r')
             if engine.lower().startswith('suri'):
                 # need the read() method to load the yaml
                 contents = fh.read()
@@ -484,8 +486,17 @@ def get_engine_conf_file(sensor):
                 #  can't be multiple version directives. So just in case, strip it out.
                 if variables.startswith("%YAML 1.1\n---\n"):
                     variables = variables[14:]
-                # dump engine_config
-                engine_config = yaml.round_trip_dump(config, version=(1,1), explicit_start=True)
+                # ***dump engine_config***
+                # because Dalton reads in yaml config and outputs it, the indentation of
+                # comments may not always line up as they were originally, especially if
+                # comments are in nested collections, asvit may not be clear what the desired
+                # indentation level shoule be.  Structurally, the indentation of comments does not
+                # matter but if a valid config line is commented out and then uncommented
+                # by the user, the indentation of that yaml entry may not be correct, causing
+                # the yaml parser to error when reading it, so be aware. Setting indent=4 and
+                # block_seq_indent=2 here, as it may minimize errors when config lines are
+                # carelessly uncommented.
+                engine_config = yaml.round_trip_dump(config, version=(1,1), explicit_start=True, indent=4, block_seq_indent=2)
             else:
                 engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
                 variables = ''
@@ -496,7 +507,7 @@ def get_engine_conf_file(sensor):
         results = {'conf': engine_config, 'variables': variables}
         return json.dumps(results)
 
-    except Exception, e:
+    except Exception as e:
         logger.error("Problem getting configuration file for sensor '%s'.  Error: %s\n%s" % (sensor, e, traceback.format_exc()))
         engine_config = "# Exception getting configuration file for sensor '%s'." % sensor
         variables = engine_config
@@ -534,7 +545,7 @@ def sensor_request_job(sensor_tech):
     SENSOR_UID = 'unknown'
     try:
         SENSOR_UID = request.args['SENSOR_UID']
-    except Exception, e:
+    except Exception as e:
         SENSOR_UID = 'unknown'
 
     SENSOR_IP = request.remote_addr
@@ -542,7 +553,7 @@ def sensor_request_job(sensor_tech):
     AGENT_VERSION = 'unknown'
     try:
         AGENT_VERSION = request.args['AGENT_VERSION']
-    except Exception, e:
+    except Exception as e:
         AGENT_VERSION = 'unknown'
 
     # update check-in data; use md5 hash of SENSOR_UID.SENSOR_IP
@@ -550,16 +561,16 @@ def sensor_request_job(sensor_tech):
     # when it has not checked in in <x> amount of time (expire time configurable via
     # 'agent_purge_time' parameter in dalton.conf).
     hash = hashlib.md5()
-    hash.update(SENSOR_UID)
-    hash.update(SENSOR_IP)
+    hash.update(SENSOR_UID.encode('utf-8'))
+    hash.update(SENSOR_IP.encode('utf-8'))
     SENSOR_HASH = hash.hexdigest()
     r.sadd("sensors", SENSOR_HASH)
-    r.set("%s-uid" % SENSOR_HASH, SENSOR_UID)
-    r.set("%s-ip" % SENSOR_HASH, SENSOR_IP)
-    r.set("%s-time" % SENSOR_HASH, datetime.datetime.now().strftime("%b %d %H:%M:%S"))
-    r.set("%s-epoch" % SENSOR_HASH, int(time.mktime(time.localtime())))
-    r.set("%s-tech" % SENSOR_HASH, sensor_tech)
-    r.set("%s-agent_version" % SENSOR_HASH, AGENT_VERSION)
+    r.set(f"{SENSOR_HASH}-uid", SENSOR_UID)
+    r.set(f"{SENSOR_HASH}-ip", SENSOR_IP)
+    r.set(f"{SENSOR_HASH}-time", datetime.datetime.now().strftime("%b %d %H:%M:%S"))
+    r.set(f"{SENSOR_HASH}-epoch", int(time.mktime(time.localtime())))
+    r.set(f"{SENSOR_HASH}-tech", sensor_tech)
+    r.set(f"{SENSOR_HASH}-agent_version", AGENT_VERSION)
 
     #grab a job! If it dosen't exist, return sleep.
     response = r.lpop(sensor_tech)
@@ -627,16 +638,16 @@ def post_job_results(jobid):
     SENSOR_UID = 'unknown'
     try:
         SENSOR_UID = request.args['SENSOR_UID']
-    except Exception, e:
+    except Exception as e:
         SENSOR_UID = 'unknown'
     hash = hashlib.md5()
-    hash.update(SENSOR_UID)
-    hash.update(SENSOR_IP)
+    hash.update(SENSOR_UID.encode('utf-8'))
+    hash.update(SENSOR_IP.encode('utf-8'))
     SENSOR_HASH = hash.hexdigest()
-    r.set("%s-current_job" % SENSOR_HASH, None)
-    r.expire("%s-current_job" % SENSOR_HASH, REDIS_EXPIRE)
+    r.set(f"{SENSOR_HASH}-current_job", None)
+    r.expire(f"{SENSOR_HASH}-current_job", REDIS_EXPIRE)
 
-    logger.info("Dalton Agent %s submitted results for job %s. Result: %s" % (SENSOR_UID, jobid, result_obj['status']))
+    logger.info("Dalton Agent %s submitted results for job %s. Result: %s", SENSOR_UID, jobid, result_obj['status'])
 
     #save results to db
     if 'ids' in result_obj:
@@ -758,33 +769,38 @@ def sensor_get_job(id):
     # user or agent requesting a job zip file
     global JOB_STORAGE_PATH
     # get the user (for logging)
-    logger.debug("Dalton in sensor_get_job(): request for job zip file %s" % (id))
+    logger.debug("Dalton in sensor_get_job(): request for job zip file %s", id)
     if not validate_jobid(id):
-        logger.error("Bad jobid given: '%s'. Possible hacking attempt." % id)
-        return render_template('/dalton/error.html', jid=id, msg=["Bad jobid, invalid characters in: '%s'" % (id)])
-    path = "%s/%s.zip" % (JOB_STORAGE_PATH, id)
+        logger.error("Bad jobid given: '%s'. Possible hacking attempt.", id)
+        return render_template('/dalton/error.html', jid=id, msg=[f"Bad jobid, invalid characters in: '{id}'"])
+    path = f"{JOB_STORAGE_PATH}/{id}.zip"
     if os.path.exists(path):
-        filedata = open(path,'r').read()
-        logger.debug("Dalton in sensor_get_job(): sending job zip file %s" % (id))
-        return Response(filedata,mimetype="application/zip", headers={"Content-Disposition":"attachment;filename=%s.zip" % id})
+        with open(path, 'rb') as fh:
+            logger.debug(f"Dalton in sensor_get_job(): sending job zip file {id}")
+            return Response(fh.read(),mimetype="application/zip", headers={"Content-Disposition":f"attachment;filename={id}.zip"})
     else:
-        logger.error("Dalton in sensor_get_job(): could not find job %s at %s." % (id, path))
-        return render_template('/dalton/error.html', jid=id, msg=["Job %s does not exist on disk.  It is either invalid or has been deleted." % id])
+        logger.error(f"Dalton in sensor_get_job(): could not find job {id} at {path}.")
+        return render_template('/dalton/error.html', jid=id, msg=[f"Job {id} does not exist on disk.  It is either invalid or has been deleted."])
 
 
 def clear_old_agents():
     global r, AGENT_PURGE_TIME
     if r.exists('sensors'):
         for sensor in r.smembers('sensors'):
-            minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
+            try:
+                minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get(f"{sensor}-epoch"))) / 60))
+#                minutes_ago = AGENT_PURGE_TIME
+            except Exception as e:
+                logger.error("Error in clear_old_agents(): %s", e)
+                # screwed something up, perhaps with Python3 strings...
             if minutes_ago >= AGENT_PURGE_TIME:
                 # delete old agents
-                r.delete("%s-uid" % sensor)
-                r.delete("%s-ip" % sensor)
-                r.delete("%s-time" % sensor)
-                r.delete("%s-epoch" % sensor)
-                r.delete("%s-tech" % sensor)
-                r.delete("%s-agent_version" % sensor)
+                r.delete(f"{sensor}-uid")
+                r.delete(f"{sensor}-ip")
+                r.delete(f"{sensor}-time")
+                r.delete(f"{sensor}-epoch")
+                r.delete(f"{sensor}-tech")
+                r.delete(f"{sensor}-agent_version")
                 r.srem("sensors", sensor)
 
 
@@ -798,13 +814,14 @@ def page_sensor_default(return_dict = False):
     clear_old_agents()
     if r.exists('sensors'):
         for sensor in r.smembers('sensors'):
-            minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get("%s-epoch" % sensor))) / 60))
+            # looks like redis keys are byte
+            minutes_ago = int(round((int(time.mktime(time.localtime())) - int(r.get(f"{sensor}-epoch"))) / 60))
             sensors[sensor] = {}
-            sensors[sensor]['uid'] = "%s" % r.get("%s-uid" % sensor)
-            sensors[sensor]['ip'] = "%s" % r.get("%s-ip" % sensor)
-            sensors[sensor]['time'] = "%s (%d minutes ago)" % (r.get("%s-time" % sensor), minutes_ago)
-            sensors[sensor]['tech'] = "%s" % r.get("%s-tech" % sensor)
-            sensors[sensor]['agent_version'] = "%s" % r.get("%s-agent_version" % sensor)
+            sensors[sensor]['uid'] = r.get(f"{sensor}-uid")
+            sensors[sensor]['ip'] = r.get(f"{sensor}-ip")
+            sensors[sensor]['time'] = "{} ({} minutes ago)".format(r.get(f"{sensor}-time"), minutes_ago)
+            sensors[sensor]['tech'] = "{}".format(r.get(f"{sensor}-tech"))
+            sensors[sensor]['agent_version'] = "{}".format(r.get(f"{sensor}-agent_version"))
     if return_dict:
         return sensors
     else:
@@ -877,7 +894,7 @@ def page_coverage_default(sensor_tech, error=None):
                 if tech.startswith(sensor_tech):
                     if tech not in sensors:
                         sensors.append(tech)
-            except Exception, e:
+            except Exception as e:
                 return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
         try:
             # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
@@ -930,17 +947,17 @@ def page_show_job(jid):
         return render_template('/dalton/coverage-summary.html', page='', job_id=jid, tech=tech)
     else:
         # job exists and is done
-        ids = r.get("%s-ids" % jid)
-        perf = r.get("%s-perf" % jid)
-        alert = r.get("%s-alert" % jid)
-        error = r.get("%s-error" % jid)
-        total_time = r.get("%s-time" % jid)
-        alert_detailed = r.get("%s-alert_detailed" % jid)
+        ids = r.get(f"{jid}-ids")
+        perf = r.get(f"{jid}-perf")
+        alert = r.get(f"{jid}-alert")
+        error = r.get(f"{jid}-error")
+        total_time = r.get(f"{jid}-time")
+        alert_detailed = r.get(f"{jid}-alert_detailed")
         try:
             # this gets passed as json with log description as key and log contents as value
             # attempt to load it as json before we pass it to job.html
-            other_logs = json.loads(r.get("%s-other_logs" % jid))
-        except Exception, e:
+            other_logs = json.loads(r.get(f"{jid}-other_logs"))
+        except Exception as e:
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
             #logger.error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
@@ -949,7 +966,7 @@ def page_show_job(jid):
         custom_rules = False
         try:
             debug = r.get("%s-debug" % jid)
-        except Exception, e:
+        except Exception as e:
             debug = ''
         overview = {}
         if (alert != None):
@@ -1138,8 +1155,8 @@ def page_coverage_summary():
     user = "undefined"
 
     #generate job_id based of pcap filenames and timestamp
-    digest.update(str(datetime.datetime.now()))
-    digest.update(str(random.randrange(96313375)))
+    digest.update(str(datetime.datetime.now()).encode('utf-8'))
+    digest.update(str(random.randrange(96313375)).encode('utf-8'))
     job_id = digest.hexdigest()[0:16]   #this is a temporary job id for the filename
 
     #store the pcaps offline temporarily
@@ -1323,7 +1340,7 @@ def page_coverage_summary():
             sid_offset = 1
 
             # file we will write the custom rules to
-            fh = open(custom_rules_file, 'wb')
+            fh = open(custom_rules_file, 'w')
             # check for rule errors (very simple right now)
             for line in custom_rules.split('\n'):
                 # strip out trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
@@ -1451,13 +1468,13 @@ def page_coverage_summary():
 
                 # set outputs
                 if 'outputs' not in config:
-                    logger.warn("No 'outputs' seciton in Suricata YAML. This may be a problem....")
+                    logger.warn("No 'outputs' section in Suricata YAML. This may be a problem....")
                     # going to try to build this from scratch but Suri still may not like it
                     config['outputs'] = []
 
                 # apparently with this version of ruamel.yaml and the round trip load, outputs isn't
-                #  and ordered dict but a list...
-                olist =[config['outputs'][i].keys()[0] for i in range(0, len(config['outputs']))]
+                #  an ordered dict but a list...
+                olist =[list(config['outputs'][i].keys())[0] for i in range(0, len(config['outputs']))]
 
                 # fast.log
                 fast_config = {'fast': {'enabled': True, \
@@ -1560,7 +1577,7 @@ def page_coverage_summary():
                         # stuff we want disabled will still get disabled despite the exceptions along the way.
                         for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
                             try:
-                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'alert':
+                                if list(config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys())[0] == 'alert':
                                     # apparently this is supported -- http://suricata.readthedocs.io/en/latest/output/eve/eve-json-output.html
                                     config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
                                     logger.debug("Removed outputs->eve-log->types->alert->tls")
@@ -1571,7 +1588,7 @@ def page_coverage_summary():
 
                         for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
                             try:
-                                if config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys()[0] == 'tls':
+                                if list(config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys())[0] == 'tls':
                                     del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
                                     logger.debug("Removed outputs->eve-log->types->tls")
                                     break
@@ -1604,7 +1621,7 @@ def page_coverage_summary():
                                                            'append': True}
                 # write out
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
-                engine_conf_fh = open(engine_conf_file, "wb")
+                engine_conf_fh = open(engine_conf_file, "w")
                 engine_conf_fh.write(yaml.round_trip_dump(config, version=(1,1), explicit_start=True))
                 engine_conf_fh.close()
             except Exception as e:
@@ -1615,7 +1632,7 @@ def page_coverage_summary():
         else:
             engine_conf_file = None
             vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
-            vars_fh = open(vars_file, "wb")
+            vars_fh = open(vars_file, "w")
             if sensor_tech.startswith('snort'):
                 # check variables
                 for line in vars.split('\n'):
@@ -1680,14 +1697,14 @@ def page_coverage_summary():
                 vars_fh.write(vars)
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_engine.conf" % job_id)
             vars_fh.close()
-            engine_conf_fh = open(engine_conf_file, "wb")
+            engine_conf_fh = open(engine_conf_file, "w")
             engine_conf_fh.write(conf_file)
             engine_conf_fh.close()
 
         # create jid (job identifier) value
         digest = hashlib.md5()
-        digest.update(job_id)
-        digest.update(sensor_tech)
+        digest.update(job_id.encode('utf-8'))
+        digest.update(sensor_tech.encode('utf-8'))
         jid = digest.hexdigest()[0:16]
 
         #Create the job zipfile. This will contain the file 'manifest.json', which is also queued.
@@ -1726,8 +1743,8 @@ def page_coverage_summary():
                     if bEnableAllRules or bShowFlowbitAlerts:
                         modified_rules_path = "%s/%s_prod_modified.rules" % (TEMP_STORAGE_PATH, job_id)
                         regex = re.compile(r"^#+\s*(alert|log|pass|activate|dynamic|drop|reject|sdrop)\s")
-                        prod_rules_fh = open(ruleset_path, 'rb')
-                        modified_rules_fh = open(modified_rules_path, 'wb')
+                        prod_rules_fh = open(ruleset_path, 'r')
+                        modified_rules_fh = open(modified_rules_path, 'w')
                         for line in prod_rules_fh:
                             # if Enable disabled rules checked, do the needful
                             if bEnableAllRules:

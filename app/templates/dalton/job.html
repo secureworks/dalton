@@ -22,9 +22,9 @@
 	        	{% endif %}
 	        	&nbsp;&nbsp;&nbsp;
 	        	{% if overview.alert_count > 0 %}
-	        		Alerts: <span class='badge badge-success'>{{overview.alert_count}}</span>
+	        		Alerts: <span class='badge badge-success'>{{overview.alert_count | int}}</span>
 	        	{% else %}
-	        		Alerts: <span class='badge badge-info'>{{overview.alert_count}}</span>
+	        		Alerts: <span class='badge badge-info'>{{overview.alert_count | int}}</span>
 	        	{% endif %}
 			&nbsp;&nbsp;&nbsp;
 			Processing Time:
