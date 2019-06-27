@@ -62,9 +62,7 @@ try:
     dalton_config_filename = 'dalton.conf'
     dalton_config = configparser.SafeConfigParser()
     dalton_config.read(dalton_config_filename)
-    # user-configurable variables; see comments in dalton.conf for details.
     TEMP_STORAGE_PATH = dalton_config.get('dalton', 'temp_path')
-    VARIABLES_STORAGE_PATH = dalton_config.get('dalton', 'var_path')
     RULESET_STORAGE_PATH = dalton_config.get('dalton', 'ruleset_path')
     JOB_STORAGE_PATH = dalton_config.get('dalton', 'job_path')
     CONF_STORAGE_PATH = dalton_config.get('dalton', 'engine_conf_path')
@@ -393,16 +391,15 @@ def page_index():
 def api_get_engine_conf_file(sensor):
     global supported_engines
     if sensor is None:
-        return Response("Invalid 'sensor' supplied.", 
+        return Response("Invalid 'sensor' supplied.",
                         status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
-    return Response(json.dumps(get_engine_conf_file(sensor)), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
+    return Response(get_engine_conf_file(sensor), status=200, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
 
 def get_engine_conf_file(sensor):
-    """ return the corresponding configuration file for passed in sensor (engine and version) 
-        also returns the variables (stripped out from config)
+    """ return the corresponding configuration file for passed in sensor (engine and version)
     """
-    # AAAAA TODO: get rid of variables separation
-    # user's browser should be making request to dynamically update 'coverage' submission page
+    # User's browser should be making request to dynamically update 'coverage' submission page
+    # Also called by API handler
     try:
         conf_file = None
         vars_file = None
@@ -417,10 +414,9 @@ def get_engine_conf_file(sensor):
         if len(files) > 0:
             files.sort(key=lambda v:LooseVersion(prefix_strip(os.path.splitext(v)[0], prefix="rust_")), reverse=True)
             conf_file = os.path.join(epath, files[0])
-        logger.debug("in get_engine_conf_file: passed sensor value: '%s', conf file used: '%s'", sensor, os.path.basename(conf_file))
+        logger.debug("in get_engine_conf_file(): passed sensor value: '%s', conf file used: '%s'", sensor, os.path.basename(conf_file))
 
         engine_config = ''
-        variables = ''
 
         if conf_file:
             # open, read, return
@@ -431,27 +427,18 @@ def get_engine_conf_file(sensor):
                 contents = fh.readlines()
             logger.debug("Loading config file %s", conf_file)
 
-                # TODO: move to job submission
-                #if "logging" in config and "default-log-level" in config['logging'] and config['logging']['default-log-level']  == "notice":
-                #    config['logging']['default-log-level']  = "info"
-
             engine_config = '\r\n'.join([x.rstrip('\r\n') for x in contents])
-            variables = '' # TODO: delete this line
         else:
             logger.warn("No suitable configuration file found for sensor '%s'.", sensor)
-            engine_config = "# No suitable configuration file found for sensor '%s'.", sensor
-            variables = "# No variables in config for sensor '%s'.", sensor #TODO: delete this line
-        results = {'conf': engine_config, 'variables': variables}
-        return json.dumps(results)
+            engine_config = f"# No suitable configuration file found for sensor '{sensor}'."
+        return engine_config
 
     except Exception as e:
         logger.error("Problem getting configuration file for sensor '%s'.  Error: %s\n%s", sensor, e, traceback.format_exc())
         engine_config = f"# Exception getting configuration file for sensor '{sensor}'."
         if DEBUG:
             engine_config += f"  Error: {e}\r\n{traceback.format_exc()}"
-        variables = engine_config
-        results = {'conf': engine_config, 'variables': variables}
-        return json.dumps(results)
+        return engine_config
 
 @dalton_blueprint.route('/dalton/sensor_api/update/', methods=['POST'])
 #@auth_required('write')
@@ -798,16 +785,16 @@ def page_coverage_default(sensor_tech, error=None):
     global r
     ruleset_dirs = []
     sensor_tech = sensor_tech.split('-')[0]
-    conf_dir = "%s/%s" % (CONF_STORAGE_PATH, sensor_tech)
+    conf_dir = f"{CONF_STORAGE_PATH}/{sensor_tech}"
     if sensor_tech is None:
         return render_template('/dalton/error.html', jid='', msg=["No Sensor technology selected for job."])
     elif not re.match(r"^[a-zA-Z0-9\_\-\.]+$", sensor_tech):
-        return render_template('/dalton/error.html', jid='', msg=["Invalid Sensor technology requested: %s" % sensor_tech])
+        return render_template('/dalton/error.html', jid='', msg=[f"Invalid Sensor technology requested: {sensor_tech}"])
     elif sensor_tech == 'summary':
         return render_template('/dalton/error.html', jid='', msg=["Page expired.  Please resubmit your job or access it from the queue."])
 
     if not os.path.isdir(conf_dir):
-        return render_template('/dalton/error.html', jid='', msg=["No engine configuration directory for '%s' found (%s)." % (sensor_tech, conf_dir)])
+        return render_template('/dalton/error.html', jid='', msg=[f"No engine configuration directory for '{sensor_tech}' found ({conf_dir})."])
 
     # pcap filename passed in from Flowsynth
     fspcap = None
@@ -815,7 +802,7 @@ def page_coverage_default(sensor_tech, error=None):
         fspcap = request.args['fspcap']
         err_msg = verify_fs_pcap(fspcap)
         if err_msg != None:
-            return render_template('/dalton/error.html', jid='', msg=["%s" % (err_msg)])
+            return render_template('/dalton/error.html', jid='', msg=[f"{err_msg}"])
     except:
         fspcap = None
 
@@ -852,22 +839,17 @@ def page_coverage_default(sensor_tech, error=None):
     # return the engine.conf from the first sensor in the list which is sorted (see above)
     # and should be the most recent sensor version (depends on lexical sort done above). It
     # is also the sensor version that is checked by default on the job submission page.
-    # this also handles populating ip/port variables
     if len(sensors) > 0:
         try:
-            configs = json.loads(get_engine_conf_file(sensors[0]))
-            #logger.debug("CONfigs:\n%s" % configs)
-            engine_conf = configs['conf']
-            variables = configs['variables']
+            logger.debug("call to get_engine_conf_file(%s)", sensors[0])
+            engine_conf = get_engine_conf_file(sensors[0])
         except Exception as e:
-            logger.error("Could not process JSON from get_engine_conf_file: %s" % e)
+            logger.error("Could not process response from get_engine_conf_file(): %s", e)
             engine_conf = "# not found"
-            variables = "# not found"
     else:
         # no sensors available. Job won't run be we can provide a default engine.conf anyway
         engine_conf = "# not found"
-        variables = "# not found"
-    return render_template('/dalton/coverage.html', sensor_tech = sensor_tech,rulesets = rulesets, error=error, variables = variables, engine_conf = engine_conf, sensors=sensors, fspcap=fspcap, max_pcaps=MAX_PCAP_FILES)
+    return render_template('/dalton/coverage.html', sensor_tech=sensor_tech, rulesets=rulesets, error=error, engine_conf=engine_conf, sensors=sensors, fspcap=fspcap, max_pcaps=MAX_PCAP_FILES)
 
 @dalton_blueprint.route('/dalton/job/<jid>')
 #@auth_required()
@@ -1098,9 +1080,9 @@ def page_coverage_summary():
     digest.update(str(random.randrange(96313375)).encode('utf-8'))
     job_id = digest.hexdigest()[0:16]   #this is a temporary job id for the filename
 
-    #store the pcaps offline temporarily
+    # store the pcaps offline temporarily
     # make temp job directory so there isn't a race condition if more
-    #  than one person submits a pcap with the same filename at the same time
+    # than one person submits a pcap with the same filename at the same time
     if os.path.exists(os.path.join(TEMP_STORAGE_PATH, job_id)):
         shutil.rmtree(os.path.join(TEMP_STORAGE_PATH, job_id))
     os.makedirs(os.path.join(TEMP_STORAGE_PATH, job_id))
@@ -1160,9 +1142,9 @@ def page_coverage_summary():
                     valid_sensor_tech = True
                     break
         if not valid_sensor_tech:
-            logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, \'%s\'" % (user, sensor_tech))
+            logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, '%s'",  user, sensor_tech)
             delete_temp_files(job_id)
-            return render_template('/dalton/error.html', jid='', msg=["There are no sensors that support sensor technology \'%s\'." % sensor_tech])
+            return render_template('/dalton/error.html', jid='', msg=[f"There are no sensors that support sensor technology '{sensor_tech}'."])
 
         # process files from web form
         for pcap_file in form_pcap_files:
@@ -1170,7 +1152,7 @@ def page_coverage_summary():
             # do some input validation on the filename and try to do some accommodation to preserve original pcap filename
             filename = clean_filename(filename)
             if os.path.splitext(filename)[1] != '.pcap':
-                    filename = "%s.pcap" % filename
+                    filename = f"{filename}.pcap"
             # handle duplicate filenames (e.g. same pcap sumbitted more than once)
             filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
             pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
@@ -1178,28 +1160,28 @@ def page_coverage_summary():
             pcap_file.save(pcappath)
 
         # If multiple files submitted to Suricata, merge them here since
-        #  Suricata can only read one file.
+        #  Suricata can only read one file. Update: Suri 4.1? and later can
         if len(pcap_files) > 1 and sensor_tech.startswith("suri"):
             if not MERGECAP_BINARY:
                 logger.error("No mergecap binary; unable to merge pcaps for Suricata job.")
                 delete_temp_files(job_id)
                 return render_template('/dalton/error.html', jid=job_id, msg=["No mergecap binary found on Dalton Controller.", "Unable to process multiple pcaps for this Suricata job."])
             combined_file = "%s/combined-%s.pcap" % (os.path.join(TEMP_STORAGE_PATH, job_id), job_id)
-            mergecap_command = "%s -w %s -F pcap %s" % (MERGECAP_BINARY, combined_file, ' '.join([p['pcappath'] for p in pcap_files]))
-            logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s" % ', '.join([p['filename'] for p in pcap_files]))
+            mergecap_command = f"{MERGECAP_BINARY} -w {combined_file} -F pcap {' '.join([p['pcappath'] for p in pcap_files])}"
+            logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s", ', '.join([p['filename'] for p in pcap_files]))
             try:
                 # validation on pcap filenames done above; otherwise OS command injection here
                 mergecap_output = subprocess.Popen(mergecap_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
                 if len(mergecap_output) > 0:
                     # return error?
-                    logger.error("Error merging pcaps with command:\n%s\n\nOutput:\n%s" % (mergecap_command, mergecap_output))
+                    logger.error("Error merging pcaps with command:\n%s\n\nOutput:\n%s", mergecap_command, mergecap_output)
                     delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid="<not_defined>", msg=["Error merging pcaps with command:", "%s" % mergecap_command, "Output:", "%s" % (mergecap_command, mergecap_output)])
+                    return render_template('/dalton/error.html', jid="<not_defined>", msg=["Error merging pcaps with command:", f"{mergecap_command}", "Output:", f"{mergecap_output}"])
                 pcap_files = [{'filename': os.path.basename(combined_file), 'pcappath': combined_file}]
             except Exception as e:
-                logger.error("Could not merge pcaps.  Error: %s" % e)
+                logger.error("Could not merge pcaps.  Error: %s",  e)
                 delete_temp_files(job_id)
-                return render_template('/dalton/error.html', jid='', msg=["Could not merge pcaps.  Error:", " %s" % e])
+                return render_template('/dalton/error.html', jid='', msg=["Could not merge pcaps.  Error:", f"{e}"])
 
         # get enable all rules option
         bEnableAllRules = False
@@ -1264,7 +1246,7 @@ def page_coverage_summary():
 
         #get custom rules (if defined)
         bCustomRules = False
-        custom_rules_file = os.path.join(TEMP_STORAGE_PATH, "%s_custom.rules" % job_id)
+        custom_rules_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_custom.rules")
         if request.form.get('optionCustomRuleset') and request.form.get('custom_ruleset'):
             bCustomRules = True
             custom_rules = request.form.get('custom_ruleset')
@@ -1292,28 +1274,28 @@ def page_coverage_summary():
                 if (len(line) > 0) and not re.search(r'^[\x00-\x7F]+$', line):
                     fh.close()
                     delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid='', msg=["Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules.", "Please encode necesary non-ASCII characters appropriately.  Rule:", " %s" % line])
+                    return render_template('/dalton/error.html', jid='', msg=["Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules.", "Please encode necesary non-ASCII characters appropriately.  Rule:", f"{line}"])
                 # some rule validation for Snort and Suricata
                 if sensor_tech.startswith('snort') or sensor_tech.startswith('suri'):
                     # rule must start with alert|log|pass|activate|dynamic|drop|reject|sdrop
                     if not re.search(r'^(alert|log|pass|activate|dynamic|drop|reject|sdrop|event_filter|threshold|suppress|rate_filter|detection_filter)\s', line):
                         fh.close()
                         delete_temp_files(job_id)
-                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule, action (first word in rule) of \'%s\' not supported.  Rule:" % line.split()[0], "%s" % line])
+                        return render_template('/dalton/error.html', jid='', msg=[f"Invalid rule, action (first word in rule) of '{line.split()[0]}' not supported.  Rule:", f"line"])
 
                     # rule must end in closing parenthesis
                     if not line.endswith(')') and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         fh.close()
                         delete_temp_files(job_id)
-                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule; does not end with closing parenthesis.  Rule:", "%s" % line])
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule; does not end with closing parenthesis.  Rule:", f"{line}"])
 
                     # last keyword in the rule must be terminated by a semicolon
                     if not line[:-1].rstrip().endswith(';') and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         fh.close()
                         delete_temp_files(job_id)
-                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule, last rule option must end with semicolon.  Rule:",  "%s" % line])
+                        return render_template('/dalton/error.html', jid='', msg=["Invalid rule, last rule option must end with semicolon.  Rule:",  f"{line}"])
 
                     # add sid if not included
                     if not re.search(r'(\s|\x3B)sid\s*\:\s*\d+\s*\x3B', line) and not line.startswith("event_filter") and not line.startswith("threshold") \
@@ -1328,7 +1310,7 @@ def page_coverage_summary():
 
         if not sensor_tech:
             delete_temp_files(job_id)
-            return render_template('/dalton/error.html', jid="<not_defined>", msg=["Variable \'sensor_tech\' not specified.  Please reload the submission page and try again."])
+            return render_template('/dalton/error.html', jid="<not_defined>", msg=["Variable 'sensor_tech' not specified.  Please reload the submission page and try again."])
 
         # get 'Override External_NET - set to any' option
         bOverrideExternalNet = False
@@ -1338,11 +1320,6 @@ def page_coverage_summary():
         except:
             pass
 
-        # get and write variables
-        vars = request.form.get('custom_vars')
-        if not vars:
-            delete_temp_files(job_id)
-            return render_template('/dalton/error.html', jid='', msg=["No variables defined."])
         # pre-set IP vars to add to the config if they don't exist.
         # this helps with some rulesets that may use these variables
         # but the variables aren't in the default config.
@@ -1354,39 +1331,35 @@ def page_coverage_summary():
             delete_temp_files(job_id)
             return render_template('/dalton/error.html', jid='', msg=["No configuration file provided."])
 
+        bLockConfig = False
+
         if sensor_tech.startswith('suri'):
             #yaml-punch!
             # combine engine conf and variables
-
-            # set to NULL so no attempt to include it will happen later
-            vars_file = None
 
             # just in case someone edited and didn't quote a boolean
             conf_file = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', conf_file)
             try:
                 # read in yaml
                 config = yaml.round_trip_load(conf_file, version=(1,1), preserve_quotes=True)
-                # add in vars
-                vars_config = yaml.safe_load(vars, version=(1,1))
                 # add some IP vars common to some rulesets
                 try:
                     for v in ipv2add:
-                        if v not in vars_config['vars']['address-groups']:
-                            vars_config['vars']['address-groups'][v] = ipv2add[v]
+                        if v not in config['vars']['address-groups']:
+                            config['vars']['address-groups'][v] = ipv2add[v]
                 except Exception as e:
-                    logger.warn("(Not Fatal) Problem customizing Suricata variables; your YAML may be bad. %s" % e)
-                    logger.debug("%s" % traceback.format_exc())
+                    logger.warn("(Not Fatal) Problem customizing Suricata variables; your YAML may be bad. %s",  e)
+                    logger.debug(f"{traceback.format_exc()}")
                 # set EXTERNAL_NET to 'any' if option set
                 try:
                     if bOverrideExternalNet:
-                        if not 'EXTERNAL_NET' in vars_config['vars']['address-groups']:
+                        if not 'EXTERNAL_NET' in config['vars']['address-groups']:
                             logger.warn("EXTERNAL_NET IP variable not set in config; setting to 'any'")
-                        vars_config['vars']['address-groups']['EXTERNAL_NET'] = 'any'
+                        config['vars']['address-groups']['EXTERNAL_NET'] = 'any'
                         logger.debug("Set 'EXTERNAL_NET' IP variable to 'any'")
                 except Exception as e:
                     logger.warn("(Not Fatal) Problem ovverriding EXTERNAL_NET: %s" % e)
                     logger.debug("%s" % traceback.format_exc())
-                config.update(vars_config)
                 # first, do rule includes
                 # should references to other rule files be removed?
                 removeOtherRuleFiles = True
@@ -1404,6 +1377,11 @@ def page_coverage_summary():
                 # remove default rule path; added back on agent
                 if 'default-rule-path' in config:
                     config.pop('default-rule-path', None)
+
+                # make minimum log level "info"
+                if "logging" in config and "default-log-level" in config['logging'] and config['logging']['default-log-level']  == "notice":
+                    config['logging']['default-log-level']  = "info"
+
 
                 # set outputs
                 if 'outputs' not in config:
@@ -1559,18 +1537,19 @@ def page_coverage_summary():
                                                            'filename': "dalton-keyword_perf.log", \
                                                            'append': True}
                 # write out
-                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_suricata.yaml" % job_id)
+                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_suricata.yaml")
                 engine_conf_fh = open(engine_conf_file, "w")
                 engine_conf_fh.write(yaml.round_trip_dump(config, version=(1,1), explicit_start=True))
                 engine_conf_fh.close()
             except Exception as e:
-                logger.error("Problem processing YAML file(s): %s" % e)
+                logger.error("Problem processing YAML file(s): %s", e)
                 logger.debug("%s" % traceback.format_exc())
                 delete_temp_files(job_id)
-                return render_template('/dalton/error.html', jid='', msg=["Error processing YAML file(s):", "%s" % e])
+                return render_template('/dalton/error.html', jid='', msg=["Error processing YAML file(s):", f"{e}"])
         else:
+            #TODO: unsplit variables for Snort jobs
             engine_conf_file = None
-            vars_file = os.path.join(TEMP_STORAGE_PATH, "%s_variables.conf" % job_id)
+            vars_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_variables.conf")
             vars_fh = open(vars_file, "w")
             if sensor_tech.startswith('snort'):
                 # check variables
@@ -1701,9 +1680,10 @@ def page_coverage_summary():
                 if request.form.get('optionCustomRuleset') and request.form.get('custom_ruleset'):
                     zf.write(custom_rules_file, arcname='dalton-custom.rules')
             except:
-                logger.warn("Problem adding custom rules: %s" % e)
+                logger.warn("Problem adding custom rules: %s", e)
                 pass
-            if vars_file:
+            vars_file = None
+            if vars_file is not None:
                 zf.write(vars_file, arcname='variables.conf')
             if engine_conf_file:
                 zf.write(engine_conf_file, arcname=os.path.basename(engine_conf_file))
