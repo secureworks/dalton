@@ -44,13 +44,6 @@
 		} else {
 			$('#custom_ruleset').hide();
 		}
-		if ($('#optionCustomVars').prop('checked')) {
-			$('#custom_vars').show();
-            $('#showHideOptionCustomVars').find('i').removeClass('icon-chevron-right').addClass('icon-chevron-down');
-		} else {
-			$('#custom_vars').hide();
-            $('#showHideOptionCustomVars').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
-		}
 		if ($('#optionCustomEngineConf').prop('checked')) {
 			$('#custom_engineconf').show();
             $('#showHideOptionCustomEngineConf').find('i').removeClass('icon-chevron-right').addClass('icon-chevron-down');
@@ -95,16 +88,6 @@
 			}
 		});
 
-		$('#showHideOptionCustomVars').click( function() {
-            $(this).find('i').toggleClass('icon-chevron-right').toggleClass('icon-chevron-down');
-		    $('#custom_vars').toggle();
-            if ($('#custom_vars').is(':visible')) {
-                $('#optionCustomVars').prop('checked', true);
-            } else {
-                $('#optionCustomVars').prop('checked', false);
-            }
-   		});
-
 		$('#showHideOptionCustomEngineConf').click( function() {
             $(this).find('i').toggleClass('icon-chevron-right').toggleClass('icon-chevron-down');
 		    $('#custom_engineconf').toggle();
@@ -146,14 +129,12 @@
 			id.unwrap();
 		}
 
-        <!-- called when sensor version changed.  Updates engine.conf data AND variables -->
+        <!-- called when sensor version changed.  Updates engine.conf -->
         $('input[name="sensor_tech"]').change( function() {
             var version = $(this).attr("id")
             var new_engine_conf = $.get("/dalton/controller_api/request_engine_conf/" + version, function( data ) {
                 if (data && data != '') {
-                    confs = JSON.parse(data)
-                    document.getElementById('custom_engineconf_t').value = confs.conf;
-                    document.getElementById('custom_vars_t').value = confs.variables;
+                    document.getElementById('custom_engineconf_t').value = data;
                     updateHeading(version);
                 }
             });
@@ -297,15 +278,6 @@
                             {% endif %}
 						</div>
 						<div class="tab-pane" id="sensorconf">
-							<div style="display:block;width:100%;padding:0;margin-bottom:5px;font-size:21px;line-height:40px;color:#333;border:0;">Variables</div>
-                                <input type="checkbox" name="optionCustomVars" id="optionCustomVars" value="custom" style="display:none;">
-								Modify default variables{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
-                                <br><a id="showHideOptionCustomVars" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
-                                <p>
-							<span id="custom_vars" class="span11";>
-								<textarea rows='25' cols='50' style='width: 100%;' name="custom_vars" id="custom_vars_t">{{ variables }}</textarea>
-							</span>
-                            <p>
 							<label class="checkbox inline">
                                 <input type="checkbox" name="overrideExternalNet" id="overrideExternalNet" value="eoverride" checked>
 								Override EXTERNAL_NET (set to 'any')
@@ -318,10 +290,7 @@
                             <span id="custom_engineconf" class="span11">
                                 <textarea rows='25' cols='50' style='width: 100%;' name="custom_engineconf" id="custom_engineconf_t">{{ engine_conf }}</textarea>
                             </span>
-
-	
 						</div>
-
 					</div>
 				</div>
 

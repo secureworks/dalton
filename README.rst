@@ -649,8 +649,7 @@ The following routes can be accessed via HTTP GET requests.  Full examples are n
 provided here but can be easily obtained by making the request in a web browser.
 
 -  | **/dalton/controller_api/request_engine_conf/<sensor>**
-   | Returns JSON of the requested configuration file split out into ``variables``
-     and ``conf``.
+   | Returns the requested configuration file as text.
 
    | If no exact match is found for a config file on disk, the closest file
      that matches is returned.
