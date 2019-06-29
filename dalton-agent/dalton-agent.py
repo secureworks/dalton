@@ -261,7 +261,6 @@ JOB_ID = None
 PCAP_FILES = []
 IDS_RULES_FILES = None
 IDS_CONFIG_FILE = None
-VARIABLES_FILE = None
 ENGINE_CONF_FILE = None
 JOB_DIRECTORY = None
 # dalton's log directory
@@ -847,13 +846,12 @@ def process_performance_logs():
 #****************************
 # resets the global variables between jobs
 def reset_globals():
-    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, VARIABLES_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, JOB_OTHER_LOGS
+    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, JOB_OTHER_LOGS
 
     JOB_ID = None
     PCAP_FILES = []
     IDS_RULES_FILES = []
     IDS_CONFIG_FILE = None
-    VARIABLES_FILE = None
     ENGINE_CONF_FILE = None
     JOB_DIRECTORY = None
     # dalton's log directory
@@ -873,9 +871,9 @@ def reset_globals():
     JOB_OTHER_LOGS = None
 
 # primary function
-# gets passed directory of submitted files (rules file, pcap file(s), variables file) and job ID
+# gets passed directory of submitted files (rules file, pcap file(s)) and job ID
 def submit_job(job_id, job_directory):
-    global JOB_ID, SENSOR_TECHNOLOGY, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, VARIABLES_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY
+    global JOB_ID, SENSOR_TECHNOLOGY, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY
     # reset and populate global vars
     reset_globals()
     (JOB_ID, JOB_DIRECTORY) = (job_id, job_directory)
@@ -991,8 +989,6 @@ def submit_job(job_id, job_directory):
             continue
         if os.path.splitext(file)[1] == '.rules':
             IDS_RULES_FILES.append(file)
-        elif os.path.basename(file) == 'variables.conf':
-            VARIABLES_FILE = file
 
     # input validation (sort of)
     if not PCAP_FILES:
@@ -1003,14 +999,11 @@ def submit_job(job_id, job_directory):
         print_error("job id not defined")
 
     if SENSOR_TECHNOLOGY.startswith('snort'):
-        if not VARIABLES_FILE or not os.path.exists(VARIABLES_FILE):
-            print_error("variables file %s does not exist" % VARIABLES_FILE)
         snort_conf_fh = open(IDS_CONFIG_FILE, "a")
 
-        # include rules and vars files in config file
+        # include rules in config file
         for rules_file in IDS_RULES_FILES:
             snort_conf_fh.write("\ninclude %s\n" % rules_file)
-        snort_conf_fh.write("\ninclude %s\n" % VARIABLES_FILE)
 
         # set these output filenames explicitly so there is no guess where/what they are
         # NOTE: when MULTIPLE "output unified2:" directives are defined, Snort will

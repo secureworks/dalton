@@ -45,6 +45,7 @@ import subprocess
 import random
 from threading import Thread
 import tempfile
+import copy
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint('dalton_blueprint', __name__, template_folder='templates/dalton/')
@@ -1334,9 +1335,6 @@ def page_coverage_summary():
         bLockConfig = False
 
         if sensor_tech.startswith('suri'):
-            #yaml-punch!
-            # combine engine conf and variables
-
             # just in case someone edited and didn't quote a boolean
             conf_file = re.sub(r'(\w):\x20+(yes|no)([\x20\x0D\x0A\x23])', '\g<1>: "\g<2>"\g<3>', conf_file)
             try:
@@ -1358,7 +1356,7 @@ def page_coverage_summary():
                         config['vars']['address-groups']['EXTERNAL_NET'] = 'any'
                         logger.debug("Set 'EXTERNAL_NET' IP variable to 'any'")
                 except Exception as e:
-                    logger.warn("(Not Fatal) Problem ovverriding EXTERNAL_NET: %s" % e)
+                    logger.warn("(Not Fatal) Problem overriding EXTERNAL_NET: %s" % e)
                     logger.debug("%s" % traceback.format_exc())
                 # first, do rule includes
                 # should references to other rule files be removed?
@@ -1543,58 +1541,53 @@ def page_coverage_summary():
                 engine_conf_fh.close()
             except Exception as e:
                 logger.error("Problem processing YAML file(s): %s", e)
-                logger.debug("%s" % traceback.format_exc())
+                logger.debug("%s", traceback.format_exc())
                 delete_temp_files(job_id)
                 return render_template('/dalton/error.html', jid='', msg=["Error processing YAML file(s):", f"{e}"])
         else:
-            #TODO: unsplit variables for Snort jobs
             engine_conf_file = None
-            vars_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_variables.conf")
-            vars_fh = open(vars_file, "w")
             if sensor_tech.startswith('snort'):
-                # check variables
-                for line in vars.split('\n'):
-                    # strip out leading and trailing whitespace (note: this removes the newline chars too so have to add them back when we write to file)
-                    line = line.strip()
-                    # if empty or comment line, continue
-                    if line == '' or line.startswith('#'):
-                        continue
-                    if not re.search(r'^(var|portvar|ipvar)\s', line):
-                        vars_fh.close()
-                        delete_temp_files(job_id)
-                        return render_template('/dalton/error.html', jid='', msg=["Invalid variable definition. Must be 'var', 'portvar', or 'ipvar':", "%s" % line])
-                    if bOverrideExternalNet:
-                        if line.startswith("ipvar EXTERNAL_NET "):
-                            line = "ipvar EXTERNAL_NET any"
-                            logger.debug("Set 'EXTERNAL_NET' ipvar to 'any'")
-                        if line.startswith("var EXTERNAL_NET "):
-                            line = "var EXTERNAL_NET any"
-                            logger.debug("Set 'EXTERNAL_NET' var to 'any'")
-                    vars_fh.write("%s\n" % line)
-                # add 'ipvar EXTERNAL_NET any' if not present and Override EXTERNAL_NET option set
-                if bOverrideExternalNet and not "\nipvar EXTERNAL_NET " in vars and not vars.startswith("ipvar EXTERNAL_NET ") and not "\nvar EXTERNAL_NET " in vars and not vars.startswith("var EXTERNAL_NET "):
-                    logger.warn("No EXTERNAL_NET variable found in Snort config, adding 'ipvar EXTERNAL_NET any'")
-                    vars_fh.write("ipvar EXTERNAL_NET any\n")
-                # add some IP vars common to some rulesets
-                try:
-                    for v in ipv2add:
-                        if not "\nipvar %s " % v in vars and not vars.startswith("ipvar %s " % v):
-                            vars_fh.write("ipvar %s %s\n" % (v, ipv2add[v]))
-                except Exception as e:
-                    logger.warn("(Not Fatal) Problem customizing Snort variables: %s" % e)
-                    logger.debug("%s" % traceback.format_exc())
-
                 # tweak Snort conf file
-                if bTrackPerformance:
-                    new_conf = ''
-                    perf_found = False
-                    # splitlines without 'True' arg removes ending newline char(s)
-                    lines = iter(conf_file.splitlines())
-                    while True:
-                        try:
-                            line = next(lines)
-                            # might as well strip out comments
-                            if line.lstrip(' ').startswith('#') or line.lstrip(' ').rstrip(' ') == '': continue
+                new_conf = ''
+                perf_found = False
+                external_net_found = False
+                ipv2add_copy = copy.deepcopy(ipv2add)
+                # calling splitlines line this (without 'True' arg) removes ending newline char(s)
+                lines = iter(conf_file.splitlines())
+                while True:
+                    try:
+                        line = next(lines)
+                        # don't bother keeping comments or empty lines....
+                        if line.lstrip(' ').startswith('#') or line.lstrip(' ').rstrip(' ') == '':
+                            # uncomment below to keep comments and empty lines
+                            #new_conf += f"{line}\n"
+                            continue
+
+                        # tweak variables
+                        if re.search(r'^(var|portvar|ipvar)\s', line):
+
+                            # add some IP vars common to some rulesets
+                            try:
+                                for v in ipv2add:
+                                    if line.startswith(f"ipvar {v}"):
+                                        # can't modify list we are iterating over so delete from copy
+                                        ipv2add_copy.pop(v)
+                            except Exception as e:
+                                logger.warn("(Not Fatal) Problem customizing Snort variables: %s", e)
+                                logger.debug("%s" % traceback.format_exc())
+                            if line.startswith("ipvar EXTERNAL_NET "):
+                                external_net_found = True
+                                if bOverrideExternalNet:
+                                    line = "ipvar EXTERNAL_NET any"
+                                    logger.debug("Set 'EXTERNAL_NET' ipvar to 'any'")
+                            if line.startswith("var EXTERNAL_NET "):
+                                external_net_found = True
+                                if bOverrideExternalNet:
+                                    logger.debug("Set 'EXTERNAL_NET' var to 'any'")
+                                    line = "var EXTERNAL_NET any"
+
+                        # add directive for rule profiling, if requested
+                        if bTrackPerformance:
                             if line.startswith("config profile_rules:"):
                                 perf_found = True
                                 while line.endswith("\\"):
@@ -1603,21 +1596,31 @@ def page_coverage_summary():
                                     line = re.sub(r'filename\s+[^\s\x2C]+', 'filename dalton-rule_perf.log', line)
                                 else:
                                     line += ", filename dalton-rule_perf.log append"
-                            new_conf += "%s\n" % line
-                        except StopIteration:
-                            break
-                    if not perf_found:
-                        new_conf += "\nconfig profile_rules: print 1000, sort avg_ticks, filename dalton-rule_perf.log append"
-                    conf_file = new_conf
 
-                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_snort.conf" % job_id)
+                        new_conf += f"{line}\n"
+                    except StopIteration:
+                        break
+
+                if bTrackPerformance and not perf_found:
+                    new_conf += "\nconfig profile_rules: print 1000, sort avg_ticks, filename dalton-rule_perf.log append\n"
+
+                # add 'ipvar EXTERNAL_NET any' if not present and Override EXTERNAL_NET option set
+                if bOverrideExternalNet and not external_net_found:
+                    new_conf += "ipvar EXTERNAL_NET any\n"
+
+                # add in other common variables if they aren't defined
+                for v in ipv2add_copy:
+                    new_conf += f"ipvar {v} {ipv2add_copy[v]}\n"
+
+                conf_file = new_conf
+                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_snort.conf")
             else:
-                vars_fh.write(vars)
-                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "%s_engine.conf" % job_id)
-            vars_fh.close()
-            engine_conf_fh = open(engine_conf_file, "w")
-            engine_conf_fh.write(conf_file)
-            engine_conf_fh.close()
+                logger.warn("Unexpected sensor_tech value submitted: %s", sensor_tech)
+                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "f{job_id}_engine.conf")
+
+            # write it out
+            with open(engine_conf_file, "w") as engine_conf_fh:
+                engine_conf_fh.write(conf_file)
 
         # create jid (job identifier) value
         digest = hashlib.md5()
@@ -1626,7 +1629,7 @@ def page_coverage_summary():
         jid = digest.hexdigest()[0:16]
 
         #Create the job zipfile. This will contain the file 'manifest.json', which is also queued.
-        #And place the rules file, variables file, and test PCAPs within the zip file
+        #And place the rules file, config file, and test PCAPs within the zip file
         if not os.path.exists(JOB_STORAGE_PATH):
             os.makedirs(JOB_STORAGE_PATH)
         zf_path = None
