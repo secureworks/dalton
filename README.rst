@@ -272,10 +272,11 @@ number of user-configurable options:
      formats) are .zip, .gz, .gzip, .bz2, .tar, .tgz, and .tar.gz. Since
      zip and tar files can contain multiple files, for those formats only
      members that have the ".pcap", ".pcapng", or ".cap" extensions will
-     be included; the other files will be ignored.
+     be included; the other files will be ignored. Password protected zip
+     files will be attempted to be decrypted with the passsword 'infected'.
 
    | If multiple pcaps are submitted for a Suricata job, they will be 
-     combined into a single pcap on job submission since Suricata can
+     combined into a single pcap on job submission since (older versions of) Suricata can
      only read a single pcap in read pcap mode.
 
 -  | **Sensor Version**
@@ -777,8 +778,9 @@ Controller container is shared with the container so '.rules' files can be easil
 added from the host machine.
 
 Popular open source rule download and management tools such as 
-`rulecat <https://github.com/jasonish/py-idstools>`__ and 
-`PulledPork <https://github.com/shirkdog/pulledpork>`__ make it trivial to download
+`rulecat <https://github.com/jasonish/py-idstools>`__,
+`PulledPork <https://github.com/shirkdog/pulledpork>`__, and
+`Suricata-Update <https://github.com/OISF/suricata-update>`__ make it trivial to download
 rulesets, combine all rules into a single ``.rules`` file, and then store it 
 in the necessary location.
 
