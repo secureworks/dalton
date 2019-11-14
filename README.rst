@@ -276,7 +276,7 @@ number of user-configurable options:
      files will be attempted to be decrypted with the passsword 'infected'.
 
    | If multiple pcaps are submitted for a Suricata job, they will be 
-     combined into a single pcap on job submission since Suricata can
+     combined into a single pcap on job submission since (older versions of) Suricata can
      only read a single pcap in read pcap mode.
 
 -  | **Sensor Version**
