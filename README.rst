@@ -780,7 +780,7 @@ added from the host machine.
 Popular open source rule download and management tools such as 
 `rulecat <https://github.com/jasonish/py-idstools>`__,
 `PulledPork <https://github.com/shirkdog/pulledpork>`__, and
-`Suricata-Update <https://github.com/OISF/suricata-update>'__ make it trivial to download
+`Suricata-Update <https://github.com/OISF/suricata-update>`__ make it trivial to download
 rulesets, combine all rules into a single ``.rules`` file, and then store it 
 in the necessary location.
 
