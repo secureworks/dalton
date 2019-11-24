@@ -242,7 +242,7 @@ to the desired SSL/TLS listen port; by default it is 443.  Then,
 modify the "nginx" section of the ``docker-compose.yml`` and uncomment
 (or add if it is missing) the line:
 
-    ::         - DALTON_EXTERNAL_PORT_SSL=${DALTON_EXTERNAL_PORT_SSL}
+             - DALTON_EXTERNAL_PORT_SSL=${DALTON_EXTERNAL_PORT_SSL}
 
 The Dalton Controller comes with a default certificate and key but
 these should be replaced.  The certificate and key files should be
@@ -1143,7 +1143,7 @@ Frequently Asked Questions
      must be rebuilt for the change to take effect (just run ``start_dalton.sh``).
 
 #. | **Is SSL/TLS supported?**
-   | SSL/TLS can be configured for the Web UI.  See _SSLTLSsupport_
+   | SSL/TLS can be configured for the Web UI.  See SSLTLSsupport_
    
 #. | **Will this work on Windows?**
    | The native Dalton code won't work as expected on Windows without non-trivial 
