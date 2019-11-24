@@ -1144,7 +1144,7 @@ Frequently Asked Questions
 
 #. | **Is SSL/TLS supported?**
    | SSL/TLS can be configured for the Web UI.
-     See `Enabling SSL/TLS on the Controller <#Enabling-SSL/TLS-on-the-Controller>`__.
+     See `Enabling SSL/TLS on the Controller <#Enabling-SSL-TLS-on-the-Controller>`__.
    
 #. | **Will this work on Windows?**
    | The native Dalton code won't work as expected on Windows without non-trivial 
