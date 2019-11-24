@@ -272,10 +272,11 @@ number of user-configurable options:
      formats) are .zip, .gz, .gzip, .bz2, .tar, .tgz, and .tar.gz. Since
      zip and tar files can contain multiple files, for those formats only
      members that have the ".pcap", ".pcapng", or ".cap" extensions will
-     be included; the other files will be ignored.
+     be included; the other files will be ignored. Password protected zip
+     files will be attempted to be decrypted with the passsword 'infected'.
 
    | If multiple pcaps are submitted for a Suricata job, they will be 
-     combined into a single pcap on job submission since Suricata can
+     combined into a single pcap on job submission since (older versions of) Suricata can
      only read a single pcap in read pcap mode.
 
 -  | **Sensor Version**
@@ -648,13 +649,16 @@ the ability to pull information from, and perform limited actions on, the Contro
 The following routes can be accessed via HTTP GET requests.  Full examples are not
 provided here but can be easily obtained by making the request in a web browser.
 
--  | **/dalton/controller_api/request_engine_conf/<sensor>**
-   | Returns the requested configuration file as text.
+-  | **/dalton/controller_api/request_engine_conf?sensor=<sensor>**
+   | Returns the requested configuration file as text.  The <sensor> value
+     is going to be the engine, version, and, if applicable, the custom config
+     filename, separated by forward slashes.  For example:
+     ``suricata/5.0.0`` or ``suricata/5.0.0/mycustomconfig.yaml``.
+     Suricata version 4.x compiled with Rust support will have
+     the prefix "rust_" before the version, e.g. ``suricata/rust_4.1.5``.
 
    | If no exact match is found for a config file on disk, the closest file
      that matches is returned.
-
-   | <sensor> is the sensor technology, e.g. ``suricata-4.0.``
 
 -  | **/dalton/controller_api/delete-old-job-files**
    | Deletes old job files from disk. Returns the number of
@@ -776,8 +780,9 @@ Controller container is shared with the container so '.rules' files can be easil
 added from the host machine.
 
 Popular open source rule download and management tools such as 
-`rulecat <https://github.com/jasonish/py-idstools>`__ and 
-`PulledPork <https://github.com/shirkdog/pulledpork>`__ make it trivial to download
+`rulecat <https://github.com/jasonish/py-idstools>`__,
+`PulledPork <https://github.com/shirkdog/pulledpork>`__, and
+`Suricata-Update <https://github.com/OISF/suricata-update>`__ make it trivial to download
 rulesets, combine all rules into a single ``.rules`` file, and then store it 
 in the necessary location.
 
@@ -791,13 +796,17 @@ Adding Sensors
 
 Adding sensors to Dalton is a fairly simple process.  If there isn't already 
 a corresponding or compatible configuration file for the new sensor, that 
-will also need to be added; see `Adding Sensor Configs <#adding-sensor-configs>`__.
+will also need to be added; see `Adding Sensor Configs <#adding-sensor-configs>`__
+for more information and to use custom config files for specific sensors.
 
-It is possible and often desirable to have multiple sensors of the same type 
-(e.g. Suricata 4.0.1), all running jobs.  In that case, just set the ``SENSOR_TECHNOLOGY`` 
-value the same (e.g. 'suricata-4.0.1') and they will all request jobs that 
-have been submitted to that queue.  A single job is given to only one sensor 
-so whichever Agent requests the next job in the queue first get it.
+Unless a custom configuration is used, (see `Adding Sensor Configs <#adding-sensor-configs>`__),
+sensors (Agents) request jobs based on
+their particular engine (Suricata or Snort) and version (e.g. 5.0.0, 2.9.9.0).
+Submitted jobs are queued based on the (corresponding) "Sensor Version" specified in the user
+interface.  All applicable sensors pull jobs from the Controller from their respective queue, meaning
+that there can be multiple Agents of the same type (engine and version) and
+they will all pull from the appropriate shared queue on the Controller and
+receive/run jobs on a first-come-first-served basis.
 
 Docker Sensors
 --------------
@@ -851,10 +860,11 @@ Example Suricata 4.0.2 specification:
           - AGENT_DEBUG=${AGENT_DEBUG}
         restart: always
 
-Rust support was added in Suricata 4.0 but is optional.  Starting with Suricata 5.0,
-Rust is manditory.  Suricata 4.0 and later agents wishing to use Rust, and all
-Suricata 5.0 and later agents, should specify the appropriate Dockerfile --
-``Dockerfiles/Dockerfile_suricata_rust``.
+Rust support was added in Suricata 4.0 but is optional.  Starting with Suricata 5.0.0,
+Rust is manditory.  To turn on Rust support for a Suricata 4.x Agent, set the
+``ENABLE_RUST`` arg in the docker-compose file to ``--enable-rust`` for that
+particular Agent specification (see below example).  Suricata 4.x Agents that have
+Rust support will show up in the user interface alongside the string, "with Rust support".
 
 Example Suricata 4.1.4 specification with Rust support:
 
@@ -863,19 +873,20 @@ Example Suricata 4.1.4 specification with Rust support:
       agent-suricata-4.1.4-rust:
         build:
           context: ./dalton-agent
-          dockerfile: Dockerfiles/Dockerfile_suricata_rust
+          dockerfile: Dockerfiles/Dockerfile_suricata
           args:
             - SURI_VERSION=4.1.4
             - http_proxy=${http_proxy}
             - https_proxy=${https_proxy}
             - no_proxy=${no_proxy}
+            - ENABLE_RUST=--enable-rust
         image: suricata-4.1.4-rust:latest
         container_name: suricata-4.1.4-rust
         environment:
           - AGENT_DEBUG=${AGENT_DEBUG}
         restart: always
 
-Suricata can also have ``SURI_VERSION=current`` in which case the latest 
+Suricata can also have ``SURI_VERSION=current`` in which case the latest
 Suricata version will be used to build the Agent.  Having a 'current' Suricata 
 version specification in the ``docker-compose.yml`` file is especially convenient 
 since when a new version comes out, all that has to be done is run the
@@ -904,13 +915,10 @@ if changed, ``DAQ_VERSION``.  Example Snort specification:
             - AGENT_DEBUG=${AGENT_DEBUG}
           restart: always
 
-Suricata 4.0 and earlier agents *without* Rust support should build off the Suricata Dockerfile,
-``Dockerfiles/Dockerfile_suricata``; Suricata 4.0 and later agents *with* Rust
-support should build off the Suricata Dockerfile, ``Dockerfiles/Dockerfile_suricata_rust``.
-Suricata 5.0 and later agents must always use ``Dockerfiles/Dockerfile_suricata_rust``
-since Rust is no longer optional.
+Suricata Agents should build off the Suricata Dockerfile,
+``Dockerfiles/Dockerfile_suricata_rust``.
 
-Snort agents should build off the
+Snort Agents should build off the
 Snort Dockerfile at ``Dockerfiles/Dockerfile_snort``.
 
 Non-Docker Sensors
@@ -923,7 +931,7 @@ A Suricata or Snort machine can be turned into a Dalton Agent fairly easily.
 Requirements:
 
 -  Engine (Suricata or Snort)
--  Python
+-  Python 3.6 or later
 -  ``dalton-agent.py``
 -  ``dalton-agent.conf``
 
@@ -987,22 +995,23 @@ Duplicate config files are not included.  For example, since all the Suricata
 1.4.x versions have the same (default) .yaml file, only "suricata-1.4.yaml" 
 is included.
 
-The Controller picks the config file to load/use based off the sensor technology 
-(Suricata or Snort) and Agent supplied version number, both of which are part 
-of the ``SENSOR_TECHNOLOGY`` string submitted by the Agent which should start 
-with "snort-" or "suricata-", depending on the engine type.  The "version 
-number" is just the part of the string after "suricata-" or "snort-".
+The Controller attempts to find a config file to load/use based off
+the sensor engine (Suricata or Snort) and version number (e.g. 5.0.0, 2.9.9.0).
 
-So if a sensor identifies itself as "suricata-5.9.1" then the Controller will 
-look for a file with the name "suricata-5.9.1.yaml" in the 
+For example, if an Agent is running Suricata version 5.0.0, then the Controller will 
+look for a file with the name "suricata-5.0.0.yaml" in the 
 ``engine-configs/suricata/`` directory.  If it can't find an 
 exact match, it will attempt to find the closest match it can based off the
-version number.  The version number is just used to help map an Agent 
-to a config.  So, for example, if an Agent identified itself as 
-"suricata-mycustomwhatever" and there was a corresponding 
-"suricata-mycustomwhatever.yaml" file in ``engine-configs/suricata``, 
-it would work fine.
+version number.
 
+If a custom config is desired to be used by a particular sensor, set
+the ``SENSOR_CONFIG`` variable in the Agent's ``dalton-agent.conf`` file
+and place a file with the same name on the Controller in the
+``engine-configs/suricata/`` directory (for Suricata) or
+``engine-configs/snort/``  directory (for Snort).  If the ``SENSOR_CONFIG`` value
+does not exactly match a config file on the Controller, the Controller
+will look for filesnames with the SENSOR_CONFIG value and extensions ".yaml", ".yml",
+and ".conf".
 
 For new Suricata releases, the ``.yaml`` file from source should just 
 be added to the ``engine-configs/suricata`` directory and named 

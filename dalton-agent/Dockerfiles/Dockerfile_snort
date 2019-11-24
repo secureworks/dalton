@@ -20,7 +20,7 @@ RUN apt-get update -y && apt-get install -y \
     libnghttp2-dev libluajit-5.1-dev && ldconfig
 
 # for debugging agent
-#RUN apt-get install -y less nano
+RUN apt-get install -y less nano
 
 # download, build, and install Snort from source
 RUN mkdir -p /src/snort-${SNORT_VERSION} && mkdir -p /etc/snort
@@ -31,7 +31,7 @@ RUN tar -zxf daq-${DAQ_VERSION}.tar.gz && cd daq-${DAQ_VERSION} && ./configure &
 # Snort
 ADD https://www.snort.org/downloads/archive/snort/snort-${SNORT_VERSION}.tar.gz snort-${SNORT_VERSION}.tar.gz
 RUN tar -zxf snort-${SNORT_VERSION}.tar.gz -C snort-${SNORT_VERSION} --strip-components=1 && \
-    cd /src/snort-${SNORT_VERSION} && ./configure --enable-sourcefire && make -j $(nproc) && make install && \
+    cd /src/snort-${SNORT_VERSION} && ./configure --enable-sourcefire --enable-debug && make -j $(nproc) && make install && \
     mkdir /usr/local/lib/snort_dynamicrules && ldconfig
 
 RUN cp -t /etc/snort/ /src/snort-${SNORT_VERSION}/etc/classification.config /src/snort-${SNORT_VERSION}/etc/file_magic.conf \

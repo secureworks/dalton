@@ -114,6 +114,7 @@ except Exception as e:
 
 # if there are no rules, use idstools rulecat to download a set for Suri and Snort
 # if rulecat fails (eaten by proxy), empty rules file(s) may be created
+# TODO: change this to use suricata-update?
 if os.path.exists(RULECAT_SCRIPT):
     for engine in ['suricata', 'snort']:
         ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
@@ -168,14 +169,20 @@ supported_engines = ['suricata', 'snort']
 
 logger.info("Dalton Started.")
 
+""" returns normalized path; used to help prevent directory traversal """
+def clean_path(mypath):
+    return os.path.normpath('/' + mypath).lstrip('/')
 
-def prefix_strip(mystring, prefix="rust_"):
-    """ strip passed in prefix from the beginning of passed in string and return it
+
+def prefix_strip(mystring, prefixes=["rust_"]):
+    """ strip passed in prefixes from the beginning of passed in string and return it
     """
-    if mystring.startswith(prefix):
-        return mystring[len(prefix):]
-    else:
-        return mystring
+    if not isinstance(prefixes, list):
+        prefixes = [prefixes]
+    for prefix in prefixes:
+        if mystring.startswith(prefix):
+            return mystring[len(prefix):]
+    return mystring
 
 def delete_temp_files(job_id):
     """ deletes temp files for given job ID"""
@@ -223,7 +230,7 @@ def get_rulesets(engine=''):
     if not re.match(r"^[a-zA-Z0-9\_\-\.]*$", engine):
         logger.error("Invalid engine value '%s' in get_rulesets()" % engine)
         return ruleset_list
-    ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
+    ruleset_dir = os.path.join(RULESET_STORAGE_PATH, clean_path(engine))
     if not os.path.isdir(ruleset_dir):
         logger.error("Could not find ruleset directory '%s'" % ruleset_dir)
         return ruleset_list
@@ -239,7 +246,7 @@ def get_rulesets(engine=''):
     ruleset_list.sort(reverse=True)
 
     # return 2D array with base and full path
-    return [[file, os.path.join(ruleset_dir, file)] for file in ruleset_list] 
+    return [[file, os.path.join(ruleset_dir, file)] for file in ruleset_list]
 
 def set_job_status_msg(jobid, msg):
     """set a job's status message """
@@ -384,14 +391,17 @@ def page_index():
     return render_template('/dalton/index.html', page='')
 
 
-# this is technically 'controller_api' but supporting 'sensor_api' since
-#  previous versions had that
-@dalton_blueprint.route('/dalton/sensor_api/request_engine_conf/<sensor>', methods=['GET'])
-@dalton_blueprint.route('/dalton/controller_api/request_engine_conf/<sensor>', methods=['GET'])
+# 'sensor' value includes forward slashes so this isn't a RESTful endpoint
+# and 'sensor' value must be passed as a GET parameter
+@dalton_blueprint.route('/dalton/controller_api/request_engine_conf', methods=['GET'])
 #@auth_required()
-def api_get_engine_conf_file(sensor):
+def api_get_engine_conf_file():
     global supported_engines
-    if sensor is None:
+    try:
+        sensor = request.args['sensor']
+    except Exception as e:
+        sensor = None
+    if not sensor or len(sensor) == 0:
         return Response("Invalid 'sensor' supplied.",
                         status=400, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
     return Response(get_engine_conf_file(sensor), status=200, mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
@@ -404,25 +414,51 @@ def get_engine_conf_file(sensor):
     try:
         conf_file = None
         vars_file = None
-        (engine, version) = sensor.split('-', 1)
-        epath = os.path.join(CONF_STORAGE_PATH, engine)
-        filelist = [f for f in os.listdir(epath) if os.path.isfile(os.path.join(epath, f))]
-        # assumes an extension (e.g. '.yaml', '.conf') on engine config files
-        # if exact match, just use that instead of relying on LooseVersion
-        files = [f for f in filelist if os.path.splitext(f)[0] == sensor]
-        if len(files) == 0:
-            files = [f for f in filelist if LooseVersion(prefix_strip(os.path.splitext(f)[0], prefix="rust_")) <= LooseVersion(sensor)]
-        if len(files) > 0:
-            files.sort(key=lambda v:LooseVersion(prefix_strip(os.path.splitext(v)[0], prefix="rust_")), reverse=True)
-            conf_file = os.path.join(epath, files[0])
-        logger.debug("in get_engine_conf_file(): passed sensor value: '%s', conf file used: '%s'", sensor, os.path.basename(conf_file))
+        custom_config = None
+        try:
+            # if custom config used
+            # 'sensor' varible format example: suricata/5.0.0/mycustomfilename
+            (engine, version, custom_config) = sensor.split('/', 2)
+            epath = os.path.join(CONF_STORAGE_PATH, clean_path(engine))
+            if os.path.isfile(os.path.join(epath, "%s" % custom_config)):
+                conf_file = "%s" % custom_config
+            elif os.path.isfile(os.path.join(epath, "%s.yaml" % custom_config)):
+                conf_file = "%s.yaml" % custom_config
+            elif os.path.isfile(os.path.join(epath, "%s.yml" % custom_config)):
+                conf_file = "%s.yml" % custom_config
+            elif os.path.isfile(os.path.join(epath, "%s.conf" % custom_config)):
+                conf_file = "%s.conf" % custom_config
+            if conf_file:
+                conf_file = (os.path.join(epath, clean_path(conf_file)))
+                logger.debug(f"Found custom config file: '{conf_file}'")
+            else:
+                logger.error(f"Unable to find custom config file '{custom_config}'")
+                engine_config = f"# Unable to find custom config file '{custom_config}'"
+                return engine_config
+        except ValueError:
+            # no custom config
+            (engine, version) = sensor.split('/', 1)
+            version = prefix_strip(version, prefixes="rust_")
+            sensor2 = f"{engine}-{version}"
+            epath = os.path.join(CONF_STORAGE_PATH, clean_path(engine))
+
+            filelist = [f for f in os.listdir(epath) if os.path.isfile(os.path.join(epath, f))]
+            # assumes an extension (e.g. '.yaml', '.conf') on engine config files
+            # if exact match, just use that instead of relying on LooseVersion
+            files = [f for f in filelist if os.path.splitext(f)[0] == sensor2]
+            if len(files) == 0:
+                files = [f for f in filelist if LooseVersion(os.path.splitext(f)[0]) <= LooseVersion(sensor2)]
+            if len(files) > 0:
+                files.sort(key=lambda v:LooseVersion(os.path.splitext(v)[0]), reverse=True)
+                conf_file = os.path.join(epath, files[0])
+            logger.debug("in get_engine_conf_file(): passed sensor value: '%s', conf file used: '%s'", sensor, os.path.basename(conf_file))
 
         engine_config = ''
 
         if conf_file:
             # open, read, return
             # Unix newline is \n but for display on web page, \r\n is desired in some
-            #  browsers/OSes.  Note: currently not converted back on job submit.
+            # browsers/OSes.  Note: currently not converted back on job submit.
             with open(conf_file, 'r') as fh:
                 # want to parse each line so put it in to a list
                 contents = fh.readlines()
@@ -461,15 +497,14 @@ def sensor_update():
     return "OK"
 
 
-@dalton_blueprint.route('/dalton/sensor_api/request_job/<sensor_tech>/', methods=['GET'])
+@dalton_blueprint.route('/dalton/sensor_api/request_job', methods=['GET'])
 #@auth_required('read')
-def sensor_request_job(sensor_tech):
+def sensor_request_job():
     """Sensor API. Called when a sensor wants a new job"""
     # job request from Dalton Agent
     global r
     global STAT_CODE_RUNNING
 
-    SENSOR_UID = 'unknown'
     try:
         SENSOR_UID = request.args['SENSOR_UID']
     except Exception as e:
@@ -477,11 +512,31 @@ def sensor_request_job(sensor_tech):
 
     SENSOR_IP = request.remote_addr
 
-    AGENT_VERSION = 'unknown'
     try:
         AGENT_VERSION = request.args['AGENT_VERSION']
     except Exception as e:
         AGENT_VERSION = 'unknown'
+
+    try:
+        SENSOR_ENGINE = request.args['SENSOR_ENGINE']
+    except Exception as e:
+        SENSOR_ENGINE = 'unknown'
+    try:
+        SENSOR_ENGINE_VERSION = request.args['SENSOR_ENGINE_VERSION']
+    except Exception as e:
+        SENSOR_ENGINE_VERSION = 'unknown'
+
+    sensor_tech = f"{SENSOR_ENGINE}/{SENSOR_ENGINE_VERSION}"
+
+    SENSOR_CONFIG = None
+    if 'SENSOR_CONFIG' in request.args.keys():
+        try:
+            SENSOR_CONFIG = request.args['SENSOR_CONFIG']
+        except Exception as e:
+            SENSOR_CONFIG = None
+
+    if SENSOR_CONFIG and len(SENSOR_CONFIG) > 0:
+        sensor_tech += f"/{SENSOR_CONFIG}"
 
     # update check-in data; use md5 hash of SENSOR_UID.SENSOR_IP
     # note: sensor keys are expired by function clear_old_agents() which removes the sensor
@@ -786,7 +841,7 @@ def page_coverage_default(sensor_tech, error=None):
     global r
     ruleset_dirs = []
     sensor_tech = sensor_tech.split('-')[0]
-    conf_dir = f"{CONF_STORAGE_PATH}/{sensor_tech}"
+    conf_dir = os.path.join(CONF_STORAGE_PATH, clean_path(sensor_tech))
     if sensor_tech is None:
         return render_template('/dalton/error.html', jid='', msg=["No Sensor technology selected for job."])
     elif not re.match(r"^[a-zA-Z0-9\_\-\.]+$", sensor_tech):
@@ -828,13 +883,13 @@ def page_coverage_default(sensor_tech, error=None):
             #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
             sensors.sort(reverse=False)
             # sort by version number; ignore "rust_" prefix
-            sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('-', 1)[1], prefix="rust_")), reverse=True)
+            sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('/', 2)[1], prefixes=["rust_"])), reverse=True)
         except Exception as e:
             try:
                 sensors.sort(key=LooseVersion, reverse=True)
             except Exception as ee:
                 sensors.sort(reverse=True)
-
+        logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
     # get conf or yaml file if sensor supports it
     engine_conf = None
     # return the engine.conf from the first sensor in the list which is sorted (see above)
@@ -848,7 +903,7 @@ def page_coverage_default(sensor_tech, error=None):
             logger.error("Could not process response from get_engine_conf_file(): %s", e)
             engine_conf = "# not found"
     else:
-        # no sensors available. Job won't run be we can provide a default engine.conf anyway
+        # no sensors available.
         engine_conf = "# not found"
     return render_template('/dalton/coverage.html', sensor_tech=sensor_tech, rulesets=rulesets, error=error, engine_conf=engine_conf, sensors=sensors, fspcap=fspcap, max_pcaps=MAX_PCAP_FILES)
 
@@ -1926,7 +1981,7 @@ def controller_api_get_current_sensors(engine):
 
     # sort so highest version number is first; ignore "rust_" prefix
     try:
-        sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('-', 1)[1], prefix="rust_")), reverse=True)
+        sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('/', 1)[1], prefixes="rust_")), reverse=True)
     except Exception as e:
         try:
             sensors.sort(key=LooseVersion, reverse=True)

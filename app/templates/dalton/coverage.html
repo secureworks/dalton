@@ -5,22 +5,27 @@
     });
 
     function updateHeading(version) {
-        var newstr = ''
+        var newstr = '';
+        var custom = 0;
         if (version == undefined) {
             version = $('input[name="sensor_tech"]:checked').val();
         }
         version = version.charAt(0).toUpperCase() + version.slice(1);
-        mysplit = version.split('-');
+        mysplit = version.split('/');
         if (mysplit.length > 1) {
             newstr = mysplit[0] + ' ';
             if (mysplit[1].startsWith("rust_")) {
                 newstr += mysplit[1].slice(5,);
                 if (mysplit.length > 2) {
-                    newstr += '-' + mysplit.slice(2,).join('-');
+                        newstr += " (" + mysplit[2] + " - with Rust support)";
+                } else {
+                    newstr += " (with Rust support)";
                 }
-                newstr += " (with Rust support)";
             } else {
-                newstr += mysplit.slice(1,).join('-');
+                newstr += mysplit[1];
+                if (mysplit.length > 2) {
+                    newstr += " (" + mysplit[2] + ")";
+                }
             }
         } else {
             newstr = version;
@@ -131,8 +136,8 @@
 
         <!-- called when sensor version changed.  Updates engine.conf -->
         $('input[name="sensor_tech"]').change( function() {
-            var version = $(this).attr("id")
-            var new_engine_conf = $.get("/dalton/controller_api/request_engine_conf/" + version, function( data ) {
+            var version = $(this).attr("value")
+            var new_engine_conf = $.get("/dalton/controller_api/request_engine_conf?sensor=" + version, function( data ) {
                 if (data && data != '') {
                     document.getElementById('custom_engineconf_t').value = data;
                     updateHeading(version);
@@ -156,14 +161,14 @@
 				Submit A New Job for <b id="versionHeading">
                 <!-- set by Javascript updateHeading(); this doesn't really matter -->
                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
-                    {% set sensor = sensors[0].split('-') %}
+                    {% set sensor = sensors[0].split('/') %}
                     {% if sensor|length > 1 %}
                         {{sensor[0]|title}}
-                            {% if sensor[1].startswith("rust_") %}
-                                {{sensor[1][5:]}}{% if sensor|length > 2 %}-{{sensor[2:]|join('-')}}{% endif %} (with Rust support)
-                            {% else %}
-                                {{sensor[1:]|join('-')}}
-                            {% endif %}
+                        {% if sensor[1].startswith("rust_") %}
+                            {{sensor[1][5:]}} ({% if sensor|length > 2 %}{{sensor[2]}} - {% endif %}with Rust support)
+                        {% else %}
+                            {{sensor[1]}}{% if sensor|length > 2 %} ({{sensor[2]}}){% endif %}
+                        {% endif %}
                     {% else %}
                         {{sensor|title}}
                     {% endif %}
@@ -209,12 +214,12 @@
                                     {% for sensor in sensors %}
                                         <!-- TODO: make this a grid insead of a list -->
                                         <input type="radio" name="sensor_tech" id="{{sensor}}" value="{{sensor}}"{% if loop.first %} checked{% endif %}><label for="{{sensor}}" class="radio inline">
-                                            {% set tlist = sensor.split('-') %}
+                                            {% set tlist = sensor.split('/') %}
                                             {% if tlist|length > 1 %}
                                                 {% if tlist[1].startswith("rust_") %}
-                                                    {{tlist[1][5:]}}{% if tlist|length > 2 %}-{{tlist[2:]|join('-')}}{% endif %} (with Rust support)
+                                                    {{tlist[1][5:]}} ({% if tlist|length > 2 %}{{tlist[2]}} - {% endif %}with Rust support)
                                                 {% else %}
-                                                    {{tlist[1:]|join('-')}}
+                                                    {{tlist[1]}}{% if tlist|length > 2 %} ({{tlist[2]}}){% endif %}
                                                 {% endif %}
                                             {% else %}
                                                 {{sensor|title}}
@@ -224,7 +229,7 @@
                                     {% endfor %}
                                 {% else %}
                                     <p style="color:red">No available Dalton Agents (Sensors) for 
-                                    {{ sensor_tech.split('-')[0]|title }} 
+                                    {{ sensor_tech.split('/')[0]|title }} 
                                     </p>
                                 {% endif %}
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Ruleset</div>
@@ -253,7 +258,7 @@
 								Use custom rules
 							</label>
 							<span id="custom_ruleset">
-								<textarea rows='10' cols='80' style='width: 1000px;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"";);'></textarea>
+								<textarea rows='10' class='span'; style='margin-left:0;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"";);'></textarea>
 							</span>
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Logs</div>
 							<label class="checkbox">
@@ -284,7 +289,7 @@
 							</label>
                             <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration File</div>
                                 <input type="checkbox" name="optionCustomEngineConf" id="optionCustomEngineConf" value="custom" style="display:none;">
-                                Modify {{ sensor_tech.split('-')[0]|title }} configuration{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
+                                Modify {{ sensor_tech.split('/')[0]|title }} configuration{% if sensor_tech.startswith('suri') %}.  This is a YAML file, whitespace is important.{% endif %}
                                 <br><a id="showHideOptionCustomEngineConf" href="javascript:void(0)" class="btn btn-default"><i class="glyphicon icon-chevron-right"></i></a>
                                 <p>
                             <span id="custom_engineconf" class="span11">
