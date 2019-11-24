@@ -381,7 +381,19 @@ def delete_old_job_files():
 
 @dalton_blueprint.route('/')
 def index():
-    return redirect('/dalton/')
+    logger.debug("ENVIRON:\n%s" % request.environ)
+    # make sure redirect is set to use http or https as appropriate
+    rurl = url_for('dalton_blueprint.page_index', _external=True)
+    if rurl.startswith('http'):
+        if "HTTP_X_FORWARDED_PROTO" in request.environ:
+            # if original request was https, make sure redirect uses https
+            rurl = rurl.replace('http', request.environ['HTTP_X_FORWARDED_PROTO'])
+        else:
+            logger.warn("Could not find request.environ['HTTP_X_FORWARDED_PROTO']. Make sure the web server (proxy) is configured to send it.")
+    else:
+        # this shouldn't be the case with '_external=True' passed to url_for()
+        logger.warn("URL does not start with 'http': %s" % rurl)
+    return redirect(rurl)
 
 @dalton_blueprint.route('/dalton')
 @dalton_blueprint.route('/dalton/')
@@ -1811,7 +1823,18 @@ def page_coverage_summary():
         if bteapotJob:
             return jid
         else:
-            return redirect('/dalton/job/%s' % jid)
+            # make sure redirect is set to use http or https as appropriate
+            rurl = url_for('dalton_blueprint.page_show_job', jid=jid, _external=True)
+            if rurl.startswith('http'):
+                if "HTTP_X_FORWARDED_PROTO" in request.environ:
+                    # if original request was https, make sure redirect uses https
+                    rurl = rurl.replace('http', request.environ['HTTP_X_FORWARDED_PROTO'])
+                else:
+                    logger.warn("Could not find request.environ['HTTP_X_FORWARDED_PROTO']. Make sure the web server (proxy) is configured to send it.")
+            else:
+                # this shouldn't be the case with '_external=True' passed to url_for()
+                logger.warn("URL does not start with 'http': %s" % rurl)
+        return redirect(rurl)
 
 @dalton_blueprint.route('/dalton/queue')
 #@login_required()
