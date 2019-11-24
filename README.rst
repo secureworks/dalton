@@ -232,6 +232,22 @@ likely fail and result in an empty file.  In this case rulesets
 will need to be added (and the empty files removed);
 see `Adding Rulesets <#adding-rulesets>`__.
 
+
+Enabling SSL/TLS on the Controller
+----------------------------------
+The Dalton Controller web interface supports SSL/TLS.  To enable,
+set the ``DALTON_EXTERNAL_PORT_SSL`` variable in the ``.env`` file
+to the desired SSL/TLS listen port; by default it is 443.  Then,
+modify the "nginx" section of the ``docker-compose.yml`` and uncomment
+(or add if it is missing) the line,
+ ``        - DALTON_EXTERNAL_PORT_SSL=${DALTON_EXTERNAL_PORT_SSL}``.
+
+The Dalton Controller comes with a default certificate and key but
+these should be replaced.  The certificate and key files should be
+placed in the ``nginx-conf/tls/`` directory and named ``dalton.crt``
+and ``dalton.key``, respectively.
+
+
 Using Dalton
 ============
 
@@ -864,7 +880,7 @@ Rust support was added in Suricata 4.0 but is optional.  Starting with Suricata 
 Rust is manditory.  To turn on Rust support for a Suricata 4.x Agent, set the
 ``ENABLE_RUST`` arg in the docker-compose file to ``--enable-rust`` for that
 particular Agent specification (see below example).  Suricata 4.x Agents that have
-Rust support will show up in the user interface alongside the string, "with Rust support".
+Rust support will show up in the Web UI alongside the string, "with Rust support".
 
 Example Suricata 4.1.4 specification with Rust support:
 
@@ -1125,10 +1141,8 @@ Frequently Asked Questions
      must be rebuilt for the change to take effect (just run ``start_dalton.sh``).
 
 #. | **Is SSL/TLS supported?**
-   | The default configuration does not leverage SSL nor is there a simple
-     "on/off" switch for SSL/TLS.  However, if you know what you are doing, it
-     isn't difficult to configure nginx for it and point the Dalton Agents to
-     it.  This has been done in some environments.
+   | SSL/TLS can be configured for the Web UI.
+     See `Enabling SSL/TLS on the Controller <#Enabling SSL/TLS on the Controller>`__
    
 #. | **Will this work on Windows?**
    | The native Dalton code won't work as expected on Windows without non-trivial 
