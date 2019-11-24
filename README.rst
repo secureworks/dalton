@@ -232,8 +232,6 @@ likely fail and result in an empty file.  In this case rulesets
 will need to be added (and the empty files removed);
 see `Adding Rulesets <#adding-rulesets>`__.
 
-.. _SSLTLSsupport:
-
 Enabling SSL/TLS on the Controller
 ----------------------------------
 The Dalton Controller web interface supports SSL/TLS.  To enable,
@@ -1145,7 +1143,8 @@ Frequently Asked Questions
      must be rebuilt for the change to take effect (just run ``start_dalton.sh``).
 
 #. | **Is SSL/TLS supported?**
-   | SSL/TLS can be configured for the Web UI.  See `Enabling SSL/TLS on the Controller <#SSLTLSsupport>`__.
+   | SSL/TLS can be configured for the Web UI.
+     See `Enabling SSL/TLS on the Controller <#Enabling-SSL/TLS-on-the-Controller>`__.
    
 #. | **Will this work on Windows?**
    | The native Dalton code won't work as expected on Windows without non-trivial 
