@@ -283,5 +283,5 @@ def retrieve_pcap(pcapid):
     if not os.path.isfile(path):
         logger.error("In get_pcap request: file not found: '%s'" % os.path.basename(path))
         return render_template('/pcapwg/error.html', error_text = "File not found: '%s'" % os.path.basename(path))
-    filedata = open(path,'r').read()
+    filedata = open(path,'rb').read()
     return Response(filedata,mimetype="application/vnd.tcpdump.pcap", headers={"Content-Disposition":"attachment;filename=%s.pcap" % pcapid})
