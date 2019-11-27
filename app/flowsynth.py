@@ -119,6 +119,7 @@ def payload_cert(formobj):
 
     file_content = request.files['cert_file'].read()
     if formobj.get('cert_file_type') == 'pem':
+        file_content = file_content.decode('utf-8')
         if certsynth.pem_cert_validate(file_content.strip()):
             return certsynth.cert_to_synth(file_content.strip(), 'PEM')
         else:
@@ -128,7 +129,7 @@ def payload_cert(formobj):
         return certsynth.cert_to_synth(file_content, 'DER')
     else:
         # this shouldn't happen if people are behaving
-        logger.error("Unable to validate submitted der file.")
+        logger.error(f"Invalid certificate format given: '{cert_file_type}'")
         return None
 
 

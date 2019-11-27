@@ -62,7 +62,7 @@ def pem_to_der(pem_str):
 
 def to_synth_bytes(some_str):
     """Convert a string to flowsynth formatted hex"""
-    str_hex = some_str.encode('hex')
+    str_hex = binascii.hexlify(some_str).decode("utf-8")
     out = "\\x" + "\\x".join(
         [str_hex[i:i + 2] for i in range(0, len(str_hex), 2)])
     return out
