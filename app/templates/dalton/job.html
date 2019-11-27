@@ -1,4 +1,26 @@
 {% extends "dalton/layout.html" %}
+{% block js %}
+    var eveRaw = '';
+    var eveJSON = '';
+    $(document).ready(function() {
+        eveRaw = document.getElementById("eve-json").innerHTML;
+        eveJSON = JSON.parse('[' + eveRaw.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
+        eveJSON = JSON.stringify(eveJSON, null, 2);
+
+        if ($('#formatEVE').prop('checked')) {
+            document.getElementById("eve-json").innerHTML = eveJSON;
+        } else {
+            document.getElementById("eve-json").innerHTML = eveRaw;
+        }
+        $('#formatEVE').click( function() {
+            if ($('#formatEVE').prop('checked')) {
+                document.getElementById("eve-json").innerHTML = eveJSON;
+            } else {
+                document.getElementById("eve-json").innerHTML = eveRaw;
+            }
+        });
+    });
+{% endblock %}
 {% block body %}
     <div class="row">
         <div class="span11">
@@ -55,7 +77,7 @@
                         {% for log_description in other_logs %}
                             {% if "Perf" in log_description %}
                                 <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-heart"></i>&nbsp;{{log_description}}</a></li>
-			    {% elif "EVE" in log_description %}
+			                {% elif "EVE" in log_description %}
                                 <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-leaf"></i>&nbsp;{{log_description}}</a></li>
                             {% else %}
                                 <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-file"></i>&nbsp;{{log_description}}</a></li>
@@ -91,7 +113,11 @@
                             {% if "Perf" in log_description or "Stats" in log_description %}
                                 <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
                             {% elif "EVE" in log_description  %}
-                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
+                                <label class="checkbox">
+                                    <input type="checkbox" name="formatEVE" id="formatEVE" value="custom">
+                                    Format
+                                </label>
+                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px" id="eve-json">{{other_logs[log_description]}}</pre></div>
                             {% else %}
                                 <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre>{{other_logs[log_description]}}</pre></div>
                             {% endif %}
