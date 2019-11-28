@@ -12,12 +12,14 @@
         } else {
             document.getElementById("eve-json").innerHTML = eveRaw;
         }
+        hljs.highlightBlock(document.getElementById("eve-json"))
         $('#formatEVE').click( function() {
             if ($('#formatEVE').prop('checked')) {
                 document.getElementById("eve-json").innerHTML = eveJSON;
             } else {
                 document.getElementById("eve-json").innerHTML = eveRaw;
             }
+            hljs.highlightBlock(document.getElementById("eve-json"))
         });
     });
 {% endblock %}
