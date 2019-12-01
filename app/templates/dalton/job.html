@@ -21,6 +21,19 @@
             }
             hljs.highlightBlock(document.getElementById("eve-json"))
         });
+        if ($('#darkMode').prop('checked')) {
+                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-dark.css') }}");
+            } else {
+                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}");
+        }
+        $('#darkMode').click( function() {
+            if ($('#darkMode').prop('checked')) {
+                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-dark.css') }}");
+            } else {
+                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}");
+            }
+            hljs.highlightBlock(document.getElementById("eve-json"))
+        });
     });
 {% endblock %}
 {% block body %}
@@ -115,11 +128,18 @@
                             {% if "Perf" in log_description or "Stats" in log_description %}
                                 <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
                             {% elif "EVE" in log_description  %}
-                                <label class="checkbox">
-                                    <input type="checkbox" name="formatEVE" id="formatEVE" value="custom">
-                                    Format
-                                </label>
-                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px" id="eve-json">{{other_logs[log_description]}}</pre></div>
+                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}">
+                                    <form class="form-inline">
+                                    <label class="checkbox">
+                                        <input type="checkbox" name="formatEVE" id="formatEVE" value="custom">
+                                        Format
+                                    </label>
+                                    <label class="checkbox" style="float: right;">
+                                        <input type="checkbox" name="darkMode" id="darkMode" value="custom">Dark Mode
+                                    </label>
+                                    </form>
+                                    <pre style="font-size:12px" id="eve-json">{{other_logs[log_description]}}</pre>
+                                </div>
                             {% else %}
                                 <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre>{{other_logs[log_description]}}</pre></div>
                             {% endif %}
