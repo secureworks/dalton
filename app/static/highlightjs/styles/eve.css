@@ -1,7 +1,6 @@
 /*
 
-WIP: based on:
-Intellij Idea-like styling (c) Vasily Polovnyov <vast@whiteants.net>
+Light theme for EVE JSON
 
 */
 
@@ -10,7 +9,7 @@ Intellij Idea-like styling (c) Vasily Polovnyov <vast@whiteants.net>
   overflow-x: auto;
   padding: 0.5em;
   color: #000;
-  background: #fff;
+  background: #F5F5F5;
 }
 
 .hljs-subst,
@@ -41,14 +40,15 @@ Intellij Idea-like styling (c) Vasily Polovnyov <vast@whiteants.net>
 .hljs-type,
 .hljs-selector-id,
 .hljs-selector-class {
-//color: #000080;
+/*  boolean*/
+color: #E57609;
 }
 
 .hljs-attribute,
 .hljs-number,
 .hljs-regexp,
 .hljs-link {
-  color: #0000ff;
+  color: #006600;
 }
 
 .hljs-number,
@@ -58,7 +58,7 @@ Intellij Idea-like styling (c) Vasily Polovnyov <vast@whiteants.net>
 }
 
 .hljs-string {
-  color: #008000;
+  color: #2121B6
 }
 
 .hljs-symbol,
