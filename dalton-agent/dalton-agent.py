@@ -66,7 +66,7 @@ parser.add_option("-c", "--config",
 dalton_config_file = options.configfile
 
 # get options from dalton config file
-config = configparser.SafeConfigParser()
+config = configparser.ConfigParser()
 
 if not os.path.exists(dalton_config_file):
     # just print to stdout; logging hasn't started yet
@@ -281,6 +281,7 @@ JOB_ALERT_LOG = None
 JOB_ALERT_DETAILED_LOG = None
 JOB_OTHER_LOGS = None
 JOB_PERFORMANCE_LOG = None
+JOB_EVE_LOG = None
 # end dalton's logs
 
 # used by Snort for logs/alerts
@@ -437,6 +438,12 @@ def send_results():
     fh = open(JOB_OTHER_LOGS, 'r')
     results = fh.read()
     results_dict['other_logs'] = results
+    fh.close()
+
+    # populate EVE log
+    fh = open(JOB_EVE_LOG, 'r')
+    results = fh.read()
+    results_dict['eve'] = results
     fh.close()
 
     #comment this out for prod
@@ -707,6 +714,17 @@ def process_suri_alerts():
     else:
         print_debug("No alerts found. File \'%s\' does not exist." % alerts_file)
 
+def process_eve_log():
+    print_debug("process_eve_log() called")
+    print_msg("Processing EVE JSON log")
+    eve_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-eve.json")
+    if os.path.exists(eve_file):
+        # just copy it; no processing needed at this time
+        shutil.copyfile(eve_file, JOB_EVE_LOG)
+        print_debug(f"copying {eve_file} to {JOB_EVE_LOG}")
+    else:
+        print_debug("No EVE JSON file found. File \'%s\' does not exist." % eve_file)
+
 def process_other_logs(other_logs):
     """ 
     Takes a dictionary of Display Name, filename pairs for logs in the IDS_LOG_DIRECTORY and poulates
@@ -833,7 +851,10 @@ def process_performance_logs():
 #****************************
 # resets the global variables between jobs
 def reset_globals():
-    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, JOB_OTHER_LOGS
+    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, \
+           JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, \
+           JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_PERFORMANCE_LOG, \
+           IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, JOB_OTHER_LOGS, JOB_EVE_LOG
 
     JOB_ID = None
     PCAP_FILES = []
@@ -851,6 +872,7 @@ def reset_globals():
     JOB_ALERT_DETAILED_LOG = None
     JOB_OTHER_LOGS = None
     JOB_PERFORMANCE_LOG = None
+    JOB_EVE_LOG = None
     # end dalton's logs
     # used by snort for logs/alerts
     IDS_LOG_DIRECTORY = None
@@ -860,7 +882,11 @@ def reset_globals():
 # primary function
 # gets passed directory of submitted files (rules file, pcap file(s)) and job ID
 def submit_job(job_id, job_directory):
-    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY
+    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, \
+           JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, \
+           JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, \
+           JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY, \
+           JOB_EVE_LOG
     # reset and populate global vars
     reset_globals()
     (JOB_ID, JOB_DIRECTORY) = (job_id, job_directory)
@@ -877,6 +903,7 @@ def submit_job(job_id, job_directory):
     JOB_OTHER_LOGS = '%s/other_logs.json' % JOB_LOG_DIRECTORY
     JOB_PERFORMANCE_LOG = '%s/performance.log' % JOB_LOG_DIRECTORY
     IDS_CONFIG_FILE = '%s/snort.conf' % JOB_DIRECTORY
+    JOB_EVE_LOG = os.path.join(JOB_LOG_DIRECTORY, "dalton-eve.json")
 
     # touch log files
     open(JOB_ERROR_LOG, "w").close()
@@ -886,6 +913,7 @@ def submit_job(job_id, job_directory):
     open(JOB_ALERT_DETAILED_LOG, "w").close()
     open(JOB_OTHER_LOGS, "w").close()
     open(JOB_PERFORMANCE_LOG, "w").close()
+    open(JOB_EVE_LOG, "w").close()
 
     print_debug(datetime.datetime.now().strftime("%b %d %Y %H:%M:%S"))
     print_debug(f"Agent Name: {SENSOR_UID}\nAgent Version: {AGENT_VERSION}\nIDS Engine: {SENSOR_ENGINE} {SENSOR_ENGINE_VERSION}\nDalton API: {DALTON_API}")
@@ -1031,6 +1059,7 @@ def submit_job(job_id, job_directory):
         run_suricata()
         # populate the alerts (fast.log)
         process_suri_alerts()
+        process_eve_log()
 
     # the rest of this can apply to Snort and Suricata
 
@@ -1045,7 +1074,6 @@ def submit_job(job_id, job_directory):
             other_logs['HTTP Log'] = 'dalton-http.log'
             other_logs['TLS Log'] = 'dalton-tls.log'
             other_logs['DNS Log'] = 'dalton-dns.log'
-            other_logs['EVE JSON'] = 'dalton-eve.json'
         if getFastPattern:
             other_logs['Fast Pattern'] = 'rules_fast_pattern.txt'
         if trackPerformance:

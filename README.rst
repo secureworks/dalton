@@ -262,8 +262,7 @@ sensor technology. The user will be prompted to select the sensor to be
 used, supply a packet capture and ruleset (pre-defined and/or custom),
 and given the ability to configure other options using the vertical
 tab(s) on the submission page. On the 'Config Files' tab a user can
-modify the sensor configuration file. The variables (e.g. $HTTP\_PORTS)
-are split out from the rest of the config in the UI.
+modify the sensor configuration file.
 
 Please be aware that in most rulesets, almost all rules looking at TCP
 traffic are set to inspect established sessions. This means that if a
@@ -402,25 +401,15 @@ Config Files
 On the job submission page, the "Config Files" vertical tab provides the
 ability to edit the configuration file(s) for the sensor:
 
--  | **Variables**
-   |  The variables that can be used by the rules.
-      If the ``Override EXTERNAL_NET (set to 'any')`` option is selected
-      (on by default), then the ``EXTERNAL_NET`` IP variable will be set to
-      ``any`` when the job is submitted.
-
 -  | **Configuration File**
-   | The engine configuration file, minus rule the variables, that the
+   | The engine configuration file, including variables, that the
      Dalton agent uses for the job.
 
-The variables and rest of the configuration file are separated
-dynamically when the pages loads, or when a new sensor version is
-selected. But on the disk the config is just one file in the
-"engine-configs/" directory (e.g.
-'engine-configs/suricata/suricata-4.0.0.yaml'). See also `Updating
-Sensor Configs <#updating-sensor-configs>`__. 
-When a job is submitted to the Controller, the ``Variables`` and
-``Configuration File`` values will be combined in to a single file for a
-Suricata Dalton agent job.
+If the ``Override EXTERNAL_NET (set to 'any')`` option is selected
+(on by default), then the ``EXTERNAL_NET`` IP variable will be set to
+``any`` when the job is submitted.
+
+See also `Updating Sensor Configs <#updating-sensor-configs>`__. 
 
 Job Results
 ===========
@@ -433,6 +422,15 @@ presents the results from the job run in a tabulated interface:
 -  | **Alert Details**
    | If ``Include Detailed Alerts`` is selected for a job, detailed output
      from processing unified2 alert files will be shown here.
+-  | **EVE JSON** (Suricata only)
+   | The EVE log, with syntax highlighting, if EVE logging is enabled.
+     The ``Format`` checkbox
+     "pretty-prints" the EVE data; the ``Dark Mode`` checkbox applies
+     a dark mode theme/coloring to the EVE data.  The UI also dynamically
+     presents checkboxes based on the event types present in the EVE log.
+     These can be used to filter the displayed EVE data.
+     If the EVE data is more than 2000 bytes, the ``Dark Mode`` option is
+     disabled and syntax coloring is turned off, for performance reasons.
 -  | **IDS Engine**
    | This the raw output from the IDS engine. For Snort jobs, the engine
      statistics will be in this tab, at the bottom.
@@ -507,15 +505,56 @@ Job API
 -------
 
 The Dalton controller provides a RESTful API to retrieve data about
-submitted jobs.  API responses use JSON although the data returned in the values is, 
+submitted jobs.  API responses use JSON or the raw ("RAW") data, and
+the data returned in the values is, 
 in most cases, just the raw text that is displayed in the Dalton web interface.
-The API can be utilized via HTTP GET requests in this format::
+
+**JSON API**
+
+The JSON API can be utilized via HTTP GET requests in this format::
 
   GET /dalton/controller_api/v2/<jobid>/<key>
 
-Where ``<jobid>`` is the Job ID and::
+For requests, ``<jobid>`` is the Job ID and::
 
-    <key> : [alert|alert_detailed|all|debug|error|ids|other_logs|perf|start_time|statcode|status|submission_time|tech|time|user]
+    <key> : [alert|alert_detailed|all|debug|error|eve||ids|other_logs|perf|start_time|statcode|status|submission_time|tech|time|user]
+
+A JSON API request returns JSON with three root elements:
+
+-  | **name**
+   | The requested data.   **All data is returned as a quoted string if it is
+     not null**.  If the 'all' key is requested, this contains key/value
+     pairs of all valid keys (so the JSON will need to be double-read to get
+     to the data).  If the 'other\_logs' keyword is requested, this is
+     key/value pairs the JSON will need to be double-read to get to the
+     data or triple-read it if it is part of an 'all' request. This is null
+     if there is no data for the requested key.
+
+-  | **error**
+   | [true\|false] depending if the API request generated an error. This is
+     not returned as a quoted string.  \ **This** **indicates an error with
+     the API request, not an error running the job**.  Errors running the job
+     can be found by querying for the 'error' key (see above).
+
+-  | **error_msg**
+   | null if error is false, otherwise this is a quoted string with the error
+     message.
+
+**RAW API**
+
+The RAW API can be utilized via the same HTTP GET requests appended with "/raw"::
+
+  GET /dalton/controller_api/v2/<jobid>/<key>/raw
+
+The ``<jobid>`` and ``<key>`` are the same as the JSON API but a
+RAW API request returns the raw data from the Redis database, in the response body.
+This is basically what is returned from the JSON API but not encapsulated as JSON.  For
+RAW API responses, the Content-Type header is set to "text/plain" with the exception of
+the "eve" and "all" logs which
+use "application/json".  A RAW request for the "all" key return a string representation
+of a Python dictionary with all the key-value pairs.
+The RAW responses also include "attachment" and "filename"
+in the Content-Disposition header that prompt browsers to download/save the file.
 
 **Valid Keys**
 
@@ -533,6 +572,9 @@ Where ``<jobid>`` is the Job ID and::
 
 -  **error** - Error data from the job.  This is the same as what is
    displayed in the "Error" tab in the job results page.
+
+-  **eve** - EVE JSON output from the job (Suricata only).  This is the same as what is
+   displayed in the "EVE JSON" tab in the job results page.
 
 -  **ids** - IDS Engine output from the job.  This is the same as what
    is displayed in the "IDS Engine" tab in the job results page.  
@@ -583,45 +625,28 @@ Where ``<jobid>`` is the Job ID and::
    job was submitted to the Dalton Controller.
 
 -  **tech** - The sensor technology (i.e. engine and version) the job was submitted
-   for.  For example, 'suricata-4.0.0' is Suricata v4.0.0.  Suricata Agents
-   start with "suricata-" and Snort Agents start with "snort-".
+   for, in the format ``<engine>/<version>``.
+   For example, ``suricata/4.0.0`` is Suricata v4.0.0.
+   If a custom config is used, it will be added on the end, also separated by a
+   forward slash.  For example, ``suricata/4.0.7/mycustomconfigname``.  A Suricata 4
+   sensor compiled with Rust support will have "rust\_" prepended to the version,
+   for example, ``suricata/rust_4.1.5``.
 
 -  **time** - The time in seconds the job took to run, as reported by
    the Dalton Agent (this includes job download time by the agent). 
    This is returned as a string and is the same as the "Processing Time"
    displayed in the job results page.
+
 -  **user** - The user who submitted the job. This will always be "undefined" 
    since authentication is not implemented in this release.
 
-An API request returns JSON with three root elements:
-
--  | **name**
-   | The requested data.   **All data is returned as a quoted string if it is
-     not null**.  If the 'all' key is requested, this contains key/value
-     pairs of all valid keys (so the JSON will need to be double-read to get
-     to the data).  If the 'other\_logs' keyword is requested, this is
-     key/value pairs the JSON will need to be double-read to get to the
-     data or triple-read it if it is part of an 'all' request. This is null
-     if there is no data for the requested key.
-
--  | **error**
-   | [true\|false] depending if the API request generated an error. This is
-     not returned as a quoted string.  \ **This** **indicates an error with
-     the API request, not an error running the job**.  Errors running the job
-     can be found by querying for the 'error' key (see above).
-
--  | **error_msg**
-   | null if error is false, otherwise this is a quoted string with the error
-     message.
- 
-
 **Examples:**
 
-Request::
+JSON API Request::
 
     GET /dalton/controller_api/v2/d1b3b838d41442f6/alert
 
-Response:
+JSON API Response:
 
 .. code::
 
@@ -646,18 +671,26 @@ Response:
     "error": false
     }
 
-Request:
-
-::
+JSON API Request::
 
     GET /dalton/controller_api/v2/ae42737ab4f52862/ninjalevel
 
-Response:
+JSON API Response:
 
 .. code:: javascript
 
     {"data": null, "error_msg": "value 'ninjalevel' invalid", "error": true}
- 
+
+RAW API Request::
+
+    GET /dalton/controller_api/v2/ae42737ab4f52862/alert/raw
+
+RAW API Response:
+
+.. code::
+
+    12/16/2019-20:03:24.094114  [**] [1:806421601:0] MyMalware C2 Request Outbound [**]
+    [Classification: (null)] [Priority: 3] {TCP} 192.168.102.203:45661 -> 172.16.31.41:80
 
 Controller API
 --------------
@@ -707,12 +740,12 @@ provided here but can be easily obtained by making the request in a web browser.
 
 .. code:: javascript
 
-    {"sensor_tech": ["suricata-4.0.1", "suricata-3.2.4", "suricata-2.0.9"]}
+    {"sensor_tech": ["suricata/4.0.1", "suricata/3.2.4", "suricata/2.0.9"]}
 
 -  | **/dalton/controller_api/get-current-sensors-json-full**
    | Response is a JSON payload with details about
      all the current active sensors (agents). Info includes agent IP,
-     last check-in time, tech (e.g. ``suricata-4.0.1``), etc.
+     last check-in time, tech (e.g. ``suricata/4.0.1``), etc.
 
 -  | **/dalton/controller_api/get-prod-rulesets/<engine>**
    | Returns a list of current available production rulesets on the
@@ -1005,7 +1038,7 @@ the ``static`` directory to serve the config files and changing it will
 mostly like break something.
 
 Sensor configuration files 
-are not automatically added when Agents are build or the Controller is run; 
+are not automatically added when Agents are built or the Controller is run; 
 they must be manually added. 
 However, the Dalton Controller already comes with the default (from source) config files 
 for Suricata versions 0.8.1 and later, and for Snort 2.9.0 and later. 

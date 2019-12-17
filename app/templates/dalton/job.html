@@ -1,39 +1,94 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
-    var eveRaw = '';
-    var eveJSON = '';
+    var eveRaw = ""
+    var eventTypeFilters = [];
+    var colorize = true;
+    {% for event_type in event_types %}
+        eventTypeFilters.push("eve-{{event_type}}");
+    {% endfor %}
+
     $(document).ready(function() {
         eveRaw = document.getElementById("eve-json").innerHTML;
-        eveJSON = JSON.parse('[' + eveRaw.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
-        eveJSON = JSON.stringify(eveJSON, null, 2);
+        console.debug("EVE size: " + eveRaw.length + " bytes");
+        if (eveRaw.length > 2000000) {
+            console.log("EVE log is " + eveRaw.length + " bytes. Turning off syntax highlighting.")
+            colorize = false;
+            document.getElementById("darkMode").disabled = true;
+        }
+        function eve2Json(myjson) {
+            return JSON.parse('[' + myjson.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
+        }
+        function eve2JsonStringify(myjson) {
+            return JSON.stringify(eve2Json(myjson), null, 2);
+        }
 
-        if ($('#formatEVE').prop('checked')) {
-            document.getElementById("eve-json").innerHTML = eveJSON;
-        } else {
-            document.getElementById("eve-json").innerHTML = eveRaw;
-        }
-        hljs.highlightBlock(document.getElementById("eve-json"))
-        $('#formatEVE').click( function() {
-            if ($('#formatEVE').prop('checked')) {
-                document.getElementById("eve-json").innerHTML = eveJSON;
-            } else {
-                document.getElementById("eve-json").innerHTML = eveRaw;
+        function updateEveFilters() {
+            eventFilterEnable = []
+            for(i=0; i < eventTypeFilters.length; i++) {
+                if ($('#' + eventTypeFilters[i]).prop('checked')) {
+                    eventFilterEnable.push(eventTypeFilters[i].replace(/^eve-/, ''));
+                }
             }
-            hljs.highlightBlock(document.getElementById("eve-json"))
-        });
-        if ($('#darkMode').prop('checked')) {
-                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-dark.css') }}");
+            if (eventFilterEnable.length == eventTypeFilters.length) {
+                updateFormat(eveRaw);
             } else {
-                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}");
+                lines = eveRaw.trim().split('\n');
+                myEveArray = [];
+                for(i=0; i < lines.length; i++) {
+                    jsonLine = JSON.parse(lines[i]);
+                    if (eventFilterEnable.includes(jsonLine.event_type)) {
+                        myEveArray.push(lines[i]);
+                    } 
+                }
+                updateFormat(myEveArray.join('\n'));
+            }
         }
-        $('#darkMode').click( function() {
+
+        function updateDarkMode(noredraw) {
             if ($('#darkMode').prop('checked')) {
                 document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-dark.css') }}");
             } else {
                 document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}");
             }
-            hljs.highlightBlock(document.getElementById("eve-json"))
+            if (!Boolean(noredraw)) {
+                if (Boolean(colorize)) {
+                    hljs.highlightBlock(document.getElementById("eve-json"));
+                }
+            }
+        }
+
+        function updateFormat(rawEve) {
+            if (rawEve == undefined) {
+                rawEve = document.getElementById("eve-json").innerHTML;
+            }
+            if ($('#formatEVE').prop('checked')) {
+                document.getElementById("eve-json").innerHTML = eve2JsonStringify(rawEve);
+            } else {
+                document.getElementById("eve-json").innerHTML = rawEve;
+            }
+            if (Boolean(colorize)) {
+                hljs.highlightBlock(document.getElementById("eve-json"));
+            }
+        }
+
+        function addEveFilterListener(myfilter) {
+            $('#' + myfilter).click( function() {
+                updateEveFilters();
+            });
+        }
+
+        $('#formatEVE').click( function() {
+            updateEveFilters();
         });
+
+        $('#darkMode').click( function() {
+            updateDarkMode();
+        });
+
+        eventTypeFilters.forEach(addEveFilterListener);
+
+        updateDarkMode(true);
+        updateEveFilters();
     });
 {% endblock %}
 {% block body %}
@@ -83,6 +138,11 @@
                     {% if alert_detailed != "" %}
                         <li><a href="#alert-detailed" data-toggle='tab'><i class="icon-zoom-in"></i>&nbsp;Alert Details</a></li>
                     {% endif %}
+
+                    {% if eve_json != "" %}
+                        <li><a href="#eve-json-tab" data-toggle='tab'><i class="icon-leaf"></i>&nbsp;EVE JSON</a></li>
+                    {% endif %}
+
                     <li><a href="#ids" data-toggle='tab'><i class="icon-eye-open"></i>&nbsp;IDS Engine</a></li>
 				    {% if perf != "" %}
 				  	    <li><a href="#perf" data-toggle='tab'><i class="icon-heart"></i>&nbsp;Performance</a></li>
@@ -92,8 +152,6 @@
                         {% for log_description in other_logs %}
                             {% if "Perf" in log_description %}
                                 <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-heart"></i>&nbsp;{{log_description}}</a></li>
-			                {% elif "EVE" in log_description %}
-                                <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-leaf"></i>&nbsp;{{log_description}}</a></li>
                             {% else %}
                                 <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-file"></i>&nbsp;{{log_description}}</a></li>
                             {% endif %}
@@ -118,6 +176,32 @@
                         <div class="tab-pane" id="alert-detailed"><pre>{{alert_detailed}}</pre></div>
                     {% endif %}
 
+                    {% if eve_json != "" %}
+                        <div class="tab-pane" id="eve-json-tab">
+                          <div class="span12" style="text-align:center;background-color:#ffffff;">
+                            <form class="form-inline">
+                                <label class="checkbox inline" style="float:left;">
+                                    <input type="checkbox" name="formatEVE" id="formatEVE" value="custom"><span class="label label-success">Format</span>
+                                </label>
+                                <label class="inline"><a href="/dalton/controller_api/v2/{{jobid}}/eve/raw">Download Raw EVE Log</a></label>
+                                <label class="checkbox inline" style="float:right;">
+                                    <input type="checkbox" name="darkMode" id="darkMode" value="custom"><span class="label label-inverse">Dark Mode</span>
+                                </label>
+                            </form>
+                            {% if event_types|length > 1 %}
+                            <form class="form inline">
+                                {% for event_type in event_types %}
+                                <label class="checkbox inline">
+                                    <input type="checkbox" name="eve-{{event_type}}" id="eve-{{event_type}}" value="custom" checked><span class="label label-info">{{event_type}}</span>
+                                </label>
+                                {% endfor %}
+                            </form>
+                            {% endif %}
+                          </div>
+                            <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" id="eve-json">{{eve_json}}</pre>
+                        </div>
+                    {% endif %}
+
 			    	<div class="tab-pane" id="ids"><pre>{{ids}}</pre></div>
 			        {% if perf != "" %}
 			        	<div class="tab-pane" id="perf"><pre style="font-size:12px">{{perf}}</pre></div>
@@ -127,19 +211,6 @@
                         {% for log_description in other_logs %}
                             {% if "Perf" in log_description or "Stats" in log_description %}
                                 <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
-                            {% elif "EVE" in log_description  %}
-                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}">
-                                    <form class="form-inline">
-                                    <label class="checkbox">
-                                        <input type="checkbox" name="formatEVE" id="formatEVE" value="custom">
-                                        Format
-                                    </label>
-                                    <label class="checkbox" style="float: right;">
-                                        <input type="checkbox" name="darkMode" id="darkMode" value="custom">Dark Mode
-                                    </label>
-                                    </form>
-                                    <pre style="font-size:12px" id="eve-json">{{other_logs[log_description]}}</pre>
-                                </div>
                             {% else %}
                                 <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre>{{other_logs[log_description]}}</pre></div>
                             {% endif %}

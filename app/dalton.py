@@ -296,6 +296,7 @@ def set_keys_timeout(jobid):
         r.expire("%s-time" % jobid, EXPIRE_VALUE)
         r.expire("%s-alert_detailed" % jobid, EXPIRE_VALUE)
         r.expire("%s-other_logs" % jobid, EXPIRE_VALUE)
+        r.expire("%s-eve" % jobid, EXPIRE_VALUE)
         r.expire("%s-teapotjob" % jobid, EXPIRE_VALUE)
     except:
         pass
@@ -307,7 +308,7 @@ def expire_all_keys(jid):
     #   efficient for large key sets so we are deleting each one individually
     global r
     logger.debug("Dalton calling expire_all_keys() on job %s" % jid)
-    keys_to_delete = ["ids", "perf", "alert", "alert_detailed", "other_logs", "error", "debug", "time", "statcode", "status", "start_time", "user", "tech", "submission_time", "teapotjob"]
+    keys_to_delete = ["ids", "perf", "alert", "alert_detailed", "other_logs", "eve", "error", "debug", "time", "statcode", "status", "start_time", "user", "tech", "submission_time", "teapotjob"]
     try:
         for cur_key in keys_to_delete:
             r.delete("%s-%s" % (jid, cur_key))
@@ -693,12 +694,22 @@ def post_job_results(jobid):
             alert_detailed = ""
     else:
         alert_detailed = ""
+
     # other_logs only supported on Suricata for now
     if "other_logs" in result_obj:
+        logger.debug("Accessing other_log data from agent POST...")
         other_logs = result_obj['other_logs']
     else:
         other_logs = ""
 
+    # EVE is Suricata only
+    if "eve" in result_obj:
+        logger.debug("Accessing EVE data from agent POST...")
+        eve = result_obj['eve']
+    else:
+        eve = ""
+
+    logger.debug("Saving job data to redis...")
     r.set("%s-ids" % jobid, ids)
     r.set("%s-perf" % jobid, perf)
     r.set("%s-alert" % jobid, alert)
@@ -707,7 +718,9 @@ def post_job_results(jobid):
     r.set("%s-time" % jobid, time)
     r.set("%s-alert_detailed" % jobid, alert_detailed)
     r.set("%s-other_logs" % jobid, other_logs)
+    r.set("%s-eve" % jobid, eve)
     set_keys_timeout(jobid)
+    logger.debug("Done saving job data to redis.")
 
     if error:
         set_job_status_msg(jobid, '<div style="color:red">ERROR!</div> <a href="/dalton/job/%s">Click here for details</a>' % jobid)
@@ -715,10 +728,9 @@ def post_job_results(jobid):
         set_job_status_msg(jobid, '<a href="/dalton/job/%s">Click here to view your results</a>' % jobid)
 
     set_job_status(jobid, STAT_CODE_DONE)
+    logger.debug("Returning from post_job_results()")
     return Response("OK", mimetype='text/plain', headers = {'X-Dalton-Webapp':'OK'})
 
-# older versions used 'sensor_api' but it really should be 'controller_api'
-@dalton_blueprint.route('/dalton/sensor_api/job_status/<jobid>', methods=['GET'])
 @dalton_blueprint.route('/dalton/controller_api/job_status/<jobid>', methods=['GET'])
 #@login_required()
 def get_ajax_job_status_msg(jobid):
@@ -744,7 +756,6 @@ def get_ajax_job_status_msg(jobid):
 def get_ajax_job_status_code(jobid):
     """return the job status code (AS A STRING! -- you need to cast the return value as an int if you want to use it as an int)"""
     # user's browser requesting job status code
-    global STAT_CODE_INVALID, STAT_CODE_RUNNING
     if not validate_jobid(jobid):
         return "%d" % STAT_CODE_INVALID
     r_status_code = get_job_status(jobid)
@@ -760,8 +771,7 @@ def get_ajax_job_status_code(jobid):
 @dalton_blueprint.route('/dalton/sensor_api/get_job/<id>', methods=['GET'])
 #@auth_required('read')
 def sensor_get_job(id):
-    # user or agent requesting a job zip file
-    global JOB_STORAGE_PATH
+    """user or agent requesting a job zip file"""
     # get the user (for logging)
     logger.debug("Dalton in sensor_get_job(): request for job zip file %s", id)
     if not validate_jobid(id):
@@ -950,7 +960,19 @@ def page_show_job(jid):
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
             #logger.error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
-
+        try:
+            eve = r.get(f"{jid}-eve")
+        except Exception as e:
+            #logger.debug(f"Problem getting {jid}-eve log:\n{e}") 
+            eve = ""
+        event_types = []
+        if len(eve) > 0:
+            # pull out all the EVE event types
+            try:
+                eve_list = [json.loads(line) for line in eve.splitlines()]
+                event_types = set([item['event_type'] for item in eve_list if 'event_type' in item])
+            except Exception as e:
+                logger.error(f"Problem parsing EVE log for jobid {jid}:\n{e}")
         # parse out custom rules option and pass it?
         custom_rules = False
         try:
@@ -967,7 +989,12 @@ def page_show_job(jid):
         else:
             overview['status'] = 'Error'
 
-        return render_template('/dalton/job.html', overview=overview,page = '', jobid = jid, ids=ids, perf=perf, alert=alert, error=error, debug=debug, total_time=total_time, tech=tech, custom_rules=custom_rules, alert_detailed=alert_detailed, other_logs=other_logs)
+        return render_template('/dalton/job.html', overview=overview,page = '',
+                               jobid = jid, ids=ids, perf=perf, alert=alert,
+                               error=error, debug=debug, total_time=total_time,
+                               tech=tech, custom_rules=custom_rules,
+                               alert_detailed=alert_detailed, other_logs=other_logs,
+                               eve_json=eve, event_types=sorted(event_types))
 
 # sanitize passed in filename (string) and make it POSIX (fully portable)
 def clean_filename(filename):
@@ -1023,7 +1050,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                 logger.debug("7z command: %s" % p7z_command)
                 # I'm not convinced that 7z outputs to stderr
                 p7z_out = subprocess.Popen(p7z_command, shell=False, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
-                if "Everything is Ok" not in p7z_out and "Errors: " in p7z_out:
+                if b"Everything is Ok" not in p7z_out and b"Errors: " in p7z_out:
                     logger.error("Problem extracting ZIP archive '%s': %s" % (os.path.basename(archivename), p7z_out))
                     raise Exception("p7zip error. See logs for details")
                 logger.debug("7z out: %s" % p7z_out)
@@ -1924,12 +1951,10 @@ def page_about_default():
 # API handling code (some of it)
 #########################################
 
-@dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>', methods=['GET'])
-#@auth_required()
-def controller_api_get_request(jid, requested_data):
+def controller_api_get_job_data(jid, requested_data):
     global r
     # add to as necessary
-    valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'perf', 'tech', 'error', 'time', 'statcode', 'debug', 'status', 'submission_time', 'start_time', 'user', 'all')
+    valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'eve', 'perf', 'tech', 'error', 'time', 'statcode', 'debug', 'status', 'submission_time', 'start_time', 'user', 'all')
     json_response = {'error':False, 'error_msg':None, 'data':None}
     # some input validation
     if not validate_jobid(jid):
@@ -1977,10 +2002,30 @@ def controller_api_get_request(jid, requested_data):
                         json_response["error_msg"] = "Unexpected error: cannot pull '%s' for jobid %s," % (requested_data, jid)
 
                 json_response["data"] = "%s" % ret_data
+    return json_response
 
+@dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>', methods=['GET'])
+#@auth_required()
+def controller_api_get_request(jid, requested_data):
+    json_response = controller_api_get_job_data(jid=jid, requested_data=requested_data)
     return Response(json.dumps(json_response), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
-    #print "raw response: %s" % json_response
 
+@dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>/raw', methods=['GET'])
+#@auth_required()
+def controller_api_get_request_raw(jid, requested_data):
+    logger.debug("controller_api_get_request_raw() called")
+    json_response = controller_api_get_job_data(jid=jid, requested_data=requested_data)
+    if json_response['error']:
+        return Response(f"ERROR: {json_response['error_msg']}", status=400, mimetype='text/plan', headers = {'X-Dalton-Webapp':'OK'})
+    else:
+        filename = f"{jid}_{requested_data}"
+        if requested_data in ["eve", "all"]:
+            mimetype = "application/json"
+            filename = f"{filename}.json"
+        else:
+            mimetype = "text/plain"
+            filename = f"{filename}.txt"
+        return Response(json_response['data'], status=200, mimetype=mimetype, headers = {'X-Dalton-Webapp':'OK', "Content-Disposition":f"attachment; filename={filename}"})
 
 @dalton_blueprint.route('/dalton/controller_api/get-current-sensors/<engine>', methods=['GET'])
 def controller_api_get_current_sensors(engine):
