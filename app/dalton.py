@@ -259,10 +259,8 @@ def set_job_status_msg(jobid, msg):
         else:
             r.expire("%s-status" % jobid, REDIS_EXPIRE)
 
-
 def get_job_status_msg(jobid):
     """returns a job's status message"""
-    global r
     return r.get("%s-status" % jobid)
 
 
@@ -279,8 +277,13 @@ def set_job_status(jobid, status):
 
 def get_job_status(jobid):
     """return a job's status code"""
-    global r
     return r.get("%s-statcode" % jobid)
+
+def get_alert_count(jobid):
+    if r.exists(f"{jobid}-alert"):
+        return r.get(f"{jobid}-alert").count('[**]') // 2
+    else:
+        return None
 
 def set_keys_timeout(jobid):
     """set timeout of REDIS_EXPIRE seconds on keys that (should) be set when job results are posted"""
@@ -301,7 +304,6 @@ def set_keys_timeout(jobid):
     except:
         pass
 
-
 def expire_all_keys(jid):
     """expires (deletes) all keys for a give job ID"""
     # using the redis keys function ('r.keys("%s-*" % jid)') searches thru all keys which is not
@@ -314,7 +316,6 @@ def expire_all_keys(jid):
             r.delete("%s-%s" % (jid, cur_key))
     except:
         pass
-
 
 def check_for_timeout(jobid):
     """checks to see if a job has been running more than JOB_RUN_TIMEOUT seconds and sets it to STAT_CODE_TIMEOUT and sets keys to expire"""
@@ -981,7 +982,7 @@ def page_show_job(jid):
             debug = ''
         overview = {}
         if (alert != None):
-            overview['alert_count'] = alert.count('[**]') / 2
+            overview['alert_count'] = get_alert_count(jid)
         else:
             overview['alert_count'] = 0
         if (error == ""):
@@ -1937,6 +1938,13 @@ def page_queue_default():
                     job['time'] = "%s" % r.get("%s-submission_time" % jid)
                     job['user'] = "%s" % r.get("%s-user" % jid)
                     job['status'] = status_msg
+                    alert_count = get_alert_count(jid)
+                    if status != STAT_CODE_DONE:
+                        job['alert_count'] = '-'
+                    elif alert_count is not None:
+                        job['alert_count'] = alert_count
+                    else:
+                        job['alert_count'] = '?'
                     queue.append(job)
                 count += 1
     return render_template('/dalton/queue.html', queue=queue, queued_jobs=queued_jobs, running_jobs=running_jobs, num_jobs=num_jobs_to_show)

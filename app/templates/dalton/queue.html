@@ -24,6 +24,7 @@
                 <tr>
                     <th>Job ID</th>
                   <!--  <th>User</th> -->
+                    <th>Alert Count</th>
                     <th>Queue</th>
         		    <th>Submission Time</th>
                     <th>Status</th>
@@ -32,6 +33,13 @@
 			<tr>
 				<td><a href="/dalton/job/{{job.jid}}">{{ job.jid }}</td>
               <!--  <td>{{ job.user }}</td> -->
+				<td>
+                    {% if job.alert_count is number %}
+                        {{ job.alert_count|int }}
+                    {% else %}
+                        {{ job.alert_count }}
+                    {% endif %}
+                </td>
 				<td>
                 {% set tlist = job.tech.split('/') %}
                 {% if tlist|length > 1 %}
