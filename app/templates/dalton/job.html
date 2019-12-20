@@ -1,6 +1,6 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
-    var eveRaw = ""
+    var eveJSON = JSON.parse('[' + {{eve_json|tojson}}.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
     var eventTypeFilters = [];
     var colorize = true;
     {% for event_type in event_types %}
@@ -8,18 +8,10 @@
     {% endfor %}
 
     $(document).ready(function() {
-        eveRaw = document.getElementById("eve-json").innerHTML;
-        console.debug("EVE size: " + eveRaw.length + " bytes");
-        if (eveRaw.length > 2000000) {
-            console.log("EVE log is " + eveRaw.length + " bytes. Turning off syntax highlighting.")
+        if ({{eve_json|length}} > 2000000) {
+            console.log("EVE log is " + {{eve_json|length}} + " bytes (" + eveJSON.length + " lines). Turning off syntax highlighting by default.");
             colorize = false;
             document.getElementById("darkMode").disabled = true;
-        }
-        function eve2Json(myjson) {
-            return JSON.parse('[' + myjson.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
-        }
-        function eve2JsonStringify(myjson) {
-            return JSON.stringify(eve2Json(myjson), null, 2);
         }
 
         function updateEveFilters() {
@@ -30,17 +22,15 @@
                 }
             }
             if (eventFilterEnable.length == eventTypeFilters.length) {
-                updateFormat(eveRaw);
+                updateFormat(eveJSON);
             } else {
-                lines = eveRaw.trim().split('\n');
                 myEveArray = [];
-                for(i=0; i < lines.length; i++) {
-                    jsonLine = JSON.parse(lines[i]);
-                    if (eventFilterEnable.includes(jsonLine.event_type)) {
-                        myEveArray.push(lines[i]);
+                for(i=0; i < eveJSON.length; i++) {
+                    if (eventFilterEnable.includes(eveJSON[i].event_type)) {
+                        myEveArray.push(eveJSON[i]);
                     } 
                 }
-                updateFormat(myEveArray.join('\n'));
+                updateFormat(myEveArray);
             }
         }
 
@@ -57,14 +47,19 @@
             }
         }
 
-        function updateFormat(rawEve) {
-            if (rawEve == undefined) {
-                rawEve = document.getElementById("eve-json").innerHTML;
+        function updateFormat(myJson) {
+            if (myJson == undefined) {
+                myJson = eveJSON;
             }
             if ($('#formatEVE').prop('checked')) {
-                document.getElementById("eve-json").innerHTML = eve2JsonStringify(rawEve);
+                document.getElementById("eve-json").innerHTML = JSON.stringify(myJson, null, 2);
             } else {
-                document.getElementById("eve-json").innerHTML = rawEve;
+                newEve = ""
+                for(i=0; i < myJson.length; i++) {
+                    // stringify doesn't preserve escaping of forward slashes (e.g. "\/" in original is just "/")
+                    newEve += JSON.stringify(myJson[i]) + "\n";
+                }
+                document.getElementById("eve-json").innerHTML = newEve;
             }
             if (Boolean(colorize)) {
                 hljs.highlightBlock(document.getElementById("eve-json"));
@@ -198,7 +193,7 @@
                             </form>
                             {% endif %}
                           </div>
-                            <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" id="eve-json">{{eve_json}}</pre>
+                            <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" name="eve-json" id="eve-json"></pre>
                         </div>
                     {% endif %}
 
