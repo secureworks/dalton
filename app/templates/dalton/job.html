@@ -178,18 +178,23 @@
                                 <label class="checkbox inline" style="float:left;">
                                     <input type="checkbox" name="formatEVE" id="formatEVE" value="custom"><span class="label label-success">Format</span>
                                 </label>
-                                <label class="inline"><a href="/dalton/controller_api/v2/{{jobid}}/eve/raw">Download Raw EVE Log</a></label>
+                                &nbsp;&nbsp;&nbsp;<label class="inline" style=:"text-align:center;"><a href="/dalton/controller_api/v2/{{jobid}}/eve/raw">Download Raw EVE Log</a></label>
                                 <label class="checkbox inline" style="float:right;">
                                     <input type="checkbox" name="darkMode" id="darkMode" value="custom"><span class="label label-inverse">Dark Mode</span>
                                 </label>
+                                <br>
+                                <label class="checkbox inline" style="float:left;">
+                                    <input type="checkbox" name="colorize" id="colorize" value="custom"><span class="label label-success">Syntax Highlighting</span>
+                                </label>
                             </form>
                             {% if event_types|length > 1 %}
-                            <form class="form inline">
+                            <form class="form inline" style="text-align:center;">
                                 {% for event_type in event_types %}
                                 <label class="checkbox inline">
                                     <input type="checkbox" name="eve-{{event_type}}" id="eve-{{event_type}}" value="custom" checked><span class="label label-info">{{event_type}}</span>
                                 </label>
                                 {% endfor %}
+                                &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
                             </form>
                             {% endif %}
                           </div>
