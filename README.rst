@@ -429,7 +429,8 @@ presents the results from the job run in a tabulated interface:
      a dark mode theme/coloring to the EVE data.  The UI also dynamically
      presents checkboxes based on the event types present in the EVE log.
      These can be used to filter the displayed EVE data.
-     If the EVE data is more than 2000 bytes, the ``Dark Mode`` option is
+     If the EVE data is more than 2000000 bytes, then by default the
+     ``Dark Mode`` option is
      disabled and syntax coloring is turned off, for performance reasons.
 -  | **IDS Engine**
    | This the raw output from the IDS engine. For Snort jobs, the engine

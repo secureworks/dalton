@@ -964,7 +964,7 @@ def page_show_job(jid):
         try:
             eve = r.get(f"{jid}-eve")
         except Exception as e:
-            #logger.debug(f"Problem getting {jid}-eve log:\n{e}") 
+            #logger.debug(f"Problem getting {jid}-eve log:\n{e}")
             eve = ""
         event_types = []
         if len(eve) > 0:
@@ -972,6 +972,8 @@ def page_show_job(jid):
             try:
                 eve_list = [json.loads(line) for line in eve.splitlines()]
                 event_types = set([item['event_type'] for item in eve_list if 'event_type' in item])
+                if len(event_types) > 0:
+                    event_types = sorted(event_types)
             except Exception as e:
                 logger.error(f"Problem parsing EVE log for jobid {jid}:\n{e}")
         # parse out custom rules option and pass it?
@@ -995,7 +997,7 @@ def page_show_job(jid):
                                error=error, debug=debug, total_time=total_time,
                                tech=tech, custom_rules=custom_rules,
                                alert_detailed=alert_detailed, other_logs=other_logs,
-                               eve_json=eve, event_types=sorted(event_types))
+                               eve_json=eve, event_types=event_types)
 
 # sanitize passed in filename (string) and make it POSIX (fully portable)
 def clean_filename(filename):
