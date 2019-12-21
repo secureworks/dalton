@@ -2,7 +2,6 @@
 {% block js %}
     var eveJSON = JSON.parse('[' + {{eve_json|tojson}}.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
     var eventTypeFilters = [];
-    var colorize = true;
     {% for event_type in event_types %}
         eventTypeFilters.push("eve-{{event_type}}");
     {% endfor %}
@@ -10,80 +9,74 @@
     $(document).ready(function() {
         if ({{eve_json|length}} > 2000000) {
             console.log("EVE log is " + {{eve_json|length}} + " bytes (" + eveJSON.length + " lines). Turning off syntax highlighting by default.");
-            colorize = false;
-            document.getElementById("darkMode").disabled = true;
+            document.getElementById("colorize").checked = false;
         }
 
-        function updateEveFilters() {
+        function renderEvePane() {
+            console.debug("renderEvePane() called");
+            // identify what filters are checked
             eventFilterEnable = []
             for(i=0; i < eventTypeFilters.length; i++) {
                 if ($('#' + eventTypeFilters[i]).prop('checked')) {
                     eventFilterEnable.push(eventTypeFilters[i].replace(/^eve-/, ''));
                 }
             }
+            // build new array of JSON objects with EVE lines
+            newEveArray = [];
             if (eventFilterEnable.length == eventTypeFilters.length) {
-                updateFormat(eveJSON);
+                newEveArray = eveJSON;
             } else {
-                myEveArray = [];
                 for(i=0; i < eveJSON.length; i++) {
                     if (eventFilterEnable.includes(eveJSON[i].event_type)) {
-                        myEveArray.push(eveJSON[i]);
+                        newEveArray.push(eveJSON[i]);
                     } 
                 }
-                updateFormat(myEveArray);
             }
-        }
-
-        function updateDarkMode(noredraw) {
-            if ($('#darkMode').prop('checked')) {
-                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-dark.css') }}");
-            } else {
-                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}");
-            }
-            if (!Boolean(noredraw)) {
-                if (Boolean(colorize)) {
-                    hljs.highlightBlock(document.getElementById("eve-json"));
-                }
-            }
-        }
-
-        function updateFormat(myJson) {
-            if (myJson == undefined) {
-                myJson = eveJSON;
-            }
+            // pretty print (or not), and update DOM
             if ($('#formatEVE').prop('checked')) {
-                document.getElementById("eve-json").innerHTML = JSON.stringify(myJson, null, 2);
+                document.getElementById("eve-json").innerHTML = JSON.stringify(newEveArray, null, 2);
             } else {
-                newEve = ""
-                for(i=0; i < myJson.length; i++) {
+                newEve = "["
+                for(i=0; i < newEveArray.length; i++) {
                     // stringify doesn't preserve escaping of forward slashes (e.g. "\/" in original is just "/")
-                    newEve += JSON.stringify(myJson[i]) + "\n";
+                    newEve += JSON.stringify(newEveArray[i]) + "\n";
                 }
+                newEve += "["
                 document.getElementById("eve-json").innerHTML = newEve;
             }
-            if (Boolean(colorize)) {
+            // apply syntax highlighting
+            if ($('#colorize').prop('checked')) {
+                console.debug("applying Syntax Highlighting...");
                 hljs.highlightBlock(document.getElementById("eve-json"));
             }
         }
 
         function addEveFilterListener(myfilter) {
             $('#' + myfilter).click( function() {
-                updateEveFilters();
+                renderEvePane();
             });
         }
 
         $('#formatEVE').click( function() {
-            updateEveFilters();
+            renderEvePane();
         });
 
         $('#darkMode').click( function() {
-            updateDarkMode();
+            if ($('#darkMode').prop('checked')) {
+                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-dark.css') }}");
+            } else {
+                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}");
+            }
+            renderEvePane();
+        });
+
+        $('#colorize').click( function() {
+            renderEvePane();
         });
 
         eventTypeFilters.forEach(addEveFilterListener);
 
-        updateDarkMode(true);
-        updateEveFilters();
+        renderEvePane();
     });
 {% endblock %}
 {% block body %}
@@ -184,7 +177,7 @@
                                 </label>
                                 <br>
                                 <label class="checkbox inline" style="float:left;">
-                                    <input type="checkbox" name="colorize" id="colorize" value="custom"><span class="label label-success">Syntax Highlighting</span>
+                                    <input type="checkbox" name="colorize" id="colorize" value="custom" checked><span class="label label-success">Syntax Highlighting</span>
                                 </label>
                             </form>
                             {% if event_types|length > 1 %}
@@ -198,7 +191,7 @@
                             </form>
                             {% endif %}
                           </div>
-                            <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" name="eve-json" id="eve-json"></pre>
+                            <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" name="eve-json" id="eve-json" class="hljs"></pre>
                         </div>
                     {% endif %}
 
