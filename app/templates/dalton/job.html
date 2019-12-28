@@ -1,89 +1,96 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
-    var eveJSON = JSON.parse('[' + {{eve_json|tojson}}.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
-    var eventTypeFilters = [];
-    var colorize = true;
-    {% for event_type in event_types %}
-        eventTypeFilters.push("eve-{{event_type}}");
-    {% endfor %}
+    {% if eve_json != "" %}
+        // default syntax hilighting limit (bytes); if lengh greater than this, don't hilight by default.
+        var hilightThreshold = 1048576
+        // 20191221 - cursory tests show that Google Chrome seems to really strugle with the hilighting
+        //            so setting to 100K
+        var hilightThresholdChrome = 102400
+        if ($.browser.chrome) {
+            hilightThreshold = hilightThresholdChrome;
+        }
+
+        var eveJSON = JSON.parse('[' + {{eve_json|tojson}}.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
+        var eventTypeFilters = [];
+        {% for event_type in event_types %}
+            eventTypeFilters.push("eve-{{event_type}}");
+        {% endfor %}
+    {% endif %}
 
     $(document).ready(function() {
-        if ({{eve_json|length}} > 2000000) {
-            console.log("EVE log is " + {{eve_json|length}} + " bytes (" + eveJSON.length + " lines). Turning off syntax highlighting by default.");
-            colorize = false;
-            document.getElementById("darkMode").disabled = true;
-        }
-
-        function updateEveFilters() {
-            eventFilterEnable = []
-            for(i=0; i < eventTypeFilters.length; i++) {
-                if ($('#' + eventTypeFilters[i]).prop('checked')) {
-                    eventFilterEnable.push(eventTypeFilters[i].replace(/^eve-/, ''));
-                }
-            }
-            if (eventFilterEnable.length == eventTypeFilters.length) {
-                updateFormat(eveJSON);
+        {% if eve_json != "" %}
+            if ({{eve_json|length}} > hilightThreshold) {
+                console.log("EVE log is " + {{eve_json|length}} + " bytes (" + eveJSON.length + " lines). Turning off syntax highlighting by default.");
+                document.getElementById("colorize").checked = false;
             } else {
-                myEveArray = [];
-                for(i=0; i < eveJSON.length; i++) {
-                    if (eventFilterEnable.includes(eveJSON[i].event_type)) {
-                        myEveArray.push(eveJSON[i]);
-                    } 
-                }
-                updateFormat(myEveArray);
+                console.debug("EVE log is " + {{eve_json|length}} + " bytes (" + eveJSON.length + " lines).");
             }
-        }
 
-        function updateDarkMode(noredraw) {
-            if ($('#darkMode').prop('checked')) {
-                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-dark.css') }}");
-            } else {
-                document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}");
-            }
-            if (!Boolean(noredraw)) {
-                if (Boolean(colorize)) {
+            function renderEvePane() {
+                // identify what filters are checked
+                eventFilterEnable = []
+                for(i=0; i < eventTypeFilters.length; i++) {
+                    if ($('#' + eventTypeFilters[i]).prop('checked')) {
+                        eventFilterEnable.push(eventTypeFilters[i].replace(/^eve-/, ''));
+                    }
+                }
+                // build new array of JSON objects with EVE lines
+                newEveArray = [];
+                if (eventFilterEnable.length == eventTypeFilters.length) {
+                    newEveArray = eveJSON;
+                } else {
+                    for(i=0; i < eveJSON.length; i++) {
+                        if (eventFilterEnable.includes(eveJSON[i].event_type)) {
+                            newEveArray.push(eveJSON[i]);
+                        } 
+                    }
+                }
+                // pretty print (or not), and update DOM
+                if ($('#formatEVE').prop('checked')) {
+                    document.getElementById("eve-json").textContent = JSON.stringify(newEveArray, null, 2);
+                } else {
+                    newEve = "["
+                    for(i=0; i < newEveArray.length; i++) {
+                        // stringify doesn't preserve escaping of forward slashes (e.g. "\/" in original is just "/")
+                        newEve += JSON.stringify(newEveArray[i]) + "\n";
+                    }
+                    newEve += "]"
+                    document.getElementById("eve-json").textContent = newEve;
+                }
+                // apply syntax highlighting
+                if ($('#colorize').prop('checked')) {
                     hljs.highlightBlock(document.getElementById("eve-json"));
                 }
             }
-        }
 
-        function updateFormat(myJson) {
-            if (myJson == undefined) {
-                myJson = eveJSON;
+            function addEveFilterListener(myfilter) {
+                $('#' + myfilter).click( function() {
+                    renderEvePane();
+                });
             }
-            if ($('#formatEVE').prop('checked')) {
-                document.getElementById("eve-json").innerHTML = JSON.stringify(myJson, null, 2);
-            } else {
-                newEve = ""
-                for(i=0; i < myJson.length; i++) {
-                    // stringify doesn't preserve escaping of forward slashes (e.g. "\/" in original is just "/")
-                    newEve += JSON.stringify(myJson[i]) + "\n";
-                }
-                document.getElementById("eve-json").innerHTML = newEve;
-            }
-            if (Boolean(colorize)) {
-                hljs.highlightBlock(document.getElementById("eve-json"));
-            }
-        }
 
-        function addEveFilterListener(myfilter) {
-            $('#' + myfilter).click( function() {
-                updateEveFilters();
+            $('#formatEVE').click( function() {
+                renderEvePane();
             });
-        }
 
-        $('#formatEVE').click( function() {
-            updateEveFilters();
-        });
+            $('#darkMode').click( function() {
+                if ($('#darkMode').prop('checked')) {
+                    document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-dark.css') }}");
+                } else {
+                    document.getElementById("eve-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}");
+                }
+                renderEvePane();
+            });
 
-        $('#darkMode').click( function() {
-            updateDarkMode();
-        });
+            $('#colorize').click( function() {
+                renderEvePane();
+            });
 
-        eventTypeFilters.forEach(addEveFilterListener);
+            eventTypeFilters.forEach(addEveFilterListener);
 
-        updateDarkMode(true);
-        updateEveFilters();
+            renderEvePane();
+        {% endif %}
+
     });
 {% endblock %}
 {% block body %}
@@ -178,22 +185,27 @@
                                 <label class="checkbox inline" style="float:left;">
                                     <input type="checkbox" name="formatEVE" id="formatEVE" value="custom"><span class="label label-success">Format</span>
                                 </label>
-                                <label class="inline"><a href="/dalton/controller_api/v2/{{jobid}}/eve/raw">Download Raw EVE Log</a></label>
+                                &nbsp;&nbsp;&nbsp;<label class="inline" style=:"text-align:center;"><a href="/dalton/controller_api/v2/{{jobid}}/eve/raw">Download Raw EVE Log</a></label>
                                 <label class="checkbox inline" style="float:right;">
                                     <input type="checkbox" name="darkMode" id="darkMode" value="custom"><span class="label label-inverse">Dark Mode</span>
                                 </label>
+                                <br>
+                                <label class="checkbox inline" style="float:left;">
+                                    <input type="checkbox" name="colorize" id="colorize" value="custom" checked><span class="label label-success">Syntax Highlighting</span>
+                                </label>
                             </form>
                             {% if event_types|length > 1 %}
-                            <form class="form inline">
+                            <form class="form inline" style="text-align:center;">
                                 {% for event_type in event_types %}
                                 <label class="checkbox inline">
                                     <input type="checkbox" name="eve-{{event_type}}" id="eve-{{event_type}}" value="custom" checked><span class="label label-info">{{event_type}}</span>
                                 </label>
                                 {% endfor %}
+                                &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
                             </form>
                             {% endif %}
                           </div>
-                            <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" name="eve-json" id="eve-json"></pre>
+                            <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" name="eve-json" id="eve-json" class="hljs"></pre>
                         </div>
                     {% endif %}
 
