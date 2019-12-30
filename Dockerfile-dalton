@@ -24,8 +24,8 @@ COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
 #install flowsynth
-ADD https://github.com/secureworks/flowsynth/raw/master/requirements.txt /opt/flowsynth/requirements.txt
-ADD https://github.com/secureworks/flowsynth/raw/master/src/flowsynth.py /opt/flowsynth/src/flowsynth.py
+ADD https://raw.githubusercontent.com/secureworks/flowsynth/afc92674a8e8b78332d68565b2e5458e2048f17e/requirements.txt /opt/flowsynth/requirements.txt
+ADD https://raw.githubusercontent.com/secureworks/flowsynth/afc92674a8e8b78332d68565b2e5458e2048f17e/src/flowsynth.py /opt/flowsynth/src/flowsynth.py
 RUN pip install -r /opt/flowsynth/requirements.txt
 RUN chmod +x /opt/flowsynth/src/flowsynth.py
 
