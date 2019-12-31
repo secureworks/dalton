@@ -373,9 +373,10 @@ number of user-configurable options:
       -  | **EVE Log**
          | If EVE logging is enabled in the config, the EVE log will be
            returned.  This can be useful for programmatic results analysis
-           when structured results are needed. Since Suricata version 3.1 and later
-           doesn't support multiple TLS loggers, the TLS log in the EVE log
-           is turned off.  See also above note about 512MB limit for
+           when structured results are needed. Since Suricata version < 3.1
+           doesn't support multiple TLS loggers, TLS logging in the EVE log
+           is disabled for jobs submitted to such agents.  The maximum supported
+           size for the EVE log is 512MB; see above note about 512MB limit for
            'Other logs'.
 
    -  | **Rule profiling**
@@ -988,18 +989,7 @@ Requirements:
 -  ``dalton-agent.conf``
 
 The ``dalton-agent.conf`` file must be modified to point to the Docker 
-Controller (see ``DALTON_API`` option).  Additionally, if the 
-``SENSOR_TECHNOLOGY`` value is not set to 'auto' (or automatic version 
-determination fails), the the ``SENSOR_TECHNOLOGY`` value should be 
-set and must follow a certain
-pattern; it should start with the engine name ('suricata' or 'snort'), 
-followed by a dash followed by the version number. For example:  'suricata-4.0.1'.  
-This format helps tell the Dalton Controller what technology is being used as 
-well as maps back to the config files on the Controller.  Technically the version 
-number part of the ``SENSOR_TECHNOLOGY`` string can be arbitrary but in that 
-case a configuration file with the corresponding name should be present on the 
-Dalton Controller so it knows which configuration file to load and use for jobs 
-related to that sensor.
+Controller (see ``DALTON_API`` option).
 
 For more details on the Dalton Agent configuration options, see the inline 
 comments in the ``dalton-agent.conf`` file.

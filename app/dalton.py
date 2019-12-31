@@ -151,8 +151,6 @@ if MAX_PCAP_FILES < 1:
     logger.warn("max_pcap_files value of '%d' invalid.  Using '%d'" % (MAX_PCAP_FILES, default_max))
     MAX_PCAP_FILES = default_max
 
-sensor_tech_re = re.compile(r"^[a-zA-Z0-9\x2D\x2E\x5F]+$")
-
 #global values used by Flask
 TRAP_BAD_REQUEST_KEY_ERRORS = True
 
@@ -183,6 +181,24 @@ def prefix_strip(mystring, prefixes=["rust_"]):
         if mystring.startswith(prefix):
             return mystring[len(prefix):]
     return mystring
+
+def get_engine_and_version(sensor_tech):
+    """ returns list with engine ("suricata" or "snort") as first element, and
+    version (e.g. "5.0.1", "2.9.9.0" as second element. Strips out prefix (e.g. "rust_")
+    and ignores custom config (if present).  Example passed in 'sensor_tech' values:
+        suricata/5.0.1
+        suricata/rust_4.1.5
+        suricata/4.0.7/mycustomconf
+        suricata/rust_4.1.5/mycustomconf
+        snort/2.9.9.0
+    """
+    try:
+        engine = sensor_tech.split('/')[0]
+        version = prefix_strip(sensor_tech.split('/')[1])
+        return (engine, version)
+    except Exception as e:
+        logger.error(f"Unable to process value '{sensor_tech}' in get_engine_and_version(): {e}")
+        return (None, None)
 
 def delete_temp_files(job_id):
     """ deletes temp files for given job ID"""
@@ -886,7 +902,7 @@ def page_coverage_default(sensor_tech, error=None):
         fspcap = None
 
     # get list of rulesets based on engine
-    rulesets = get_rulesets(sensor_tech.split('-')[0])
+    rulesets = get_rulesets(sensor_tech)
 
     # enumerate sensor versions based on available sensors and pass them to coverage.html
     #   This way we can dynamically update the submission page as soon as new sensor versions check in
@@ -1257,8 +1273,17 @@ def page_coverage_summary():
             pcap_files.append({'filename': filename, 'pcappath': pcappath})
             pcap_file.save(pcappath)
 
+        (sensor_tech_engine, sensor_tech_version) = get_engine_and_version(sensor_tech)
+        if sensor_tech_engine is None or sensor_tech_version is None:
+            logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job with invalid sensor tech string, '%s'",  user, sensor_tech)
+            delete_temp_files(job_id)
+            return render_template('/dalton/error.html', jid='', msg=[f"Bad sensor_tech string submitted: '{sensor_tech}'."])
+
         # If multiple files submitted to Suricata, merge them here since
         #  Suricata can only read one file. Update: Suri 4.1? and later can
+        #  TODO: don't merge if sensor_tech_engine == "suricata" and
+        #        LooseVersion(sensor_tech_version) >= LooseVersion(4.1) (if that is the right one).
+        #        Will need to check/update agent code accordingly.
         if len(pcap_files) > 1 and sensor_tech.startswith("suri"):
             if not MERGECAP_BINARY:
                 logger.error("No mergecap binary; unable to merge pcaps for Suricata job.")
@@ -1580,33 +1605,35 @@ def page_coverage_summary():
                     try:
                         # set filename
                         config['outputs'][olist.index('eve-log')]['eve-log']['filename'] = "dalton-eve.json"
-                        # disable EVE TLS logging. This mixing of dicts and lists is onerous....
-                        # Update: apparently in Suri 4 and >= 3.1 you CAN have multiple tls loggers....
+
+                        # disable EVE TLS logging if Suricata version is < 3.1 which doesn't support multiple
+                        # loggers. This mixing of dicts and lists is onerous....
                         # doing this one at a time (two passes) since we are iterating over the structure
                         # we want to edit AND we are using list indexes.
                         # Also, the yaml will be represented differently based on the values (e.g. string vs ordered dict).
                         # Instead of trying to check everything every time, just catch the exception(s) and move on. The
                         # stuff we want disabled will still get disabled despite the exceptions along the way.
-                        for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
-                            try:
-                                if list(config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys())[0] == 'alert':
-                                    # apparently this is supported -- http://suricata.readthedocs.io/en/latest/output/eve/eve-json-output.html
-                                    config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
-                                    logger.debug("Removed outputs->eve-log->types->alert->tls")
-                                    break
-                            except Exception as e:
-                                #logger.debug("Possible issue when removing outputs->eve-log->types->alert->tls (EVE TLS log). Error: %s" % e)
-                                pass
+                        if LooseVersion(sensor_tech_version) < LooseVersion("3.1"):
+                            for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
+                                try:
+                                    if list(config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys())[0] == 'alert':
+                                        # apparently this is supported -- http://suricata.readthedocs.io/en/latest/output/eve/eve-json-output.html
+                                        config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]['alert'].pop('tls', None)
+                                        logger.debug("Removed outputs->eve-log->types->alert->tls")
+                                        break
+                                except Exception as e:
+                                    #logger.debug("Possible issue when removing outputs->eve-log->types->alert->tls (EVE TLS log). Error: %s" % e)
+                                    pass
 
-                        for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
-                            try:
-                                if list(config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys())[0] == 'tls':
-                                    del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
-                                    logger.debug("Removed outputs->eve-log->types->tls")
-                                    break
-                            except Exception as e:
-                                #logger.debug("Possible issue when removing outputs->eve-log->types->tls (EVE TLS log). Error: %s" % e)
-                                pass
+                            for i in range(0,len(config['outputs'][olist.index('eve-log')]['eve-log']['types'])):
+                                try:
+                                    if list(config['outputs'][olist.index('eve-log')]['eve-log']['types'][i].keys())[0] == 'tls':
+                                        del config['outputs'][olist.index('eve-log')]['eve-log']['types'][i]
+                                        logger.debug("Removed outputs->eve-log->types->tls")
+                                        break
+                                except Exception as e:
+                                    #logger.debug("Possible issue when removing outputs->eve-log->types->tls (EVE TLS log). Error: %s" % e)
+                                    pass
                     except Exception as e:
                         logger.debug("Problem editing eve-log section of config: %s" % e)
                         pass
