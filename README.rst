@@ -373,7 +373,7 @@ number of user-configurable options:
       -  | **EVE Log**
          | If EVE logging is enabled in the config, the EVE log will be
            returned.  This can be useful for programmatic results analysis
-           when structured results are needed. Since Suricata version < 3.1
+           when structured results are needed. Since Suricata version 3.1 and later
            doesn't support multiple TLS loggers, the TLS log in the EVE log
            is turned off.  See also above note about 512MB limit for
            'Other logs'.

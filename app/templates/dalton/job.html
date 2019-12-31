@@ -54,7 +54,7 @@
                         // stringify doesn't preserve escaping of forward slashes (e.g. "\/" in original is just "/")
                         newEve += JSON.stringify(newEveArray[i]) + "\n";
                     }
-                    newEve += "]"
+                    newEve = newEve.slice(0,-1) + ']';
                     document.getElementById("eve-json").textContent = newEve;
                 }
                 // apply syntax highlighting
