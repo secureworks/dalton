@@ -96,6 +96,8 @@ except Exception as e:
     print(f"Error parsing config file, '{dalton_config_file}':\n\n{e}\n\nexiting.")
     sys.exit(1)
 
+SENSOR_ENGINE_VERSION_ORIG = 'undefined'
+
 #***************
 #*** Logging ***
 #***************
@@ -139,6 +141,7 @@ def find_file(name):
 
 ''' returns the version of the engine given full path to binary (e.g. Suricata, Snort) '''
 def get_engine_version(path):
+    global SENSOR_ENGINE_VERSION_ORIG
     engine = "unknown"
     version = "unknown"
     try:
@@ -164,6 +167,8 @@ def get_engine_version(path):
         result = regex.search(output.decode('utf-8'))
         if result:
             version = result.group('version')
+
+        SENSOR_ENGINE_VERSION_ORIG = version
 
         # if Suricata version 4, see if Rust is enabled and add to version string
         if "suricata" in engine  and version.split('.')[0] == "4":
@@ -267,6 +272,7 @@ logger.info("Added '%s' to 'no_proxy' environment variable." % dalton_web_contai
 #************************
 JOB_ID = None
 PCAP_FILES = []
+PCAP_DIR = "pcaps"
 IDS_RULES_FILES = None
 IDS_CONFIG_FILE = None
 ENGINE_CONF_FILE = None
@@ -537,7 +543,7 @@ def process_snort_alerts():
     job_alert_log_fh.close()
 
 def check_pcaps():
-    """ 
+    """
     Check of the pcaps and alert on potential issues.
     Add other checks here as needed.
     """
@@ -560,10 +566,10 @@ def check_pcaps():
                                         "\n\n"
                                         "Almost all IDS rules that look for TCP traffic require "
                                         "an established connection.\nYou will need to provide a more complete "
-                                        "pcap if you want accurate results." 
+                                        "pcap if you want accurate results."
                                         "\n\n"
                                         "If you need help crafting a pcap, Flowsynth may be able to help --\n"
-                                        "https://github.com/secureworks/flowsynth" 
+                                        "https://github.com/secureworks/flowsynth"
                                         "\n\n"
                                         "And, \"there's always barber college....\"" % os.path.basename(pcap))
             else:
@@ -651,7 +657,7 @@ def check_pcaps():
 def run_snort():
     print_debug("run_snort() called")
     # note: if we don't have '--treat-drop-as-alert' then some alerts in a stream that has already triggered a 'drop' rule won't fire since they are assumed to already blocked by the DAQ
-    snort_command = "%s -Q --daq dump --daq-dir /usr/lib/daq/ --daq-var load-mode=read-file --daq-var file=/tmp/inline-out.pcap -l %s -c %s -k none -X --conf-error-out --process-all-events --treat-drop-as-alert --pcap-list=\"%s\" 2>&1" % (IDS_BINARY, IDS_LOG_DIRECTORY, IDS_CONFIG_FILE, ' '.join(PCAP_FILES))
+    snort_command = "%s -Q --daq dump --daq-dir /usr/lib/daq/ --daq-var load-mode=read-file --daq-var file=/tmp/inline-out.pcap -l %s -c %s -k none -X --conf-error-out --process-all-events --treat-drop-as-alert --pcap-dir=%s 2>&1" % (IDS_BINARY, IDS_LOG_DIRECTORY, IDS_CONFIG_FILE, os.path.split(PCAP_FILES[0])[0])
     print_msg("Starting Snort and Running Pcap(s)...")
     print_debug("Running Snort with the following command command:\n%s" % snort_command)
     snort_output_fh = open(JOB_IDS_LOG, "w")
@@ -671,12 +677,16 @@ def run_suricata():
     # some Suri versions don't support all modern options like '-k' so try to deal with that here
     add_options = ""
     try:
-        if LooseVersion(SENSOR_VERSION) > LooseVersion(2.0):
-            # not sure if the '-k' option was added is Suri 2.0 or some other time but setting it to this for now
+        if LooseVersion(SENSOR_ENGINE_VERSION_ORIG) >= LooseVersion("2.0"):
+            # not sure if the '-k' option was added in Suri 2.0 or earlier but for now just doing this for v2 and later
             add_options = "-k none"
     except Exception as e:
         add_options = ""
-    suricata_command = "%s -c %s -l %s %s -r %s" % (IDS_BINARY, IDS_CONFIG_FILE, IDS_LOG_DIRECTORY, add_options, PCAP_FILES[0])
+    suricata_command = "%s -c %s -l %s %s " % (IDS_BINARY, IDS_CONFIG_FILE, IDS_LOG_DIRECTORY, add_options)
+    if len(PCAP_FILES) > 1:
+        suricata_command += "-r %s" % (os.path.dirname(PCAP_FILES[0]))
+    else:
+        suricata_command += "-r %s" % (PCAP_FILES[0])
     print_debug("Running suricata with the following command:\n%s" % suricata_command)
     suri_output_fh = open(JOB_IDS_LOG, "w")
     subprocess.call(suricata_command, shell = True, stderr=subprocess.STDOUT, stdout=suri_output_fh)
@@ -992,9 +1002,15 @@ def submit_job(job_id, job_directory):
         print_error("Could not extract engine configuration file from job.")
 
     try:
-        PCAP_FILES = [os.path.join(JOB_DIRECTORY, os.path.basename(cap)) for cap in manifest_data[0]['pcaps']]
-    except Exception:
+        PCAP_FILES = [os.path.join(JOB_DIRECTORY, PCAP_DIR, os.path.basename(cap)) for cap in manifest_data[0]['pcaps']]
+        for pcap_file in PCAP_FILES:
+            # move pcaps to their own directory (PCAP_DIR) since at this point they are in the JOB_DIRECTORY; can
+            # be easier for the engine to process when there are multiple pcaps
+            (base, name) = os.path.split(os.path.split(pcap_file)[0])
+            shutil.move(os.path.join(os.path.dirname(os.path.dirname(pcap_file)), os.path.basename(pcap_file)), pcap_file)
+    except Exception as e:
         print_error("Could not determine pcap files in job.")
+        logger.debug("Problem moving pcaps to directory '%s': %s" % (os.path.join(JOB_DIRECTORY, PCAP_DIR), e))
 
 
     # parse job dir for configs and pcaps
@@ -1040,7 +1056,8 @@ def submit_job(job_id, job_directory):
         print_debug("adding default-rule-path to yaml:\n%s\n" % '\n'.join(IDS_RULES_FILES))
         suri_yaml_fh.write("default-rule-path: %s\n" % JOB_DIRECTORY)
         suri_yaml_fh.close()
-        if len(PCAP_FILES) > 1:
+        # reading multiple pcaps added in Suricata 4.1
+        if len(PCAP_FILES) > 1 and LooseVersion("4.1") > LooseVersion(SENSOR_ENGINE_VERSION_ORIG):
             print_error("Multiple pcap files were submitted to the Dalton Agent for a Suricata job.\n\nSuricata can only read a single pcap file so multiple pcaps submitted to the Dalton Controller should have been combined by the Controller when packaging the job.\n\nIf you see this, something went wrong on the Controller or you are doing something untoward.")
 
     if SENSOR_ENGINE.startswith('snort'):
@@ -1119,7 +1136,7 @@ while True:
             # JOB_DEBUG_LOG not defined yet so can't call print_debug() here
             #print_debug("Extracting zip file for job id %s" % JOB_ID)
             JOB_DIRECTORY = "%s/%s_%s" % (STORAGE_PATH, JOB_ID, datetime.datetime.now().strftime("%b-%d-%Y_%H-%M-%S"))
-            os.makedirs(JOB_DIRECTORY)
+            os.makedirs(os.path.join(JOB_DIRECTORY, PCAP_DIR))
             zf = zipfile.ZipFile(zf_path, 'r')
             filenames = zf.namelist()
             for filename in filenames:

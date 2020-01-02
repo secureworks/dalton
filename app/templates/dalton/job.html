@@ -54,7 +54,11 @@
                         // stringify doesn't preserve escaping of forward slashes (e.g. "\/" in original is just "/")
                         newEve += JSON.stringify(newEveArray[i]) + "\n";
                     }
-                    newEve = newEve.slice(0,-1) + ']';
+                    if (newEve.length == 1) {
+                        newEve = "";
+                    } else {
+                        newEve = newEve.slice(0,-1) + ']';
+                    }
                     document.getElementById("eve-json").textContent = newEve;
                 }
                 // apply syntax highlighting
@@ -194,7 +198,7 @@
                                     <input type="checkbox" name="colorize" id="colorize" value="custom" checked><span class="label label-success">Syntax Highlighting</span>
                                 </label>
                             </form>
-                            {% if event_types|length > 1 %}
+                            {% if event_types|length > 0 %}
                             <form class="form inline" style="text-align:center;">
                                 {% for event_type in event_types %}
                                 <label class="checkbox inline">

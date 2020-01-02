@@ -134,17 +134,37 @@
 			id.unwrap();
 		}
 
+        function show_hide_log_options(sensor_tech) {
+            {# Unified2 is dead. Long live unifed2. #}
+            {# Suricata 6 ends support for unified2 #}
+            if (sensor_tech.startsWith("suri") && Number(sensor_tech.split('/')[1].replace(/^rust_/,"").split('.')[0]) >= 6) {
+                $('#optionAlertDetailedDiv').hide();
+            } else {
+                $('#optionAlertDetailedDiv').show();
+            }
+
+            {# EVE log support started with Suricata version 2 #}
+            if (sensor_tech.startsWith("suri") && Number(sensor_tech.split('/')[1].replace(/^rust_/,"").split('.')[0]) < 2) {
+                $('#optionEveLogDiv').hide();
+            } else {
+                $('#optionEveLogDiv').show();
+            }
+        }
+
         <!-- called when sensor version changed.  Updates engine.conf -->
         $('input[name="sensor_tech"]').change( function() {
             var version = $(this).attr("value")
+            console.debug("Version: " + version);
             var new_engine_conf = $.get("/dalton/controller_api/request_engine_conf?sensor=" + version, function( data ) {
                 if (data && data != '') {
                     document.getElementById('custom_engineconf_t').value = data;
                     updateHeading(version);
                 }
             });
+            show_hide_log_options(version);
         });
         updateHeading();
+        show_hide_log_options($('input[name="sensor_tech"]:checked').val());
     });
 {% endblock %}
 
@@ -261,11 +281,19 @@
 								<textarea rows='10' class='span'; style='margin-left:0;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"";);'></textarea>
 							</span>
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Logs</div>
-							<label class="checkbox">
-								<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed" checked>
-							    Pcap records from alerts
-                            </label>
+                            <div id="optionAlertDetailedDiv">
+    							<label class="checkbox">
+	    							<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed" checked>
+		    					    Pcap records from alerts (unified2)
+                                </label>
+                            </div>
                             {% if sensor_tech.startswith('suri') %}
+                                <div id="optionEveLogDiv">
+                                    <label class="checkbox">
+                                        <input type="checkbox" name="optionEveLog" id="optionEveLog" value="optionEveLog" checked>
+                                        EVE log
+                                    </label>
+                                </div>
                                 <label class="checkbox">
                                     <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs" checked>
                                     Other logs (Alert Debug, HTTP, TLS, DNS, etc.)
