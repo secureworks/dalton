@@ -1214,6 +1214,13 @@ def page_coverage_summary():
             return render_template('/dalton/error.html', jid='', msg=[err_msg])
         pcap_files.append({'filename': fspcap, 'pcappath': os.path.join(FS_PCAP_PATH, os.path.basename(fspcap))})
 
+    bSplitCap = False
+    try:
+        if request.form.get("optionSplitcap"):
+            bSplitCap = True
+    except:
+        pass
+
     # grab the user submitted files from the web form (max number of arbitrary files allowed on the web form
     # governed by max_pcap_files variable in dalton.conf)
     # note that these are file handle objects? have to get filename using .filename
@@ -1283,7 +1290,7 @@ def page_coverage_summary():
         # If multiple files submitted to Suricata, merge them here if the
         # Suricata version is < 4.1 since that is when support for multiple pcaps
         # was added.
-        if len(pcap_files) > 1 and sensor_tech.startswith("suri") and LooseVersion(sensor_tech_version) < LooseVersion("4.1"):
+        if len(pcap_files) > 1 and sensor_tech.startswith("suri") and LooseVersion(sensor_tech_version) < LooseVersion("4.1") and not bSplitCap:
             if not MERGECAP_BINARY:
                 logger.error("No mergecap binary; unable to merge pcaps for Suricata job.")
                 delete_temp_files(job_id)
@@ -1771,138 +1778,167 @@ def page_coverage_summary():
         digest = hashlib.md5()
         digest.update(job_id.encode('utf-8'))
         digest.update(sensor_tech.encode('utf-8'))
-        jid = digest.hexdigest()[0:16]
 
-        #Create the job zipfile. This will contain the file 'manifest.json', which is also queued.
-        #And place the rules file, config file, and test PCAPs within the zip file
-        if not os.path.exists(JOB_STORAGE_PATH):
-            os.makedirs(JOB_STORAGE_PATH)
-        zf_path = None
-        if bteapotJob:
-            # add 'teapot_' to the beginning of the jid to distinguish teapot jobs.  Among other things, this
-            # makes it so cron or whatever can easily delete teapot jobs on a different schedule if need be.
-            jid = 'teapot_%s' % jid
-        zf_path = '%s/%s.zip' % (JOB_STORAGE_PATH, jid)
-        zf = zipfile.ZipFile(zf_path, mode='w')
-        try:
-            for pcap in pcap_files:
-                zf.write(pcap['pcappath'], arcname=os.path.basename(pcap['filename']))
-            if request.form.get('optionProdRuleset'):
-                ruleset_path = request.form.get('prod_ruleset')
-                if not ruleset_path:
-                    delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid=jid, msg=["No defined ruleset provided."])
-                if not prod_ruleset_name: # if Suri job, this is already set above
-                    prod_ruleset_name = os.path.basename(ruleset_path)
-                    if not prod_ruleset_name.endswith(".rules"):
-                        prod_ruleset_name = "%s.rules" % prod_ruleset_name
-                logger.debug("ruleset_path = %s" % ruleset_path)
-                logger.debug("Dalton in page_coverage_summary():   prod_ruleset_name: %s" % (prod_ruleset_name))
-                if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
-                    delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid=jid, msg=["Invalid ruleset submitted: '%s'." % prod_ruleset_name, "Path/name invalid."])
-                elif not os.path.exists(ruleset_path):
-                    delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid=jid, msg=["Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path)])
-                else:
-                    # if these options are set, modify ruleset accordingly
-                    if bEnableAllRules or bShowFlowbitAlerts:
-                        modified_rules_path = "%s/%s_prod_modified.rules" % (TEMP_STORAGE_PATH, job_id)
-                        regex = re.compile(r"^#+\s*(alert|log|pass|activate|dynamic|drop|reject|sdrop)\s")
-                        prod_rules_fh = open(ruleset_path, 'r')
-                        modified_rules_fh = open(modified_rules_path, 'w')
-                        for line in prod_rules_fh:
-                            # if Enable disabled rules checked, do the needful
-                            if bEnableAllRules:
-                                if regex.search(line):
-                                    line = line.lstrip('# \t')
-                            # if show all flowbit alerts set, strip out 'flowbits:noalert;'
-                            if bShowFlowbitAlerts:
-                                line = re.sub(r'([\x3B\s])flowbits\s*\x3A\s*noalert\s*\x3B', '\g<1>', line)
-                            modified_rules_fh.write(line)
-                        prod_rules_fh.close()
-                        modified_rules_fh.close()
-                        ruleset_path = modified_rules_path
-                    zf.write(ruleset_path, arcname=prod_ruleset_name)
+        splitcap_jid_list = []
+
+        for splitcap in pcap_files:
+            digest.update(splitcap['filename'].encode('utf-8'))
+            jid = digest.hexdigest()[0:16]
+
+            #Create the job zipfile. This will contain the file 'manifest.json', which is also queued.
+            #And place the rules file, config file, and test PCAPs within the zip file
+            # for splitcap (creating separate jobs for each pcap), only the pcap file and manifest are
+            # modified but seems easier and just as fast to go thru the whole (new) zip file creation
+            # process here.
+            if not os.path.exists(JOB_STORAGE_PATH):
+                os.makedirs(JOB_STORAGE_PATH)
+            zf_path = None
+            if bteapotJob:
+                # add 'teapot_' to the beginning of the jid to distinguish teapot jobs.  Among other things, this
+                # makes it so cron or whatever can easily delete teapot jobs on a different schedule if need be.
+                jid = f"teapot_{jid}"
+            if bSplitCap:
+                set_job_status_msg(jid, f"Creating job for pcap '{os.path.basename(splitcap['filename'])}'...")
+            zf_path = os.path.join(f"{JOB_STORAGE_PATH}", f"{jid}.zip")
+            zf = zipfile.ZipFile(zf_path, mode='w')
             try:
-                if request.form.get('optionCustomRuleset') and request.form.get('custom_ruleset'):
-                    zf.write(custom_rules_file, arcname='dalton-custom.rules')
-            except:
-                logger.warn("Problem adding custom rules: %s", e)
-                pass
-            vars_file = None
-            if vars_file is not None:
-                zf.write(vars_file, arcname='variables.conf')
-            if engine_conf_file:
-                zf.write(engine_conf_file, arcname=os.path.basename(engine_conf_file))
+                if bSplitCap:
+                    zf.write(splitcap['pcappath'], arcname=os.path.basename(splitcap['filename']))
+                else:
+                    for pcap in pcap_files:
+                        zf.write(pcap['pcappath'], arcname=os.path.basename(pcap['filename']))
+                if request.form.get('optionProdRuleset'):
+                    ruleset_path = request.form.get('prod_ruleset')
+                    if not ruleset_path:
+                        delete_temp_files(job_id)
+                        return render_template('/dalton/error.html', jid=jid, msg=["No defined ruleset provided."])
+                    if not prod_ruleset_name: # if Suri job, this is already set above
+                        prod_ruleset_name = os.path.basename(ruleset_path)
+                        if not prod_ruleset_name.endswith(".rules"):
+                            prod_ruleset_name = "%s.rules" % prod_ruleset_name
+                    logger.debug("ruleset_path = %s" % ruleset_path)
+                    logger.debug("Dalton in page_coverage_summary():   prod_ruleset_name: %s" % (prod_ruleset_name))
+                    if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
+                        delete_temp_files(job_id)
+                        return render_template('/dalton/error.html', jid=jid, msg=["Invalid ruleset submitted: '%s'." % prod_ruleset_name, "Path/name invalid."])
+                    elif not os.path.exists(ruleset_path):
+                        delete_temp_files(job_id)
+                        return render_template('/dalton/error.html', jid=jid, msg=["Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path)])
+                    else:
+                        # if these options are set, modify ruleset accordingly
+                        if bEnableAllRules or bShowFlowbitAlerts:
+                            modified_rules_path = "%s/%s_prod_modified.rules" % (TEMP_STORAGE_PATH, job_id)
+                            regex = re.compile(r"^#+\s*(alert|log|pass|activate|dynamic|drop|reject|sdrop)\s")
+                            prod_rules_fh = open(ruleset_path, 'r')
+                            modified_rules_fh = open(modified_rules_path, 'w')
+                            for line in prod_rules_fh:
+                                # if Enable disabled rules checked, do the needful
+                                if bEnableAllRules:
+                                    if regex.search(line):
+                                        line = line.lstrip('# \t')
+                                # if show all flowbit alerts set, strip out 'flowbits:noalert;'
+                                if bShowFlowbitAlerts:
+                                    line = re.sub(r'([\x3B\s])flowbits\s*\x3A\s*noalert\s*\x3B', '\g<1>', line)
+                                modified_rules_fh.write(line)
+                            prod_rules_fh.close()
+                            modified_rules_fh.close()
+                            ruleset_path = modified_rules_path
+                        zf.write(ruleset_path, arcname=prod_ruleset_name)
+                try:
+                    if request.form.get('optionCustomRuleset') and request.form.get('custom_ruleset'):
+                        zf.write(custom_rules_file, arcname='dalton-custom.rules')
+                except:
+                    logger.warn("Problem adding custom rules: %s", e)
+                    pass
+                vars_file = None
+                if vars_file is not None:
+                    zf.write(vars_file, arcname='variables.conf')
+                if engine_conf_file:
+                    zf.write(engine_conf_file, arcname=os.path.basename(engine_conf_file))
 
-            #build the json job
-            json_job = {}
-            json_job['id'] = jid
-            json_job['pcaps']= []
-            for pcap in pcap_files:
-                json_job['pcaps'].append(os.path.basename(pcap['filename']))
-            json_job['user'] = user
-            json_job['enable-all-rules'] = bEnableAllRules
-            json_job['show-flowbit-alerts'] = bShowFlowbitAlerts
-            json_job['custom-rules'] = bCustomRules
-            json_job['track-performance'] = bTrackPerformance
-            json_job['get-engine-stats'] = bGetEngineStats
-            json_job['teapot-job'] = bteapotJob
-            json_job['alert-detailed'] = bGetAlertDetailed
-            json_job['get-fast-pattern'] = bGetFastPattern
-            json_job['get-other-logs'] = bGetOtherLogs
-            json_job['sensor-tech'] = sensor_tech
-            json_job['prod-ruleset'] = prod_ruleset_name
-            json_job['engine-conf'] = os.path.basename(engine_conf_file)
-            # add var and other fields too
-            str_job = json.dumps(json_job)
+                #build the json job
+                json_job = {}
+                json_job['id'] = jid
+                json_job['pcaps']= []
+                if bSplitCap:
+                    json_job['pcaps'].append(os.path.basename(splitcap['filename']))
+                else:
+                    for pcap in pcap_files:
+                        json_job['pcaps'].append(os.path.basename(pcap['filename']))
+                json_job['user'] = user
+                json_job['enable-all-rules'] = bEnableAllRules
+                json_job['show-flowbit-alerts'] = bShowFlowbitAlerts
+                json_job['custom-rules'] = bCustomRules
+                json_job['track-performance'] = bTrackPerformance
+                json_job['get-engine-stats'] = bGetEngineStats
+                json_job['teapot-job'] = bteapotJob
+                json_job['split-pcaps'] = bSplitCap
+                json_job['alert-detailed'] = bGetAlertDetailed
+                json_job['get-fast-pattern'] = bGetFastPattern
+                json_job['get-other-logs'] = bGetOtherLogs
+                json_job['sensor-tech'] = sensor_tech
+                json_job['prod-ruleset'] = prod_ruleset_name
+                json_job['engine-conf'] = os.path.basename(engine_conf_file)
+                # add var and other fields too
+                str_job = json.dumps(json_job)
 
-            #build the manifest file
-            manifest_path = '%s/%s.json' % (TEMP_STORAGE_PATH, job_id)
-            f = open(manifest_path, 'w')
-            f.write(str_job)
-            f.close()
+                #build the manifest file
+                manifest_path = os.path.join(f"{TEMP_STORAGE_PATH}", f"{job_id}.json")
+                f = open(manifest_path, 'w')
+                f.write(str_job)
+                f.close()
 
-            zf.write(manifest_path, arcname='manifest.json')
-        finally:
-            zf.close()
+                zf.write(manifest_path, arcname='manifest.json')
+            finally:
+                zf.close()
 
-        logger.debug("Dalton in page_coverage_summary(): created job zip file %s for user %s" % (zf_path, user))
+            logger.debug("Dalton in page_coverage_summary(): created job zip file %s for user %s" % (zf_path, user))
 
-        #remove the temp files from local storage now that everything has been written to the zip file
+            # Note: any redis sets here are not given expire times; these should
+            # be set when job is requested by agent
+
+            #store user name
+            r.set("%s-user" % jid, user)
+
+            #store sensor tech for job
+            r.set("%s-tech" % jid, sensor_tech)
+
+            # store submission time for job
+            r.set("%s-submission_time" % jid, datetime.datetime.now().strftime("%b %d %H:%M:%S"))
+
+            # if this is a teapot job,
+            if bteapotJob:
+                r.set("%s-teapotjob" % jid, bteapotJob)
+
+            # set job as queued and write to the Redis queue
+            set_job_status(jid, STAT_CODE_QUEUED)
+            set_job_status_msg(jid, f"Queued Job {jid}")
+            logger.info("Dalton user '%s' submitted Job %s to queue %s" % (user, jid, sensor_tech))
+            r.rpush(sensor_tech, str_job)
+
+            # add to list for queue web page
+            r.lpush("recent_jobs", jid)
+
+            if bSplitCap:
+                splitcap_jid_list.append(jid)
+            else:
+                break
+
+        #remove the temp files from local storage now that everything has been written to the zip file(s)
         delete_temp_files(job_id)
 
-        # Note: any redis sets here are not given expire times; these should
-        # be set when job is requested by agent
-
-        #store user name
-        r.set("%s-user" % jid, user)
-
-        #store sensor tech for job
-        r.set("%s-tech" % jid, sensor_tech)
-
-        # store submission time for job
-        r.set("%s-submission_time" % jid, datetime.datetime.now().strftime("%b %d %H:%M:%S"))
-
-        # if this is a teapot job,
         if bteapotJob:
-            r.set("%s-teapotjob" % jid, bteapotJob)
-
-        # set job as queued and write to the Redis queue
-        set_job_status(jid, STAT_CODE_QUEUED)
-        set_job_status_msg(jid, "Queued")
-        logger.info("Dalton user '%s' submitted Job %s to queue %s" % (user, jid, sensor_tech))
-        r.rpush(sensor_tech, str_job)
-
-        # add to list for queue web page
-        r.lpush("recent_jobs", jid)
-
-        if bteapotJob:
-            return jid
+            if bSplitCap:
+                return ','.join(splitcap_jid_list)
+            else:
+                return jid
         else:
             # make sure redirect is set to use http or https as appropriate
-            rurl = url_for('dalton_blueprint.page_show_job', jid=jid, _external=True)
+            if bSplitCap:
+                # TODO: something better than just redirect to queue page
+                rurl = url_for('dalton_blueprint.page_queue_default', _external=True)
+            else:
+                rurl = url_for('dalton_blueprint.page_show_job', jid=jid, _external=True)
             if rurl.startswith('http'):
                 if "HTTP_X_FORWARDED_PROTO" in request.environ:
                     # if original request was https, make sure redirect uses https
@@ -1912,7 +1948,7 @@ def page_coverage_summary():
             else:
                 # this shouldn't be the case with '_external=True' passed to url_for()
                 logger.warn("URL does not start with 'http': %s" % rurl)
-        return redirect(rurl)
+            return redirect(rurl)
 
 @dalton_blueprint.route('/dalton/queue')
 #@login_required()

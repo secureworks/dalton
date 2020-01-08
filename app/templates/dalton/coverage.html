@@ -227,7 +227,13 @@
 							<div id="resetpcap" style="display:inline;">
 								<a href="#">Reset Pcaps</a>
 							</div>
-
+                            <p>
+                            <div>
+                                <label class="checkbox" id="labelSplitcap">
+                                    <input type="checkbox" name="optionSplitcap" id="optionSplitcap" value="splitcap">
+                                    Create separate jobs for each pcap
+                                </label>
+                            </div>
 
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Sensor Version</div>
                                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
