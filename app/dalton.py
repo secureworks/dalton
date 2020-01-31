@@ -1520,16 +1520,33 @@ def page_coverage_summary():
                 if "logging" in config and "default-log-level" in config['logging'] and config['logging']['default-log-level']  == "notice":
                     config['logging']['default-log-level']  = "info"
 
+                for citem in ['outputs', 'logging']:
+                    # set outputs
+                    if citem not in config:
+                        logger.warn(f"No '{citem}' section in Suricata YAML. This may be a problem....")
+                        # going to try to build this from scratch but Suri still may not like it
+                        config[f"{citem}"] = []
 
-                # set outputs
-                if 'outputs' not in config:
-                    logger.warn("No 'outputs' section in Suricata YAML. This may be a problem....")
-                    # going to try to build this from scratch but Suri still may not like it
-                    config['outputs'] = []
-
-                # apparently with this version of ruamel.yaml and the round trip load, outputs isn't
+                # apparently with this version of ruamel.yaml and the round trip load, some things aren't
                 #  an ordered dict but a list...
+                llist =[list(config['logging']['outputs'][i].keys())[0] for i in range(0, len(config['logging']['outputs']))]
                 olist =[list(config['outputs'][i].keys())[0] for i in range(0, len(config['outputs']))]
+
+                # Suricata log. Hard code location for use in socket control
+                slog_level = "info"
+                if 'file' in llist:
+                    try:
+                        slog_level = config['logging']['outputs'][llist.index('file')]['file']['level']
+                    except Exception as e:
+                        logger.warn("Unable to get log level from config (logging->outputs->file->level): %s" % e)
+                        pass
+                file_config = {'file': {'enabled': True, \
+                                                'filename': "/tmp/dalton-suricata.log", \
+                                                'level': f"{slog_level}"}}
+                if 'file' in llist:
+                    config['logging']['outputs'][llist.index('file')] = file_config
+                else:
+                    config['logging']['outputs'].append(file_config)
 
                 # fast.log
                 fast_config = {'fast': {'enabled': True, \

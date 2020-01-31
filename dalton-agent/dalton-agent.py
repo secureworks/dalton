@@ -49,9 +49,19 @@ import logging
 from logging.handlers import RotatingFileHandler
 from distutils.version import LooseVersion
 import binascii
+import hashlib
+from pathlib import Path
 
 # urllib2 in Python < 2.6 doesn't support setting a timeout so doing it like this
 socket.setdefaulttimeout(120)
+
+# Hard code this since Controller hard codes it.
+# Used particularly for logging suri output when using socket control
+suricata_logging_outputs_file = "/tmp/dalton-suricata.log"
+
+# Also hard-coded; no need to expose but putting in variable for convenience.
+suricata_sc_pid_file = "/usr/local/var/run/suricata.pid"
+
 
 #*********************************
 #*** Parse Comand Line Options ***
@@ -91,6 +101,10 @@ try:
     API_KEY = config.get('dalton', 'API_KEY')
     POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
     KEEP_JOB_FILES = config.getboolean('dalton', 'KEEP_JOB_FILES')
+    USE_SURICATA_SOCKET_CONTROL = config.getboolean('dalton', 'USE_SURICATA_SOCKET_CONTROL')
+    SURICATA_SC_PYTHON_MODULES = config.get('dalton', 'SURICATA_SC_PYTHON_MODULES')
+    SURICATA_SOCKET_NAME = config.get('dalton', 'SURICATA_SOCKET_NAME')
+
 except Exception as e:
     # just print to stdout; logging hasn't started yet
     print(f"Error parsing config file, '{dalton_config_file}':\n\n{e}\n\nexiting.")
@@ -115,11 +129,22 @@ else:
     file_handler.setLevel(logging.INFO)
     logger.setLevel(logging.INFO)
 
+
 #************************************************
 #** Helper Functions to populate config values **
 #************************************************
-''' returns full path to file if found on system '''
+def prefix_strip(mystring, prefixes=["rust_"]):
+    """ strip passed in prefixes from the beginning of passed in string and return it
+    """
+    if not isinstance(prefixes, list):
+        prefixes = [prefixes]
+    for prefix in prefixes:
+        if mystring.startswith(prefix):
+            return mystring[len(prefix):]
+    return mystring
+
 def find_file(name):
+    """Returns full path to file if found on system."""
     ret_path = None
     try:
         # see if it is already in the path by using the 'which' command
@@ -139,8 +164,8 @@ def find_file(name):
                 break
     return ret_path
 
-''' returns the version of the engine given full path to binary (e.g. Suricata, Snort) '''
 def get_engine_version(path):
+    """returns the version of the engine given full path to binary (e.g. Suricata, Snort)."""
     global SENSOR_ENGINE_VERSION_ORIG
     engine = "unknown"
     version = "unknown"
@@ -183,11 +208,37 @@ def get_engine_version(path):
     logger.debug("Using IDS binary '%s': engine: '%s', version '%s'" % (path, engine, version))
     return (engine, version)
 
+def hash_file(filenames):
+    """Returns md5sum of pased in file. If a list of files is passed,
+       they are concatenated together and hashed.
+       Remove "default-rule-path" from Suricata config since this
+       changes every job.
+    """
+    if not isinstance(filenames, list):
+        filenames = [filenames]
+    hash = hashlib.md5()
+    for filename in filenames:
+        if not os.path.isfile(filename):
+            logger.error(f"in hash_file(): file '{filename}' does not exit.")
+            raise
+        if filename.endswith(".yaml"):
+            # remove "default-rule-path:" line
+            with open(filename, 'r') as fh:
+                lines = fh.readlines()
+                hash.update("".join([l for l in lines if not l.startswith("default-rule-path:")]).encode('utf-8'))
+        else:
+            with open(filename, 'rb') as fh:
+                data = fh.read(65536)
+                while len(data) > 0:
+                    hash.update(data)
+                    data = fh.read(65536)
+    return hash.hexdigest()
+
 #**************************
 #*** Constant Variables ***
 #**************************
 
-AGENT_VERSION = "3.0.0"
+AGENT_VERSION = "3.1.0"
 HTTP_HEADERS = {
     "User-Agent" : f"Dalton Agent/{AGENT_VERSION}"
 }
@@ -238,6 +289,25 @@ if SENSOR_CONFIG == "auto":
 else:
     sensor_config_variable = f"SENSOR_CONFIG={SENSOR_CONFIG}&"
 
+if not SENSOR_ENGINE.startswith("suricata"):
+    USE_SURICATA_SOCKET_CONTROL = False
+
+if USE_SURICATA_SOCKET_CONTROL:
+    # Socket Control supported in Suricata 1.4 and later
+    if float('.'.join(prefix_strip(eng_ver).split('.')[:2])) < 3.0:
+        msg = f"Dalton Agent does not support Suricata Socket Control for Suricata versions before 3.0. This is running Suricata version {eng_ver}.  Disabling Suricata Socket Control Mode."
+        logger.warn(msg)
+        USE_SURICATA_SOCKET_CONTROL = False
+
+if USE_SURICATA_SOCKET_CONTROL:
+    if os.path.isdir(SURICATA_SC_PYTHON_MODULES):
+        sys.path.append(SURICATA_SC_PYTHON_MODULES)
+    elif os.path.isdir(os.path.abspath(os.path.join(SURICATA_SC_PYTHON_MODULES, '..', 'scripts', 'suricatasc', 'src'))):
+        # older Suricata versions had suricatasc in "scripts" directory, not "python" directory
+        sys.path.append(os.path.abspath(os.path.join(SURICATA_SC_PYTHON_MODULES, '..', 'scripts', 'suricatasc', 'src')))
+    # Used as Suricata default-log-dir when in SC mode
+    os.makedirs(os.path.dirname(SURICATA_SOCKET_NAME), exist_ok=True)
+
 req_job_url = (f"{DALTON_API}/request_job?"
                f"SENSOR_ENGINE={SENSOR_ENGINE}&"
                f"SENSOR_ENGINE_VERSION={SENSOR_ENGINE_VERSION}&"
@@ -255,6 +325,8 @@ logger.info("\tSENSOR_ENGINE_VERSION: %s" % SENSOR_ENGINE_VERSION)
 logger.info("\tSENSOR_CONFIG: %s" % SENSOR_CONFIG)
 logger.info("\tIDS_BINARY: %s" % IDS_BINARY)
 logger.info("\tTCPDUMP_BINARY: %s" % TCPDUMP_BINARY)
+if SENSOR_ENGINE.startswith("suricata"):
+    logger.info("\tUSE_SURICATA_SOCKET_CONTROL: %s" % USE_SURICATA_SOCKET_CONTROL)
 
 # just in case the Dalton Agent is set to use a proxy, exclude "dalton_web" which is the
 # web server container and communication with it shouldn't go thru a proxy; if the
@@ -275,7 +347,6 @@ PCAP_FILES = []
 PCAP_DIR = "pcaps"
 IDS_RULES_FILES = None
 IDS_CONFIG_FILE = None
-ENGINE_CONF_FILE = None
 JOB_DIRECTORY = None
 # dalton's log directory
 JOB_LOG_DIRECTORY = None
@@ -298,11 +369,197 @@ TOTAL_PROCESSING_TIME = ''
 ERROR_SLEEP_TIME = 5
 URLLIB_TIMEOUT = 120
 
-#**************************
-#*** Custom Error Class ***
-#**************************
+# global class used for Suricata Socket Control
+# set later
+SCONTROL = None
+
+#****************#
+#*** Job Logs ***#
+#****************#
+# functions for populating job logs
+def print_error(msg):
+    if JOB_ERROR_LOG:
+        fh = open(JOB_ERROR_LOG, "a")
+        fh.write("%s\n" % msg)
+        fh.close()
+    else:
+        logger.debug("print_error() called but no JOB_ERROR_LOG exists")
+    print_msg("ERROR!")
+    print_debug("ERROR:\n%s" % msg)
+    # throw error
+    raise DaltonError(msg)
+
+def print_msg(msg):
+    print_debug(msg)
+    # send message
+    logger.debug(msg)
+    send_update(msg, JOB_ID)
+
+def print_debug(msg):
+    global JOB_DEBUG_LOG
+    if JOB_DEBUG_LOG:
+        fh = open(JOB_DEBUG_LOG, "a")
+        fh.write("*****\n%s\n" % msg)
+        fh.close()
+    else:
+        logger.debug("print_debug() called but no JOB_DEBUG_LOG exists")
+
+#**********************
+#*** Custom Classes ***
+#**********************
+
+class SocketController:
+    """ Basically a wrapper for Suricata socket control.
+        Also handles start/restart of Suricata which is
+        run in daemon mode.
+    """
+    def __init__(self, socket_path):
+        try:
+            self.sc = suricatasc.SuricataSC(socket_path)
+            self.ruleset_hash = None
+            self.config_hash = None
+            self.reset_logging()
+            self.suricata_is_running = False
+        except Exception as e:
+            print_error("Problem initializing Suricata socket control: %s" % e)
+
+    def connect(self):
+        try:
+            logger.debug("Connecting to socket...")
+            self.sc.connect()
+        except Exception as e:
+            self.suricata_is_running = False
+            logger.debug("%s" % traceback.format_exc())
+            print_error("Problem connecting to Unix socket: %s" % e)
+
+    def send_command(self, command):
+        try:
+            cmd, arguments = self.sc.parse_command(command)
+            #logger.debug("in send_command():\n\tcmd: %s\n\targuments: %s" % (cmd, arguments))
+            cmdret = self.sc.send_command(cmd, arguments)
+        except Exception as e:
+            print_error("Problem parsing/sending command: %s" % e)
+
+        if cmdret["return"] == "NOK":
+            print_error("\"NOK\" response received from socket command; message: %s" % json.dumps(cmdret["message"]))
+
+        return json.dumps(cmdret["message"])
+
+    def close(self):
+        """Close socket connection."""
+        self.sc.close()
+        logger.debug("Closed connection to socket.")
+
+    def shutdown(self):
+        """Shutdown Suricata process."""
+        logger.debug("Shutting down Suricata Unix Socket instance.")
+        try:
+            self.send_command("shutdown")
+        except Exception as e:
+            print_error(f"Problem shutting down Suricata instance in shutdown(): {e}")
+        finally:
+            self.suricata_is_running = False
+
+
+    def stop_suricata_daemon(self):
+        """Stop Suricata daemon using socket control."""
+        logger.debug("stop_suricata_daemon() called")
+        if not self.suricata_is_running:
+            logger.warn("stop_suricata_daemon() called but Suricata may not be running."
+                        " Still attempting shutdown but it will likely error."
+                       )
+        try:
+            self.connect()
+            self.shutdown()
+            self.close()
+        except Exception as e:
+            print_error(f"Problem shutting down old Suricata instance in stop_suricata_daemon(): {e}")
+        finally:
+            self.suricata_is_running = False
+
+    def reset_logging(self, delete_pid_file = True):
+        """ Reset log files and remove pid file if exists. """
+        # logging
+        if os.path.exists(suricata_logging_outputs_file):
+            logger.debug("deleting '%s'" % suricata_logging_outputs_file)
+            os.unlink(suricata_logging_outputs_file)
+        # touch file since it gets read at Suri startup in daemon mode and
+        # there could be a race condition
+        Path(suricata_logging_outputs_file).touch()
+        self.log_offset = 0
+        self.suri_startup_log = ''
+
+        # pid file
+        if delete_pid_file:
+            if os.path.exists(suricata_sc_pid_file):
+                logger.debug("deleting '%s'" % suricata_sc_pid_file)
+                os.unlink(suricata_sc_pid_file)
+
+    def start_suricata_daemon(self, config):
+        """Start Suricata thread with Unix Socket listener."""
+        logger.debug("start_suricata_daemon() called")
+        self.reset_logging()
+        if config is None:
+            print_error("start_suricata_daemon() called but not initialized.")
+        # start Suri
+        suricata_command = f"suricata -c {config} -k none --runmode single --unix-socket={SURICATA_SOCKET_NAME} -D"
+        print_debug(f"Starting suricata thread with the following command:\n{suricata_command}")
+        # use Popen() instead of call() since the latter blocks which isn't what we want
+        subprocess.Popen(suricata_command, shell = True)
+        # wait for Suricata to be ready to process traffic before returning
+        # tail suricata_logging_outputs_file (default /tmp/dalton-suricata.log),
+        # look for "engine started."
+        with open(suricata_logging_outputs_file, 'r') as suri_output_fh:
+            logger.debug("tailing '%s' so see when engine has startup up fully" % suricata_logging_outputs_file)
+            now = datetime.datetime.now()
+            keep_looking = True
+            while keep_looking:
+                line = suri_output_fh.readline()
+                if not line or not line.endswith('\n'):
+                    time.sleep(0.1)
+                    continue
+                self.suri_startup_log += line
+                if "engine started" in line:
+                    self.log_offset = suri_output_fh.tell()
+                    break
+                if "<Error>" in line:
+                    # submit_job() erorrs out before JOB_IDS_LOG is copied so
+                    # copy over output log to JOB_IDS_LOG here so it gets returned
+                    shutil.copyfile(suricata_logging_outputs_file, JOB_IDS_LOG)
+                    self.suricata_is_running = False
+                    print_error(f"Problem starting Suricata daemon: {line}")
+                else:
+                    new_now = datetime.datetime.now()
+                    if (new_now - now).seconds > 120:
+                        # timeout
+                        shutil.copyfile(suricata_logging_outputs_file, JOB_IDS_LOG)
+                        self.suricata_is_running = False
+                        print_error("Timeout waiting on Suricata daemon to start.")
+
+        self.suricata_is_running = True
+        logger.debug("Suricata daemon started")
+
+    def restart_suricata_socket_mode(self, newconfig):
+        if self.suricata_is_running:
+            # Suricata daemon is running; stop it so we can start
+            # a new one with a new config and/or rules
+            self.stop_suricata_daemon()
+        SCONTROL.start_suricata_daemon(newconfig)
+
+# Error Class
 class DaltonError(Exception):
     pass
+
+#***********************
+#*** Custom Imports ****
+#***********************
+
+if USE_SURICATA_SOCKET_CONTROL:
+    try:
+        import suricatasc
+    except Exception as e:
+        logger.error(f"Unable to import 'suricatasc' module (SURICATA_SC_PYTHON_MODULES set to '{SURICATA_SC_PYTHON_MODULES}'). Suricata Socket Control will be disabled.")
+        USE_SURICATA_SOCKET_CONTROL = False
 
 #****************************************
 #*** Communication/Printing Functions ***
@@ -397,13 +654,12 @@ def send_results():
 
     # populate ids log
     results = ''
-    fh = open(JOB_IDS_LOG, 'r')
-    results = fh.read()
+    with open(JOB_IDS_LOG, 'r') as fh:
+        results = fh.read()
     # make sure we have only ASCII
     results_dict['ids'] = ""
     for line in results:
         results_dict['ids'] += nonprintable_re.sub(hexescape, line)
-    fh.close()
 
     # populate alert
     fh = open(JOB_ALERT_LOG, 'r')
@@ -499,34 +755,6 @@ def error_post_results(error_msg):
     json_results_dict = json.dumps(results_dict)
     payload = {'json_data': json_results_dict}
     post_results(payload)
-
-def print_error(msg):
-    if JOB_ERROR_LOG:
-        fh = open(JOB_ERROR_LOG, "a")
-        fh.write("%s\n" % msg)
-        fh.close()
-    else:
-        logger.debug("print_error() called but no JOB_ERROR_LOG exists")
-    print_msg("ERROR!")
-    print_debug("ERROR:\n%s" % msg)
-    # throw error
-    raise DaltonError(msg)
-
-def print_msg(msg):
-    print_debug(msg)
-    # send message
-    logger.debug(msg)
-    send_update(msg, JOB_ID)
-
-def print_debug(msg):
-    global JOB_DEBUG_LOG
-    if JOB_DEBUG_LOG:
-        fh = open(JOB_DEBUG_LOG, "a")
-        fh.write("*****\n%s\n" % msg)
-        fh.close()
-    else:
-        logger.debug("print_debug() called but no JOB_DEBUG_LOG exists")
-
 
 # process alert output from Snort
 def process_snort_alerts():
@@ -668,8 +896,56 @@ def run_snort():
 #** Suricata Functions **
 #************************
 
+
+def run_suricata_sc():
+    global SCONTROL
+    print_debug("Using Suricata Socket Control ... run_suricata_sc() called")
+    if not IDS_BINARY:
+        print_error("No Suricata binary found on system.")
+    print_msg("Running pcap(s) thru Suricata; using socket control")
+    config_hash = hash_file(IDS_CONFIG_FILE)
+    ruleset_hash = hash_file(sorted(glob.glob(os.path.join(JOB_DIRECTORY, "*.rules"))))
+    logger.debug("NEW config_hash: %s, ruleset_hash: %s" % (config_hash, ruleset_hash))
+    logger.debug("OLD config_hash: %s, ruleset_hash: %s" % (SCONTROL.config_hash, SCONTROL.ruleset_hash))
+    if (not (ruleset_hash == SCONTROL.ruleset_hash and config_hash == SCONTROL.config_hash)) \
+        and SCONTROL.suricata_is_running:
+        # if hashes don't match, shutdown suri via socket, start new suri, update hashes, run
+        print_debug("Suricata Socket Control: new hashes found, restarting Suricata.....")
+        SCONTROL.ruleset_hash = ruleset_hash
+        SCONTROL.config_hash = config_hash
+        SCONTROL.restart_suricata_socket_mode(newconfig=IDS_CONFIG_FILE)
+    else:
+        if not SCONTROL.suricata_is_running:
+            logger.warn("Suricata thread not running ... starting it back up....")
+            SCONTROL.ruleset_hash = ruleset_hash
+            SCONTROL.config_hash = config_hash
+            SCONTROL.restart_suricata_socket_mode(newconfig=IDS_CONFIG_FILE)
+        else:
+            print_debug("New job has same config and ruleset hash, not restarting.")
+
+    SCONTROL.connect()
+    for pcap in PCAP_FILES:
+        resp = SCONTROL.send_command(f"pcap-file {pcap} {IDS_LOG_DIRECTORY}")
+        logger.debug("Sent pcap %s. Response: %s" % (pcap, resp))
+
+    # pcap files submitted (non blocking, they get queued); wait until done
+    # note that "pcap-file-number" command returns the number in the queue, and
+    # does not inlude the current pcap being processed, so wait until that
+    # ("pcap-current") is None.
+    files_remaining = 1
+    current_pcap = "dummy.pcap"
+    # TODO: change dynamically based on number of pcap files?
+    sleep_time = .1
+    while files_remaining > 0 or current_pcap != "\"None\"":
+        time.sleep(sleep_time)
+        # TODO: try/catch ???
+        files_remaining = int(SCONTROL.send_command("pcap-file-number"))
+        current_pcap = SCONTROL.send_command("pcap-current")
+        #logger.debug(f"files_remaining: {files_remaining}, current_pcap: {current_pcap}")
+    logger.debug("In run_suricata_sc(): all pcaps done running ... closing connection to socket.")
+    SCONTROL.close()
+
 def run_suricata():
-    global IDS_BINARY, IDS_CONFIG_FILE, IDS_LOG_DIRECTORY, JOB_ALERT_LOG, PCAP_FILES, JOB_IDS_LOG
     print_debug("run_suricata() called")
     if not IDS_BINARY:
         print_error("No Suricata binary found on system.")
@@ -773,9 +1049,9 @@ def check_for_errors(tech):
         ids_log_fh = open(JOB_IDS_LOG, "r")
         for line in ids_log_fh:
             if tech.startswith('suri'):
-                if (" - <Error> - " in line or line.startswith("ERROR") or line.startswith("Failed to parse configuration file")):
+                if ("<Error>" in line or line.startswith("ERROR") or line.startswith("Failed to parse configuration file")):
                     error_lines.append(line)
-                    if "bad dump file format" in line:
+                    if "bad dump file format" in line or "unknown file format" in line:
                         error_lines.append("Bad pcap file(s) submitted to Suricata. Pcap files should be in libpcap format (pcapng is not supported in older Suricata versions).\n")
             elif tech.startswith('snort'):
                 if "ERROR:" in line or "FATAL" in line or "Fatal Error" in line or "Segmentation fault" in line or line.startswith("Error "):
@@ -861,7 +1137,7 @@ def process_performance_logs():
 #****************************
 # resets the global variables between jobs
 def reset_globals():
-    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, \
+    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, \
            JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, \
            JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_PERFORMANCE_LOG, \
            IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, JOB_OTHER_LOGS, JOB_EVE_LOG
@@ -870,7 +1146,6 @@ def reset_globals():
     PCAP_FILES = []
     IDS_RULES_FILES = []
     IDS_CONFIG_FILE = None
-    ENGINE_CONF_FILE = None
     JOB_DIRECTORY = None
     # dalton's log directory
     JOB_LOG_DIRECTORY = None
@@ -892,7 +1167,7 @@ def reset_globals():
 # primary function
 # gets passed directory of submitted files (rules file, pcap file(s)) and job ID
 def submit_job(job_id, job_directory):
-    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, ENGINE_CONF_FILE, \
+    global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, \
            JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, \
            JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, \
            JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY, \
@@ -1071,9 +1346,13 @@ def submit_job(job_id, job_directory):
     elif SENSOR_ENGINE.startswith('suri'):
         # this section for Suricata agents
         if getFastPattern:
+            #TODO: test this if socket control enabled
             generate_fast_pattern()
         # run the Suricata job
-        run_suricata()
+        if USE_SURICATA_SOCKET_CONTROL:
+            run_suricata_sc()
+        else:
+            run_suricata()
         # populate the alerts (fast.log)
         process_suri_alerts()
         process_eve_log()
@@ -1111,6 +1390,23 @@ def submit_job(job_id, job_directory):
     else:
         print_debug("Performance tracking disabled, not processing performance logs")
 
+    # Populate JOB_IDS_LOG accordingly for Suricata socket control
+    if USE_SURICATA_SOCKET_CONTROL:
+        with open(JOB_IDS_LOG, 'w') as fhout:
+            if (not SCONTROL.suricata_is_running) and SCONTROL.log_offset == 0:
+                # this means suri Errored at startup; pass here and just
+                # the whole output file will be included later, otherwise
+                # there will be duplicate output in the returned log
+                pass
+            else:
+                # include initial suricata startup output
+                fhout.write(f"{SCONTROL.suri_startup_log}\n-----\n\n")
+            with open(suricata_logging_outputs_file, 'r') as fh:
+                # include relevant part of suricata log from this job
+                fh.seek(SCONTROL.log_offset, 0)
+                fhout.write(fh.read())
+                SCONTROL.log_offset = fh.tell()
+
     # check IDS output for error messages not identified and/or
     # handled elsewhere. Applies to Suri and Snort for now
     # calling this last so that everything else is populated
@@ -1121,6 +1417,11 @@ def submit_job(job_id, job_directory):
     check_pcaps()
 
 #################################################
+
+# init class to use for suricata socket control
+if USE_SURICATA_SOCKET_CONTROL:
+    SCONTROL = SocketController(SURICATA_SOCKET_NAME)
+
 # agent part: send files via json, clean up files
 while True:
     try:
@@ -1182,12 +1483,21 @@ while True:
             # remove job directory and contained files
             if not KEEP_JOB_FILES:
                 shutil.rmtree(JOB_DIRECTORY)
+                if not USE_SURICATA_SOCKET_CONTROL and os.path.exists(suricata_logging_outputs_file):
+                    os.unlink(suricata_logging_outputs_file)
             logger.info("Job %s complete" % JOB_ID)
             JOB_ID = None
         else:
             time.sleep(POLL_INTERVAL)
     except KeyboardInterrupt:
         logger.info("Keyboard Interrupt caught, exiting....")
+        try:
+            if USE_SURICATA_SOCKET_CONTROL:
+                SCONTROL.connect()
+                SCONTROL.shutdown()
+                SCONTROL.close()
+        except:
+            pass
         sys.exit(0)
     except DaltonError as e:
         logger.debug("DaltonError caught (in while True loop):\n%s" % e)
@@ -1206,3 +1516,11 @@ while True:
             logger.error("Agent Error -- Is the Dalton Controller accepting network communications?")
             sys.stdout.flush()
             time.sleep(ERROR_SLEEP_TIME)
+#    finally:
+#        try:
+#            if USE_SURICATA_SOCKET_CONTROL:
+#                SCONTROL.connect()
+#                SCONTROL.shutdown()
+#                SCONTROL.close()
+#        except:
+#            pass
