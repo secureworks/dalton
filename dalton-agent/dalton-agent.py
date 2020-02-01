@@ -102,7 +102,7 @@ try:
     POLL_INTERVAL = int(config.get('dalton', 'POLL_INTERVAL'))
     KEEP_JOB_FILES = config.getboolean('dalton', 'KEEP_JOB_FILES')
     USE_SURICATA_SOCKET_CONTROL = config.getboolean('dalton', 'USE_SURICATA_SOCKET_CONTROL')
-    SURICATA_SC_PYTHON_MODULES = config.get('dalton', 'SURICATA_SC_PYTHON_MODULES')
+    SURICATA_SC_PYTHON_MODULE = config.get('dalton', 'SURICATA_SC_PYTHON_MODULE')
     SURICATA_SOCKET_NAME = config.get('dalton', 'SURICATA_SOCKET_NAME')
 
 except Exception as e:
@@ -300,11 +300,11 @@ if USE_SURICATA_SOCKET_CONTROL:
         USE_SURICATA_SOCKET_CONTROL = False
 
 if USE_SURICATA_SOCKET_CONTROL:
-    if os.path.isdir(SURICATA_SC_PYTHON_MODULES):
-        sys.path.append(SURICATA_SC_PYTHON_MODULES)
-    elif os.path.isdir(os.path.abspath(os.path.join(SURICATA_SC_PYTHON_MODULES, '..', 'scripts', 'suricatasc', 'src'))):
+    if os.path.isdir(SURICATA_SC_PYTHON_MODULE):
+        sys.path.append(SURICATA_SC_PYTHON_MODULE)
+    elif os.path.isdir(os.path.abspath(os.path.join(SURICATA_SC_PYTHON_MODULE, '..', 'scripts', 'suricatasc', 'src'))):
         # older Suricata versions had suricatasc in "scripts" directory, not "python" directory
-        sys.path.append(os.path.abspath(os.path.join(SURICATA_SC_PYTHON_MODULES, '..', 'scripts', 'suricatasc', 'src')))
+        sys.path.append(os.path.abspath(os.path.join(SURICATA_SC_PYTHON_MODULE, '..', 'scripts', 'suricatasc', 'src')))
     # Used as Suricata default-log-dir when in SC mode
     os.makedirs(os.path.dirname(SURICATA_SOCKET_NAME), exist_ok=True)
 
@@ -558,7 +558,7 @@ if USE_SURICATA_SOCKET_CONTROL:
     try:
         import suricatasc
     except Exception as e:
-        logger.error(f"Unable to import 'suricatasc' module (SURICATA_SC_PYTHON_MODULES set to '{SURICATA_SC_PYTHON_MODULES}'). Suricata Socket Control will be disabled.")
+        logger.error(f"Unable to import 'suricatasc' module (SURICATA_SC_PYTHON_MODULE set to '{SURICATA_SC_PYTHON_MODULE}'). Suricata Socket Control will be disabled.")
         USE_SURICATA_SOCKET_CONTROL = False
 
 #****************************************
