@@ -115,3 +115,7 @@ ENV/
 
 *.iml
 .idea
+
+*.bak
+/app/static/highlightjs/styles/
+!/app/static/highlightjs/styles/eve*

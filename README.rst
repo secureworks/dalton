@@ -49,6 +49,7 @@ Contents
 -  `Using Dalton <#using-dalton>`__
 
    -  `Launching A New Job <#launching-a-new-job>`__
+   -  `Suricata Socket Control Mode <#suricata-socket-control-mode>`__
    -  `Job Settings <#job-settings>`__
    -  `Config Files <#config-files>`__
    -  `Job Results <#job-results>`__
@@ -274,6 +275,34 @@ testing such a packet is desired, it will need to be incorporated into a
 new pcap that includes a 3-way handshake and the server and client IPs
 set correctly. This can be done fairly easily using Flowsynth; the
 `Flowsynth Web UI <#flowsynth-webui>`__ makes this easy.
+
+Suricata Socket Control Mode
+----------------------------
+
+Dalton Agents running Suricata 3.0 and later will, by default, attempt to
+use `Suricata Socket Control <https://suricata.readthedocs.io/en/latest/manpages/suricatasc.html>`__
+mode to process pcaps instead of starting up a new Suricata process for each job
+and using pcap replay mode.  Leveraging the socket control feature of Suricata
+offers significant job performance gains (reduced job runtime) when the
+ruleset and config do not change between jobs on an agent, since the overhead
+of starting up Suricata and processing the ruleset is eliminated.
+
+Suricata Socket Control mode can be disabled by setting ``USE_SURICATA_SOCKET_CONTROL``
+to ``False`` in the agent's ``dalton-agent.conf`` file.  If the Dalton agent
+is unable to use Suricata Socket Control for a job, it will
+use the classic read pcap mode.
+
+The Suricata Socket Control mode leverages the ``suricatasc`` Python
+module included with the Suricata source.  If the agent was built
+as a Docker container using the Dockerfile(s) provided, then the
+``suricatasc`` Python file(s) should already be there and the
+agent aware of them.  If not, or if the module is not in PYTHONPATH,
+then the ``SURICATA_SC_PYTHON_MODULE`` config item in the
+``dalton-agent.conf`` file can be set to point to correct location.
+
+While Socket Control is supported by Suricata in versions 1.4 and later,
+the ``suricatasc`` module was not Python 3 compatible until Suricata
+3.0 so that is the earliest version Dalton supports.
 
 Job Settings
 ------------
