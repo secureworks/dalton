@@ -83,19 +83,19 @@ services:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
-# Suricata 4.1,5 from source, with Rust support
-  agent-suricata-4.1.5:
+# Suricata 4.1.6 from source, with Rust support
+  agent-suricata-4.1.6:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_suricata
       args:
-        - SURI_VERSION=4.1.5
+        - SURI_VERSION=4.1.6
         - ENABLE_RUST=--enable-rust
         - http_proxy=${http_proxy}
         - https_proxy=${https_proxy}
         - no_proxy=${no_proxy}
-    image: suricata-4.1.5:latest
-    container_name: suricata-4.1.5
+    image: suricata-4.1.6:latest
+    container_name: suricata-4.1.6
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
@@ -115,22 +115,6 @@ services:
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
-
-# Suricata 4.0.6 from source
-#  agent-suricata-4.0.6:
-#    build:
-#      context: ./dalton-agent
-#      dockerfile: Dockerfiles/Dockerfile_suricata
-#      args:
-#        - SURI_VERSION=4.0.6
-#        - http_proxy=${http_proxy}
-#        - https_proxy=${https_proxy}
-#        - no_proxy=${no_proxy}
-#    image: suricata-4.0.6:latest
-#    container_name: suricata-4.0.6
-#    environment:
-#      - AGENT_DEBUG=${AGENT_DEBUG}
-#    restart: always
 
 # Suricata 3.2.5 from source
 #  agent-suricata-3.2.5:
@@ -164,34 +148,34 @@ services:
 #      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
-# Suricata 2.0.9 from source
-#  agent-suricata-2.0.9:
+# Suricata 2.0.11 from source
+#  agent-suricata-2.0.11:
 #    build:
 #      context: ./dalton-agent
 #      dockerfile: Dockerfiles/Dockerfile_suricata
 #      args:
-#        - SURI_VERSION=2.0.9
+#        - SURI_VERSION=2.0.11
 #        - http_proxy=${http_proxy}
 #        - https_proxy=${https_proxy}
 #        - no_proxy=${no_proxy}
-#    image: suricata-2.0.9:latest
-#    container_name: suricata-2.0.9
+#    image: suricata-2.0.11:latest
+#    container_name: suricata-2.0.11
 #    environment:
 #      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
 
-# Suricata 2.0.6 from source
-#  agent-suricata-2.0.6:
+# Suricata 1.4.7 from source
+#  agent-suricata-1.4.7:
 #    build:
 #      context: ./dalton-agent
 #      dockerfile: Dockerfiles/Dockerfile_suricata
 #      args:
-#        - SURI_VERSION=2.0.6
+#        - SURI_VERSION=1.4.7
 #        - http_proxy=${http_proxy}
 #        - https_proxy=${https_proxy}
 #        - no_proxy=${no_proxy}
-#    image: suricata-2.0.6:latest
-#    container_name: suricata-2.0.6
+#    image: suricata-1.4.7:latest
+#    container_name: suricata-1.4.7
 #    environment:
 #      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
@@ -225,19 +209,36 @@ services:
 #  fine on it.
 #
 
-# Snort 2.9.15 from source
-  agent-snort-2.9.15:
+# Snort 2.9.15.1 from source
+  agent-snort-2.9.15.1:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_snort
       args:
-        - SNORT_VERSION=2.9.15
+        - SNORT_VERSION=2.9.15.1
         - DAQ_VERSION=2.0.6
         - http_proxy=${http_proxy}
         - https_proxy=${https_proxy}
         - no_proxy=${no_proxy}
-    image: snort-2.9.15:latest
-    container_name: snort-2.9.15
+    image: snort-2.9.15.1:latest
+    container_name: snort-2.9.15.1
+    environment:
+      - AGENT_DEBUG=${AGENT_DEBUG}
+    restart: always
+
+# Snort 2.9.14.1 from source
+  agent-snort-2.9.14.1:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_snort
+      args:
+        - SNORT_VERSION=2.9.14.1
+        - DAQ_VERSION=2.0.6
+        - http_proxy=${http_proxy}
+        - https_proxy=${https_proxy}
+        - no_proxy=${no_proxy}
+    image: snort-2.9.14.1:latest
+    container_name: snort-2.9.14.1
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
@@ -326,4 +327,3 @@ services:
 #    environment:
 #      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
-

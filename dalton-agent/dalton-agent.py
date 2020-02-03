@@ -172,7 +172,7 @@ def get_engine_version(path):
     try:
         process = subprocess.Popen("%s -V" % path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         stdout, stderr = process.communicate()
-        regex = re.compile(r"(Version|Suricata version)\s+(?P<version>[\d\x2E]+)")
+        regex = re.compile(r"(Version|Suricata version)\s+(?P<version>\d+[\d\x2E\x2D\5FA-Za-z]*)")
         if stderr:
             # apparently 'Snort -V' outputs to stderr....
             output = stderr
