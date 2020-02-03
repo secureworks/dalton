@@ -287,6 +287,11 @@ offers significant job performance gains (reduced job runtime) when the
 ruleset and config do not change between jobs on an agent, since the overhead
 of starting up Suricata and processing the ruleset is eliminated.
 
+If ``Rule profiling`` is enabled, then Suricata Socket Control
+mode will be disabled for that job since the rule profiling and
+keyword profiling logs do not get populated (or usually do not have
+enough time to be populated) for socket control pcap runs.
+
 Suricata Socket Control mode can be disabled by setting ``USE_SURICATA_SOCKET_CONTROL``
 to ``False`` in the agent's ``dalton-agent.conf`` file.  If the Dalton agent
 is unable to use Suricata Socket Control for a job, it will
@@ -478,7 +483,7 @@ presents the results from the job run in a tabulated interface:
    | This the raw output from the IDS engine. For Snort jobs, the engine
      statistics will be in this tab, at the bottom.
 -  | **Performance**
-   | If ``Enable rule profiling`` is enabled, those results will be
+   | If ``Rule profiling`` is enabled, those results will be
      included here.
 -  | **Debug**
    | This is the Debug output from the agent.

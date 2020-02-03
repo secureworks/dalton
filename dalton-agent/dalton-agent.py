@@ -1171,7 +1171,7 @@ def submit_job(job_id, job_directory):
            JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, \
            JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, \
            JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY, \
-           JOB_EVE_LOG
+           JOB_EVE_LOG, USE_SURICATA_SOCKET_CONTROL
     # reset and populate global vars
     reset_globals()
     (JOB_ID, JOB_DIRECTORY) = (job_id, job_directory)
@@ -1346,8 +1346,13 @@ def submit_job(job_id, job_directory):
     elif SENSOR_ENGINE.startswith('suri'):
         # this section for Suricata agents
         if getFastPattern:
-            #TODO: test this if socket control enabled
             generate_fast_pattern()
+        # cannot get rule profiling or keyword profiling when using Socket Control
+        if trackPerformance and USE_SURICATA_SOCKET_CONTROL:
+            msg = "'Rule profiling' enabled, disabling Suricata Socket control."
+            logger.warn(msg)
+            print_debug(msg)
+            USE_SURICATA_SOCKET_CONTROL = False
         # run the Suricata job
         if USE_SURICATA_SOCKET_CONTROL:
             run_suricata_sc()
@@ -1422,8 +1427,13 @@ def submit_job(job_id, job_directory):
 if USE_SURICATA_SOCKET_CONTROL:
     SCONTROL = SocketController(SURICATA_SOCKET_NAME)
 
+# USE_SURICATA_SOCKET_CONTROL can get changed in submit_job(); save it
+# so it can be reset between jobs.
+USE_SURICATA_SOCKET_CONTROL_DEFAULT = USE_SURICATA_SOCKET_CONTROL
+
 # agent part: send files via json, clean up files
 while True:
+    USE_SURICATA_SOCKET_CONTROL = USE_SURICATA_SOCKET_CONTROL_DEFAULT
     try:
         job = request_job()
         if (job != None):
