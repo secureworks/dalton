@@ -116,6 +116,10 @@ ENV/
 *.iml
 .idea
 
+
+# don't inlude backups
 *.bak
-/app/static/highlightjs/styles/
-!/app/static/highlightjs/styles/eve*
+*.orig
+
+app/static/highlightjs/styles/*
+!eve-*.css
