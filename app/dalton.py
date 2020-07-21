@@ -1312,6 +1312,15 @@ def page_coverage_summary():
                 delete_temp_files(job_id)
                 return render_template('/dalton/error.html', jid='', msg=["Could not merge pcaps.  Error:", f"{e}"])
 
+        # get use Suricata Socket Control option
+        bSuricataSC = False
+        if sensor_tech.startswith("suri") :
+            try:
+                if request.form.get("optionUseSC"):
+                    bSuricataSC = True
+            except:
+                pass
+
         # get enable all rules option
         bEnableAllRules = False
         if request.form.get('optionProdRuleset') and request.form.get('optionEnableAllRules'):
@@ -1439,7 +1448,7 @@ def page_coverage_summary():
                         return render_template('/dalton/error.html', jid='', msg=["Invalid rule, last rule option must end with semicolon.  Rule:",  f"{line}"])
 
                     # add sid if not included
-                    if not re.search(r'(\s|\x3B)sid\s*\:\s*\d+\s*\x3B', line) and not line.startswith("event_filter") and not line.startswith("threshold") \
+                    if not re.search(r'(^[^\x28]+\x28\s*|\s|\x3B)sid\s*\:\s*\d+\s*\x3B', line) and not line.startswith("event_filter") and not line.startswith("threshold") \
                         and not line.startswith("suppress") and not line.startswith("rate_filter") and not line.startswith("detection_filter"):
                         # if no sid in rule, fix automatically instead of throwing an error
                         #return render_template('/dalton/error.html', jid='', msg=["\'sid\' not specified in rule, this will error.  Rule:", "%s" % line])
@@ -1890,6 +1899,7 @@ def page_coverage_summary():
                 json_job['get-engine-stats'] = bGetEngineStats
                 json_job['teapot-job'] = bteapotJob
                 json_job['split-pcaps'] = bSplitCap
+                json_job['use-suricatasc'] = bSuricataSC
                 json_job['alert-detailed'] = bGetAlertDetailed
                 json_job['get-fast-pattern'] = bGetFastPattern
                 json_job['get-other-logs'] = bGetOtherLogs

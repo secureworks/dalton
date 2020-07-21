@@ -326,7 +326,7 @@ logger.info("\tSENSOR_CONFIG: %s" % SENSOR_CONFIG)
 logger.info("\tIDS_BINARY: %s" % IDS_BINARY)
 logger.info("\tTCPDUMP_BINARY: %s" % TCPDUMP_BINARY)
 if SENSOR_ENGINE.startswith("suricata"):
-    logger.info("\tUSE_SURICATA_SOCKET_CONTROL: %s" % USE_SURICATA_SOCKET_CONTROL)
+    logger.info("\tSURICATA_SOCKET_CONTROL Support: %s" % USE_SURICATA_SOCKET_CONTROL)
 
 # just in case the Dalton Agent is set to use a proxy, exclude "dalton_web" which is the
 # web server container and communication with it shouldn't go thru a proxy; if the
@@ -510,7 +510,7 @@ class SocketController:
         # tail suricata_logging_outputs_file (default /tmp/dalton-suricata.log),
         # look for "engine started."
         with open(suricata_logging_outputs_file, 'r') as suri_output_fh:
-            logger.debug("tailing '%s' so see when engine has startup up fully" % suricata_logging_outputs_file)
+            logger.debug("tailing '%s' to see when engine has startup up fully" % suricata_logging_outputs_file)
             now = datetime.datetime.now()
             keep_looking = True
             while keep_looking:
@@ -1214,6 +1214,18 @@ def submit_job(job_id, job_directory):
         manifest_file.close()
     print_debug("manifest.json: %s" % manifest_data)
 
+    # use Suricata Socket Control (Suricata only)
+    if SENSOR_ENGINE.startswith('suri'):
+        try:
+            useSuricataSC = manifest_data[0]['use-suricatasc']
+            if useSuricataSC != USE_SURICATA_SOCKET_CONTROL:
+                msg = f"Changing Suricata Socket Control option to '{useSuricataSC}' per job settings."
+                logger.info(msg)
+                print_debug(msg)
+                USE_SURICATA_SOCKET_CONTROL = useSuricataSC
+        except Exception as e:
+            logger.warn("Problem getting 'use-suricatasc' value from manifest: %s" % e)
+
     trackPerformance = False
     try:
         trackPerformance = manifest_data[0]['track-performance']
@@ -1328,7 +1340,7 @@ def submit_job(job_id, job_directory):
         suri_yaml_fh.write("\n")
         # set default-rule-path; this is stripped out when the controller built
         # the job with the expectation that it be added here.
-        print_debug("adding default-rule-path to yaml:\n%s\n" % '\n'.join(IDS_RULES_FILES))
+        print_debug("adding default-rule-path to yaml:\n%s" % '\n'.join(IDS_RULES_FILES))
         suri_yaml_fh.write("default-rule-path: %s\n" % JOB_DIRECTORY)
         suri_yaml_fh.close()
         # reading multiple pcaps added in Suricata 4.1

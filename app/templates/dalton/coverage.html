@@ -151,6 +151,14 @@
             }
         }
 
+        function show_hide_suricatasc_options(sensor_tech) {
+            if (sensor_tech.startsWith("suri") && Number(sensor_tech.split('/')[1].replace(/^rust_/,"").split('.')[0]) >= 3) {
+                $('#divUseSC').show();
+            } else {
+                $('#divUseSC').hide();
+            }
+        }
+
         <!-- called when sensor version changed.  Updates engine.conf -->
         $('input[name="sensor_tech"]').change( function() {
             var version = $(this).attr("value")
@@ -162,9 +170,11 @@
                 }
             });
             show_hide_log_options(version);
+            show_hide_suricatasc_options(version);
         });
         updateHeading();
         show_hide_log_options($('input[name="sensor_tech"]:checked').val());
+        show_hide_suricatasc_options($('input[name="sensor_tech"]:checked').val());
     });
 {% endblock %}
 
@@ -258,6 +268,13 @@
                                     {{ sensor_tech.split('/')[0]|title }} 
                                     </p>
                                 {% endif %}
+                                <p>
+                                <div id="divUseSC">
+                                    <label class="checkbox" id="labelUseSC">
+                                        <input type="checkbox" name="optionUseSC" id="optionUseSC" value="use_sock_control" checked>
+                                        Use Suricata Socket Control Pcap Processing Mode
+                                    </label>
+                                </div>
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Ruleset</div>
 							<label class="checkbox">
 								<input type="checkbox" name="optionProdRuleset" id="optionRuleset" value="prod" checked>

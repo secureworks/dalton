@@ -279,23 +279,25 @@ set correctly. This can be done fairly easily using Flowsynth; the
 Suricata Socket Control Mode
 ----------------------------
 
-Dalton Agents running Suricata 3.0 and later will, by default, attempt to
-use `Suricata Socket Control <https://suricata.readthedocs.io/en/latest/manpages/suricatasc.html>`__
+Dalton Agents running Suricata 3.0 and later are capable of using the
+`Suricata Socket Control <https://suricata.readthedocs.io/en/latest/manpages/suricatasc.html>`__
 mode to process pcaps instead of starting up a new Suricata process for each job
 and using pcap replay mode.  Leveraging the socket control feature of Suricata
 offers significant job performance gains (reduced job runtime) when the
 ruleset and config do not change between jobs on an agent, since the overhead
 of starting up Suricata and processing the ruleset is eliminated.
 
+To enable Suricata Socket Control select ``Use Suricata Socket Control Pcap Processing Mode``
+on the job submission page, located in the ``Sensor Version`` section of the ``Job Settings``
+vertical tab.
+
+If the Dalton agent is unable to use Suricata Socket Control for a job, it will
+use the classic read pcap mode.
+
 If ``Rule profiling`` is enabled, then Suricata Socket Control
 mode will be disabled for that job since the rule profiling and
 keyword profiling logs do not get populated (or usually do not have
 enough time to be populated) for socket control pcap runs.
-
-Suricata Socket Control mode can be disabled by setting ``USE_SURICATA_SOCKET_CONTROL``
-to ``False`` in the agent's ``dalton-agent.conf`` file.  If the Dalton agent
-is unable to use Suricata Socket Control for a job, it will
-use the classic read pcap mode.
 
 The Suricata Socket Control mode leverages the ``suricatasc`` Python
 module included with the Suricata source.  If the agent was built
@@ -308,6 +310,18 @@ then the ``SURICATA_SC_PYTHON_MODULE`` config item in the
 While Socket Control is supported by Suricata in versions 1.4 and later,
 the ``suricatasc`` module was not Python 3 compatible until Suricata
 3.0 so that is the earliest version Dalton supports.
+
+-  | **Problems with Suricata Socket Control Mode**
+   | There are some known issues with Suricata Socket Control, not related to Dalton.
+     If you experience
+     problems with it, try running the job with this option disabled.
+
+   -  | **Sample Issues**
+      | `Docker Suricata Socket Control crashing using command 'reopen-log-files <https://redmine.openinfosecfoundation.org/issues/3436>`__
+
+      | `Suricata 4.1 Seg Fault: Socket Control pcap-file and corrupt pcap <https://redmine.openinfosecfoundation.org/issues/3448>`__
+
+      | `Alert metadata not present in EVE output when using Socket Control Pcap Processing Mode <https://redmine.openinfosecfoundation.org/issues/3467>`__
 
 Job Settings
 ------------
@@ -339,6 +353,9 @@ number of user-configurable options:
 -  | **Sensor Version**
    | The specific sensor version to use to run the specified pcap(s)
      and rule(s).
+
+   -  | **Use Suricata Socket Control Pcap Processing Mode**
+      | See `Suricata Socket Control Mode <#suricata-socket-control-mode>`__ section.
 
 -  **Ruleset**
 
