@@ -8,3 +8,4 @@ redis==2.10.6
 #  compatible YAML 1.1 and Suri doesn't like it
 ruamel.yaml==0.14.12
 idstools
+werkzeug==0.16.1
