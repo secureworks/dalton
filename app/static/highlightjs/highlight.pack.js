@@ -1,2 +1,281 @@
-/*! highlight.js v9.17.1 | BSD3 License | git.io/hljslicense */
-!function(e){var n="object"==typeof window&&window||"object"==typeof self&&self;"undefined"==typeof exports||exports.nodeType?n&&(n.hljs=e({}),"function"==typeof define&&define.amd&&define([],function(){return n.hljs})):e(exports)}(function(a){var f=[],o=Object.keys,N={},g={},_=!0,n=/^(no-?highlight|plain|text)$/i,E=/\blang(?:uage)?-([\w-]+)\b/i,t=/((^(<[^>]+>|\t|)+|(?:\n)))/gm,r={case_insensitive:"cI",lexemes:"l",contains:"c",keywords:"k",subLanguage:"sL",className:"cN",begin:"b",beginKeywords:"bK",end:"e",endsWithParent:"eW",illegal:"i",excludeBegin:"eB",excludeEnd:"eE",returnBegin:"rB",returnEnd:"rE",variants:"v",IDENT_RE:"IR",UNDERSCORE_IDENT_RE:"UIR",NUMBER_RE:"NR",C_NUMBER_RE:"CNR",BINARY_NUMBER_RE:"BNR",RE_STARTERS_RE:"RSR",BACKSLASH_ESCAPE:"BE",APOS_STRING_MODE:"ASM",QUOTE_STRING_MODE:"QSM",PHRASAL_WORDS_MODE:"PWM",C_LINE_COMMENT_MODE:"CLCM",C_BLOCK_COMMENT_MODE:"CBCM",HASH_COMMENT_MODE:"HCM",NUMBER_MODE:"NM",C_NUMBER_MODE:"CNM",BINARY_NUMBER_MODE:"BNM",CSS_NUMBER_MODE:"CSSNM",REGEXP_MODE:"RM",TITLE_MODE:"TM",UNDERSCORE_TITLE_MODE:"UTM",COMMENT:"C",beginRe:"bR",endRe:"eR",illegalRe:"iR",lexemesRe:"lR",terminators:"t",terminator_end:"tE"},C="</span>",m="Could not find the language '{}', did you forget to load/include a language module?",O={classPrefix:"hljs-",tabReplace:null,useBR:!1,languages:void 0},c="of and for in not or if then".split(" ");function B(e){return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}function d(e){return e.nodeName.toLowerCase()}function R(e){return n.test(e)}function i(e){var n,t={},r=Array.prototype.slice.call(arguments,1);for(n in e)t[n]=e[n];return r.forEach(function(e){for(n in e)t[n]=e[n]}),t}function p(e){var a=[];return function e(n,t){for(var r=n.firstChild;r;r=r.nextSibling)3===r.nodeType?t+=r.nodeValue.length:1===r.nodeType&&(a.push({event:"start",offset:t,node:r}),t=e(r,t),d(r).match(/br|hr|img|input/)||a.push({event:"stop",offset:t,node:r}));return t}(e,0),a}function v(e,n,t){var r=0,a="",i=[];function o(){return e.length&&n.length?e[0].offset!==n[0].offset?e[0].offset<n[0].offset?e:n:"start"===n[0].event?e:n:e.length?e:n}function c(e){a+="<"+d(e)+f.map.call(e.attributes,function(e){return" "+e.nodeName+'="'+B(e.value).replace(/"/g,"&quot;")+'"'}).join("")+">"}function l(e){a+="</"+d(e)+">"}function u(e){("start"===e.event?c:l)(e.node)}for(;e.length||n.length;){var s=o();if(a+=B(t.substring(r,s[0].offset)),r=s[0].offset,s===e){for(i.reverse().forEach(l);u(s.splice(0,1)[0]),(s=o())===e&&s.length&&s[0].offset===r;);i.reverse().forEach(c)}else"start"===s[0].event?i.push(s[0].node):i.pop(),u(s.splice(0,1)[0])}return a+B(t.substr(r))}function l(n){return n.v&&!n.cached_variants&&(n.cached_variants=n.v.map(function(e){return i(n,{v:null},e)})),n.cached_variants?n.cached_variants:function e(n){return!!n&&(n.eW||e(n.starts))}(n)?[i(n,{starts:n.starts?i(n.starts):null})]:Object.isFrozen(n)?[i(n)]:[n]}function u(e){if(r&&!e.langApiRestored){for(var n in e.langApiRestored=!0,r)e[n]&&(e[r[n]]=e[n]);(e.c||[]).concat(e.v||[]).forEach(u)}}function M(n,t){var i={};return"string"==typeof n?r("keyword",n):o(n).forEach(function(e){r(e,n[e])}),i;function r(a,e){t&&(e=e.toLowerCase()),e.split(" ").forEach(function(e){var n,t,r=e.split("|");i[r[0]]=[a,(n=r[0],(t=r[1])?Number(t):function(e){return-1!=c.indexOf(e.toLowerCase())}(n)?0:1)]})}}function x(r){function s(e){return e&&e.source||e}function f(e,n){return new RegExp(s(e),"m"+(r.cI?"i":"")+(n?"g":""))}function a(a){var i,e,o={},c=[],l={},t=1;function n(e,n){o[t]=e,c.push([e,n]),t+=new RegExp(n.toString()+"|").exec("").length-1+1}for(var r=0;r<a.c.length;r++){n(e=a.c[r],e.bK?"\\.?(?:"+e.b+")\\.?":e.b)}a.tE&&n("end",a.tE),a.i&&n("illegal",a.i);var u=c.map(function(e){return e[1]});return i=f(function(e,n){for(var t=/\[(?:[^\\\]]|\\.)*\]|\(\??|\\([1-9][0-9]*)|\\./,r=0,a="",i=0;i<e.length;i++){var o=r+=1,c=s(e[i]);for(0<i&&(a+=n),a+="(";0<c.length;){var l=t.exec(c);if(null==l){a+=c;break}a+=c.substring(0,l.index),c=c.substring(l.index+l[0].length),"\\"==l[0][0]&&l[1]?a+="\\"+String(Number(l[1])+o):(a+=l[0],"("==l[0]&&r++)}a+=")"}return a}(u,"|"),!0),l.lastIndex=0,l.exec=function(e){var n;if(0===c.length)return null;i.lastIndex=l.lastIndex;var t=i.exec(e);if(!t)return null;for(var r=0;r<t.length;r++)if(null!=t[r]&&null!=o[""+r]){n=o[""+r];break}return"string"==typeof n?(t.type=n,t.extra=[a.i,a.tE]):(t.type="begin",t.rule=n),t},l}if(r.c&&-1!=r.c.indexOf("self")){if(!_)throw new Error("ERR: contains `self` is not supported at the top-level of a language.  See documentation.");r.c=r.c.filter(function(e){return"self"!=e})}!function n(t,e){t.compiled||(t.compiled=!0,t.k=t.k||t.bK,t.k&&(t.k=M(t.k,r.cI)),t.lR=f(t.l||/\w+/,!0),e&&(t.bK&&(t.b="\\b("+t.bK.split(" ").join("|")+")\\b"),t.b||(t.b=/\B|\b/),t.bR=f(t.b),t.endSameAsBegin&&(t.e=t.b),t.e||t.eW||(t.e=/\B|\b/),t.e&&(t.eR=f(t.e)),t.tE=s(t.e)||"",t.eW&&e.tE&&(t.tE+=(t.e?"|":"")+e.tE)),t.i&&(t.iR=f(t.i)),null==t.relevance&&(t.relevance=1),t.c||(t.c=[]),t.c=Array.prototype.concat.apply([],t.c.map(function(e){return l("self"===e?t:e)})),t.c.forEach(function(e){n(e,t)}),t.starts&&n(t.starts,e),t.t=a(t))}(r)}function S(n,i,a,e){function c(e,n,t,r){if(!t&&""===n)return"";if(!e)return n;var a='<span class="'+(r?"":O.classPrefix);return(a+=e+'">')+n+(t?"":C)}function o(){R+=null!=E.sL?function(){var e="string"==typeof E.sL;if(e&&!N[E.sL])return B(p);var n=e?S(E.sL,p,!0,d[E.sL]):T(p,E.sL.length?E.sL:void 0);return 0<E.relevance&&(v+=n.relevance),e&&(d[E.sL]=n.top),c(n.language,n.value,!1,!0)}():function(){var e,n,t,r,a,i,o;if(!E.k)return B(p);for(r="",n=0,E.lR.lastIndex=0,t=E.lR.exec(p);t;)r+=B(p.substring(n,t.index)),a=E,i=t,o=g.cI?i[0].toLowerCase():i[0],(e=a.k.hasOwnProperty(o)&&a.k[o])?(v+=e[1],r+=c(e[0],B(t[0]))):r+=B(t[0]),n=E.lR.lastIndex,t=E.lR.exec(p);return r+B(p.substr(n))}(),p=""}function l(e){R+=e.cN?c(e.cN,"",!0):"",E=Object.create(e,{parent:{value:E}})}function u(e){var n=e[0],t=e.rule;return t&&t.endSameAsBegin&&(t.eR=new RegExp(n.replace(/[-\/\\^$*+?.()|[\]{}]/g,"\\$&"),"m")),t.skip?p+=n:(t.eB&&(p+=n),o(),t.rB||t.eB||(p=n)),l(t),t.rB?0:n.length}function s(e){var n=e[0],t=i.substr(e.index),r=function e(n,t){if(r=n.eR,a=t,(i=r&&r.exec(a))&&0===i.index){for(;n.endsParent&&n.parent;)n=n.parent;return n}var r,a,i;if(n.eW)return e(n.parent,t)}(E,t);if(r){var a=E;for(a.skip?p+=n:(a.rE||a.eE||(p+=n),o(),a.eE&&(p=n));E.cN&&(R+=C),E.skip||E.sL||(v+=E.relevance),(E=E.parent)!==r.parent;);return r.starts&&(r.endSameAsBegin&&(r.starts.eR=r.eR),l(r.starts)),a.rE?0:n.length}}var f={};function t(e,n){var t=n&&n[0];if(p+=e,null==t)return o(),0;if("begin"==f.type&&"end"==n.type&&f.index==n.index&&""===t)return p+=i.slice(n.index,n.index+1),1;if("begin"===(f=n).type)return u(n);if("illegal"===n.type&&!a)throw new Error('Illegal lexeme "'+t+'" for mode "'+(E.cN||"<unnamed>")+'"');if("end"===n.type){var r=s(n);if(null!=r)return r}return p+=t,t.length}var g=D(n);if(!g)throw console.error(m.replace("{}",n)),new Error('Unknown language: "'+n+'"');x(g);var r,E=e||g,d={},R="";for(r=E;r!==g;r=r.parent)r.cN&&(R=c(r.cN,"",!0)+R);var p="",v=0;try{for(var M,b,h=0;E.t.lastIndex=h,M=E.t.exec(i);)b=t(i.substring(h,M.index),M),h=M.index+b;for(t(i.substr(h)),r=E;r.parent;r=r.parent)r.cN&&(R+=C);return{relevance:v,value:R,i:!1,language:n,top:E}}catch(e){if(e.message&&-1!==e.message.indexOf("Illegal"))return{i:!0,relevance:0,value:B(i)};if(_)return{relevance:0,value:B(i),language:n,top:E,errorRaised:e};throw e}}function T(t,e){e=e||O.languages||o(N);var r={relevance:0,value:B(t)},a=r;return e.filter(D).filter(L).forEach(function(e){var n=S(e,t,!1);n.language=e,n.relevance>a.relevance&&(a=n),n.relevance>r.relevance&&(a=r,r=n)}),a.language&&(r.second_best=a),r}function b(e){return O.tabReplace||O.useBR?e.replace(t,function(e,n){return O.useBR&&"\n"===e?"<br>":O.tabReplace?n.replace(/\t/g,O.tabReplace):""}):e}function s(e){var n,t,r,a,i,o,c,l,u,s,f=function(e){var n,t,r,a,i=e.className+" ";if(i+=e.parentNode?e.parentNode.className:"",t=E.exec(i)){var o=D(t[1]);return o||(console.warn(m.replace("{}",t[1])),console.warn("Falling back to no-highlight mode for this block.",e)),o?t[1]:"no-highlight"}for(n=0,r=(i=i.split(/\s+/)).length;n<r;n++)if(R(a=i[n])||D(a))return a}(e);R(f)||(O.useBR?(n=document.createElement("div")).innerHTML=e.innerHTML.replace(/\n/g,"").replace(/<br[ \/]*>/g,"\n"):n=e,i=n.textContent,r=f?S(f,i,!0):T(i),(t=p(n)).length&&((a=document.createElement("div")).innerHTML=r.value,r.value=v(t,p(a),i)),r.value=b(r.value),e.innerHTML=r.value,e.className=(o=e.className,c=f,l=r.language,u=c?g[c]:l,s=[o.trim()],o.match(/\bhljs\b/)||s.push("hljs"),-1===o.indexOf(u)&&s.push(u),s.join(" ").trim()),e.result={language:r.language,re:r.relevance},r.second_best&&(e.second_best={language:r.second_best.language,re:r.second_best.relevance}))}function h(){if(!h.called){h.called=!0;var e=document.querySelectorAll("pre code");f.forEach.call(e,s)}}var w={disableAutodetect:!0};function D(e){return e=(e||"").toLowerCase(),N[e]||N[g[e]]}function L(e){var n=D(e);return n&&!n.disableAutodetect}return a.highlight=S,a.highlightAuto=T,a.fixMarkup=b,a.highlightBlock=s,a.configure=function(e){O=i(O,e)},a.initHighlighting=h,a.initHighlightingOnLoad=function(){window.addEventListener("DOMContentLoaded",h,!1),window.addEventListener("load",h,!1)},a.registerLanguage=function(n,e){var t;try{t=e(a)}catch(e){if(console.error("Language definition for '{}' could not be registered.".replace("{}",n)),!_)throw e;console.error(e),t=w}u(N[n]=t),t.rawDefinition=e.bind(null,a),t.aliases&&t.aliases.forEach(function(e){g[e]=n})},a.listLanguages=function(){return o(N)},a.getLanguage=D,a.requireLanguage=function(e){var n=D(e);if(n)return n;throw new Error("The '{}' language is required, but not loaded.".replace("{}",e))},a.autoDetection=L,a.inherit=i,a.debugMode=function(){_=!1},a.IR=a.IDENT_RE="[a-zA-Z]\\w*",a.UIR=a.UNDERSCORE_IDENT_RE="[a-zA-Z_]\\w*",a.NR=a.NUMBER_RE="\\b\\d+(\\.\\d+)?",a.CNR=a.C_NUMBER_RE="(-?)(\\b0[xX][a-fA-F0-9]+|(\\b\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)",a.BNR=a.BINARY_NUMBER_RE="\\b(0b[01]+)",a.RSR=a.RE_STARTERS_RE="!|!=|!==|%|%=|&|&&|&=|\\*|\\*=|\\+|\\+=|,|-|-=|/=|/|:|;|<<|<<=|<=|<|===|==|=|>>>=|>>=|>=|>>>|>>|>|\\?|\\[|\\{|\\(|\\^|\\^=|\\||\\|=|\\|\\||~",a.BE=a.BACKSLASH_ESCAPE={b:"\\\\[\\s\\S]",relevance:0},a.ASM=a.APOS_STRING_MODE={cN:"string",b:"'",e:"'",i:"\\n",c:[a.BE]},a.QSM=a.QUOTE_STRING_MODE={cN:"string",b:'"',e:'"',i:"\\n",c:[a.BE]},a.PWM=a.PHRASAL_WORDS_MODE={b:/\b(a|an|the|are|I'm|isn't|don't|doesn't|won't|but|just|should|pretty|simply|enough|gonna|going|wtf|so|such|will|you|your|they|like|more)\b/},a.C=a.COMMENT=function(e,n,t){var r=a.inherit({cN:"comment",b:e,e:n,c:[]},t||{});return r.c.push(a.PWM),r.c.push({cN:"doctag",b:"(?:TODO|FIXME|NOTE|BUG|XXX):",relevance:0}),r},a.CLCM=a.C_LINE_COMMENT_MODE=a.C("//","$"),a.CBCM=a.C_BLOCK_COMMENT_MODE=a.C("/\\*","\\*/"),a.HCM=a.HASH_COMMENT_MODE=a.C("#","$"),a.NM=a.NUMBER_MODE={cN:"number",b:a.NR,relevance:0},a.CNM=a.C_NUMBER_MODE={cN:"number",b:a.CNR,relevance:0},a.BNM=a.BINARY_NUMBER_MODE={cN:"number",b:a.BNR,relevance:0},a.CSSNM=a.CSS_NUMBER_MODE={cN:"number",b:a.NR+"(%|em|ex|ch|rem|vw|vh|vmin|vmax|cm|mm|in|pt|pc|px|deg|grad|rad|turn|s|ms|Hz|kHz|dpi|dpcm|dppx)?",relevance:0},a.RM=a.REGEXP_MODE={cN:"regexp",b:/\//,e:/\/[gimuy]*/,i:/\n/,c:[a.BE,{b:/\[/,e:/\]/,relevance:0,c:[a.BE]}]},a.TM=a.TITLE_MODE={cN:"title",b:a.IR,relevance:0},a.UTM=a.UNDERSCORE_TITLE_MODE={cN:"title",b:a.UIR,relevance:0},a.METHOD_GUARD={b:"\\.\\s*"+a.UIR,relevance:0},[a.BE,a.ASM,a.QSM,a.PWM,a.C,a.CLCM,a.CBCM,a.HCM,a.NM,a.CNM,a.BNM,a.CSSNM,a.RM,a.TM,a.UTM,a.METHOD_GUARD].forEach(function(e){!function n(t){Object.freeze(t);var r="function"==typeof t;Object.getOwnPropertyNames(t).forEach(function(e){!t.hasOwnProperty(e)||null===t[e]||"object"!=typeof t[e]&&"function"!=typeof t[e]||r&&("caller"===e||"callee"===e||"arguments"===e)||Object.isFrozen(t[e])||n(t[e])});return t}(e)}),a});hljs.registerLanguage("json",function(e){var i={literal:"true false null"},n=[e.CLCM,e.CBCM],c=[e.QSM,e.CNM],r={e:",",eW:!0,eE:!0,c:c,k:i},t={b:"{",e:"}",c:[{cN:"attr",b:/"/,e:/"/,c:[e.BE],i:"\\n"},e.inherit(r,{b:/:/})].concat(n),i:"\\S"},a={b:"\\[",e:"\\]",c:[e.inherit(r)],i:"\\S"};return c.push(t,a),n.forEach(function(e){c.push(e)}),{c:c,k:i,i:"\\S"}});
+/*
+  Highlight.js 10.3.2 (31e1fc40)
+  License: BSD-3-Clause
+  Copyright (c) 2006-2020, Ivan Sagalaev
+*/
+var hljs=function(){"use strict";function e(n){Object.freeze(n)
+;var t="function"==typeof n
+;return Object.getOwnPropertyNames(n).forEach((function(r){
+!Object.hasOwnProperty.call(n,r)||null===n[r]||"object"!=typeof n[r]&&"function"!=typeof n[r]||t&&("caller"===r||"callee"===r||"arguments"===r)||Object.isFrozen(n[r])||e(n[r])
+})),n}class n{constructor(e){void 0===e.data&&(e.data={}),this.data=e.data}
+ignoreMatch(){this.ignore=!0}}function t(e){
+return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;")
+}function r(e,...n){var t={};for(const n in e)t[n]=e[n]
+;return n.forEach((function(e){for(const n in e)t[n]=e[n]})),t}function a(e){
+return e.nodeName.toLowerCase()}var i=Object.freeze({__proto__:null,
+escapeHTML:t,inherit:r,nodeStream:function(e){var n=[];return function e(t,r){
+for(var i=t.firstChild;i;i=i.nextSibling)3===i.nodeType?r+=i.nodeValue.length:1===i.nodeType&&(n.push({
+event:"start",offset:r,node:i}),r=e(i,r),a(i).match(/br|hr|img|input/)||n.push({
+event:"stop",offset:r,node:i}));return r}(e,0),n},mergeStreams:function(e,n,r){
+var i=0,s="",o=[];function l(){
+return e.length&&n.length?e[0].offset!==n[0].offset?e[0].offset<n[0].offset?e:n:"start"===n[0].event?e:n:e.length?e:n
+}function c(e){s+="<"+a(e)+[].map.call(e.attributes,(function(e){
+return" "+e.nodeName+'="'+t(e.value)+'"'})).join("")+">"}function u(e){
+s+="</"+a(e)+">"}function g(e){("start"===e.event?c:u)(e.node)}
+for(;e.length||n.length;){var d=l()
+;if(s+=t(r.substring(i,d[0].offset)),i=d[0].offset,d===e){o.reverse().forEach(u)
+;do{g(d.splice(0,1)[0]),d=l()}while(d===e&&d.length&&d[0].offset===i)
+;o.reverse().forEach(c)
+}else"start"===d[0].event?o.push(d[0].node):o.pop(),g(d.splice(0,1)[0])}
+return s+t(r.substr(i))}});const s=e=>!!e.kind;class o{constructor(e,n){
+this.buffer="",this.classPrefix=n.classPrefix,e.walk(this)}addText(e){
+this.buffer+=t(e)}openNode(e){if(!s(e))return;let n=e.kind
+;e.sublanguage||(n=`${this.classPrefix}${n}`),this.span(n)}closeNode(e){
+s(e)&&(this.buffer+="</span>")}value(){return this.buffer}span(e){
+this.buffer+=`<span class="${e}">`}}class l{constructor(){this.rootNode={
+children:[]},this.stack=[this.rootNode]}get top(){
+return this.stack[this.stack.length-1]}get root(){return this.rootNode}add(e){
+this.top.children.push(e)}openNode(e){const n={kind:e,children:[]}
+;this.add(n),this.stack.push(n)}closeNode(){
+if(this.stack.length>1)return this.stack.pop()}closeAllNodes(){
+for(;this.closeNode(););}toJSON(){return JSON.stringify(this.rootNode,null,4)}
+walk(e){return this.constructor._walk(e,this.rootNode)}static _walk(e,n){
+return"string"==typeof n?e.addText(n):n.children&&(e.openNode(n),
+n.children.forEach((n=>this._walk(e,n))),e.closeNode(n)),e}static _collapse(e){
+"string"!=typeof e&&e.children&&(e.children.every((e=>"string"==typeof e))?e.children=[e.children.join("")]:e.children.forEach((e=>{
+l._collapse(e)})))}}class c extends l{constructor(e){super(),this.options=e}
+addKeyword(e,n){""!==e&&(this.openNode(n),this.addText(e),this.closeNode())}
+addText(e){""!==e&&this.add(e)}addSublanguage(e,n){const t=e.root
+;t.kind=n,t.sublanguage=!0,this.add(t)}toHTML(){
+return new o(this,this.options).value()}finalize(){return!0}}function u(e){
+return e?"string"==typeof e?e:e.source:null}
+const g="[a-zA-Z]\\w*",d="[a-zA-Z_]\\w*",h="\\b\\d+(\\.\\d+)?",f="(-?)(\\b0[xX][a-fA-F0-9]+|(\\b\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)",p="\\b(0b[01]+)",m={
+begin:"\\\\[\\s\\S]",relevance:0},b={className:"string",begin:"'",end:"'",
+illegal:"\\n",contains:[m]},v={className:"string",begin:'"',end:'"',
+illegal:"\\n",contains:[m]},x={
+begin:/\b(a|an|the|are|I'm|isn't|don't|doesn't|won't|but|just|should|pretty|simply|enough|gonna|going|wtf|so|such|will|you|your|they|like|more)\b/
+},E=function(e,n,t={}){var a=r({className:"comment",begin:e,end:n,contains:[]
+},t);return a.contains.push(x),a.contains.push({className:"doctag",
+begin:"(?:TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):",relevance:0}),a
+},_=E("//","$"),w=E("/\\*","\\*/"),N=E("#","$");var y=Object.freeze({
+__proto__:null,IDENT_RE:g,UNDERSCORE_IDENT_RE:d,NUMBER_RE:h,C_NUMBER_RE:f,
+BINARY_NUMBER_RE:p,
+RE_STARTERS_RE:"!|!=|!==|%|%=|&|&&|&=|\\*|\\*=|\\+|\\+=|,|-|-=|/=|/|:|;|<<|<<=|<=|<|===|==|=|>>>=|>>=|>=|>>>|>>|>|\\?|\\[|\\{|\\(|\\^|\\^=|\\||\\|=|\\|\\||~",
+SHEBANG:(e={})=>{const n=/^#![ ]*\//;return e.binary&&(e.begin=function(...e){
+return e.map((e=>u(e))).join("")}(n,/.*\b/,e.binary,/\b.*/)),r({
+className:"meta",begin:n,end:/$/,relevance:0,"on:begin":(e,n)=>{
+0!==e.index&&n.ignoreMatch()}},e)},BACKSLASH_ESCAPE:m,APOS_STRING_MODE:b,
+QUOTE_STRING_MODE:v,PHRASAL_WORDS_MODE:x,COMMENT:E,C_LINE_COMMENT_MODE:_,
+C_BLOCK_COMMENT_MODE:w,HASH_COMMENT_MODE:N,NUMBER_MODE:{className:"number",
+begin:h,relevance:0},C_NUMBER_MODE:{className:"number",begin:f,relevance:0},
+BINARY_NUMBER_MODE:{className:"number",begin:p,relevance:0},CSS_NUMBER_MODE:{
+className:"number",
+begin:h+"(%|em|ex|ch|rem|vw|vh|vmin|vmax|cm|mm|in|pt|pc|px|deg|grad|rad|turn|s|ms|Hz|kHz|dpi|dpcm|dppx)?",
+relevance:0},REGEXP_MODE:{begin:/(?=\/[^/\n]*\/)/,contains:[{className:"regexp",
+begin:/\//,end:/\/[gimuy]*/,illegal:/\n/,contains:[m,{begin:/\[/,end:/\]/,
+relevance:0,contains:[m]}]}]},TITLE_MODE:{className:"title",begin:g,relevance:0
+},UNDERSCORE_TITLE_MODE:{className:"title",begin:d,relevance:0},METHOD_GUARD:{
+begin:"\\.\\s*[a-zA-Z_]\\w*",relevance:0},END_SAME_AS_BEGIN:function(e){
+return Object.assign(e,{"on:begin":(e,n)=>{n.data._beginMatch=e[1]},
+"on:end":(e,n)=>{n.data._beginMatch!==e[1]&&n.ignoreMatch()}})}
+}),R="of and for in not or if then".split(" ");function k(e){function n(n,t){
+return RegExp(u(n),"m"+(e.case_insensitive?"i":"")+(t?"g":""))}class t{
+constructor(){
+this.matchIndexes={},this.regexes=[],this.matchAt=1,this.position=0}
+addRule(e,n){
+n.position=this.position++,this.matchIndexes[this.matchAt]=n,this.regexes.push([n,e]),
+this.matchAt+=function(e){return RegExp(e.toString()+"|").exec("").length-1
+}(e)+1}compile(){0===this.regexes.length&&(this.exec=()=>null)
+;const e=this.regexes.map((e=>e[1]));this.matcherRe=n(function(e,n="|"){
+for(var t=/\[(?:[^\\\]]|\\.)*\]|\(\??|\\([1-9][0-9]*)|\\./,r=0,a="",i=0;i<e.length;i++){
+var s=r+=1,o=u(e[i]);for(i>0&&(a+=n),a+="(";o.length>0;){var l=t.exec(o)
+;if(null==l){a+=o;break}
+a+=o.substring(0,l.index),o=o.substring(l.index+l[0].length),
+"\\"===l[0][0]&&l[1]?a+="\\"+(Number(l[1])+s):(a+=l[0],"("===l[0]&&r++)}a+=")"}
+return a}(e),!0),this.lastIndex=0}exec(e){
+this.matcherRe.lastIndex=this.lastIndex;const n=this.matcherRe.exec(e)
+;if(!n)return null
+;const t=n.findIndex(((e,n)=>n>0&&void 0!==e)),r=this.matchIndexes[t]
+;return n.splice(0,t),Object.assign(n,r)}}class a{constructor(){
+this.rules=[],this.multiRegexes=[],
+this.count=0,this.lastIndex=0,this.regexIndex=0}getMatcher(e){
+if(this.multiRegexes[e])return this.multiRegexes[e];const n=new t
+;return this.rules.slice(e).forEach((([e,t])=>n.addRule(e,t))),
+n.compile(),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){
+return 0!==this.regexIndex}considerAll(){this.regexIndex=0}addRule(e,n){
+this.rules.push([e,n]),"begin"===n.type&&this.count++}exec(e){
+const n=this.getMatcher(this.regexIndex);n.lastIndex=this.lastIndex
+;let t=n.exec(e)
+;if(this.resumingScanAtSamePosition())if(t&&t.index===this.lastIndex);else{
+const n=this.getMatcher(0);n.lastIndex=this.lastIndex+1,t=n.exec(e)}
+return t&&(this.regexIndex+=t.position+1,
+this.regexIndex===this.count&&this.considerAll()),t}}function i(e,n){
+const t=e.input[e.index-1],r=e.input[e.index+e[0].length]
+;"."!==t&&"."!==r||n.ignoreMatch()}
+if(e.contains&&e.contains.includes("self"))throw Error("ERR: contains `self` is not supported at the top-level of a language.  See documentation.")
+;return function t(s,o){const l=s;if(s.compiled)return l
+;s.compiled=!0,s.__beforeBegin=null,s.keywords=s.keywords||s.beginKeywords
+;let c=null
+;if("object"==typeof s.keywords&&(c=s.keywords.$pattern,delete s.keywords.$pattern),
+s.keywords&&(s.keywords=function(e,n){var t={}
+;return"string"==typeof e?r("keyword",e):Object.keys(e).forEach((function(n){
+r(n,e[n])})),t;function r(e,r){
+n&&(r=r.toLowerCase()),r.split(" ").forEach((function(n){var r=n.split("|")
+;t[r[0]]=[e,O(r[0],r[1])]}))}
+}(s.keywords,e.case_insensitive)),s.lexemes&&c)throw Error("ERR: Prefer `keywords.$pattern` to `mode.lexemes`, BOTH are not allowed. (see mode reference) ")
+;return l.keywordPatternRe=n(s.lexemes||c||/\w+/,!0),
+o&&(s.beginKeywords&&(s.begin="\\b("+s.beginKeywords.split(" ").join("|")+")(?=\\b|\\s)",
+s.__beforeBegin=i),
+s.begin||(s.begin=/\B|\b/),l.beginRe=n(s.begin),s.endSameAsBegin&&(s.end=s.begin),
+s.end||s.endsWithParent||(s.end=/\B|\b/),
+s.end&&(l.endRe=n(s.end)),l.terminator_end=u(s.end)||"",
+s.endsWithParent&&o.terminator_end&&(l.terminator_end+=(s.end?"|":"")+o.terminator_end)),
+s.illegal&&(l.illegalRe=n(s.illegal)),
+void 0===s.relevance&&(s.relevance=1),s.contains||(s.contains=[]),
+s.contains=[].concat(...s.contains.map((function(e){return function(e){
+return e.variants&&!e.cached_variants&&(e.cached_variants=e.variants.map((function(n){
+return r(e,{variants:null},n)}))),e.cached_variants?e.cached_variants:M(e)?r(e,{
+starts:e.starts?r(e.starts):null}):Object.isFrozen(e)?r(e):e}("self"===e?s:e)
+}))),s.contains.forEach((function(e){t(e,l)
+})),s.starts&&t(s.starts,o),l.matcher=function(e){const n=new a
+;return e.contains.forEach((e=>n.addRule(e.begin,{rule:e,type:"begin"
+}))),e.terminator_end&&n.addRule(e.terminator_end,{type:"end"
+}),e.illegal&&n.addRule(e.illegal,{type:"illegal"}),n}(l),l}(e)}function M(e){
+return!!e&&(e.endsWithParent||M(e.starts))}function O(e,n){
+return n?Number(n):function(e){return R.includes(e.toLowerCase())}(e)?0:1}
+const L={props:["language","code","autodetect"],data:function(){return{
+detectedLanguage:"",unknownLanguage:!1}},computed:{className(){
+return this.unknownLanguage?"":"hljs "+this.detectedLanguage},highlighted(){
+if(!this.autoDetect&&!hljs.getLanguage(this.language))return console.warn(`The language "${this.language}" you specified could not be found.`),
+this.unknownLanguage=!0,t(this.code);let e
+;return this.autoDetect?(e=hljs.highlightAuto(this.code),
+this.detectedLanguage=e.language):(e=hljs.highlight(this.language,this.code,this.ignoreIllegals),
+this.detectectLanguage=this.language),e.value},autoDetect(){
+return!(this.language&&(e=this.autodetect,!e&&""!==e));var e},
+ignoreIllegals:()=>!0},render(e){return e("pre",{},[e("code",{
+class:this.className,domProps:{innerHTML:this.highlighted}})])}},j={install(e){
+e.component("highlightjs",L)}
+},I=t,T=r,{nodeStream:S,mergeStreams:A}=i,B=Symbol("nomatch")
+;return function(t){
+var r=[],a=Object.create(null),i=Object.create(null),s=[],o=!0,l=/(^(<[^>]+>|\t|)+|\n)/gm,u="Could not find the language '{}', did you forget to load/include a language module?"
+;const g={disableAutodetect:!0,name:"Plain text",contains:[]};var d={
+noHighlightRe:/^(no-?highlight)$/i,
+languageDetectRe:/\blang(?:uage)?-([\w-]+)\b/i,classPrefix:"hljs-",
+tabReplace:null,useBR:!1,languages:null,__emitter:c};function h(e){
+return d.noHighlightRe.test(e)}function f(e,n,t,r){var a={code:n,language:e}
+;N("before:highlight",a);var i=a.result?a.result:p(a.language,a.code,t,r)
+;return i.code=a.code,N("after:highlight",i),i}function p(e,t,r,i){var s=t
+;function l(e,n){var t=_.case_insensitive?n[0].toLowerCase():n[0]
+;return Object.prototype.hasOwnProperty.call(e.keywords,t)&&e.keywords[t]}
+function c(){null!=y.subLanguage?function(){if(""!==O){var e=null
+;if("string"==typeof y.subLanguage){
+if(!a[y.subLanguage])return void M.addText(O)
+;e=p(y.subLanguage,O,!0,R[y.subLanguage]),R[y.subLanguage]=e.top
+}else e=m(O,y.subLanguage.length?y.subLanguage:null)
+;y.relevance>0&&(L+=e.relevance),M.addSublanguage(e.emitter,e.language)}
+}():function(){if(!y.keywords)return void M.addText(O);let e=0
+;y.keywordPatternRe.lastIndex=0;let n=y.keywordPatternRe.exec(O),t="";for(;n;){
+t+=O.substring(e,n.index);const r=l(y,n);if(r){const[e,a]=r
+;M.addText(t),t="",L+=a,M.addKeyword(n[0],e)}else t+=n[0]
+;e=y.keywordPatternRe.lastIndex,n=y.keywordPatternRe.exec(O)}
+t+=O.substr(e),M.addText(t)}(),O=""}function g(e){
+return e.className&&M.openNode(e.className),y=Object.create(e,{parent:{value:y}
+})}function h(e,t,r){let a=function(e,n){var t=e&&e.exec(n)
+;return t&&0===t.index}(e.endRe,r);if(a){if(e["on:end"]){const r=new n(e)
+;e["on:end"](t,r),r.ignore&&(a=!1)}if(a){for(;e.endsParent&&e.parent;)e=e.parent
+;return e}}if(e.endsWithParent)return h(e.parent,t,r)}function f(e){
+return 0===y.matcher.regexIndex?(O+=e[0],1):(S=!0,0)}function b(e){
+var n=e[0],t=s.substr(e.index),r=h(y,e,t);if(!r)return B;var a=y
+;a.skip?O+=n:(a.returnEnd||a.excludeEnd||(O+=n),c(),a.excludeEnd&&(O=n));do{
+y.className&&M.closeNode(),y.skip||y.subLanguage||(L+=y.relevance),y=y.parent
+}while(y!==r.parent)
+;return r.starts&&(r.endSameAsBegin&&(r.starts.endRe=r.endRe),
+g(r.starts)),a.returnEnd?0:n.length}var v={};function x(t,a){var i=a&&a[0]
+;if(O+=t,null==i)return c(),0
+;if("begin"===v.type&&"end"===a.type&&v.index===a.index&&""===i){
+if(O+=s.slice(a.index,a.index+1),!o){const n=Error("0 width match regex")
+;throw n.languageName=e,n.badRule=v.rule,n}return 1}
+if(v=a,"begin"===a.type)return function(e){var t=e[0],r=e.rule
+;const a=new n(r),i=[r.__beforeBegin,r["on:begin"]]
+;for(const n of i)if(n&&(n(e,a),a.ignore))return f(t)
+;return r&&r.endSameAsBegin&&(r.endRe=RegExp(t.replace(/[-/\\^$*+?.()|[\]{}]/g,"\\$&"),"m")),
+r.skip?O+=t:(r.excludeBegin&&(O+=t),
+c(),r.returnBegin||r.excludeBegin||(O=t)),g(r),r.returnBegin?0:t.length}(a)
+;if("illegal"===a.type&&!r){
+const e=Error('Illegal lexeme "'+i+'" for mode "'+(y.className||"<unnamed>")+'"')
+;throw e.mode=y,e}if("end"===a.type){var l=b(a);if(l!==B)return l}
+if("illegal"===a.type&&""===i)return 1
+;if(T>1e5&&T>3*a.index)throw Error("potential infinite loop, way more iterations than matches")
+;return O+=i,i.length}var _=E(e)
+;if(!_)throw console.error(u.replace("{}",e)),Error('Unknown language: "'+e+'"')
+;var w=k(_),N="",y=i||w,R={},M=new d.__emitter(d);!function(){
+for(var e=[],n=y;n!==_;n=n.parent)n.className&&e.unshift(n.className)
+;e.forEach((e=>M.openNode(e)))}();var O="",L=0,j=0,T=0,S=!1;try{
+for(y.matcher.considerAll();;){
+T++,S?S=!1:y.matcher.considerAll(),y.matcher.lastIndex=j
+;const e=y.matcher.exec(s);if(!e)break;const n=x(s.substring(j,e.index),e)
+;j=e.index+n}return x(s.substr(j)),M.closeAllNodes(),M.finalize(),N=M.toHTML(),{
+relevance:L,value:N,language:e,illegal:!1,emitter:M,top:y}}catch(n){
+if(n.message&&n.message.includes("Illegal"))return{illegal:!0,illegalBy:{
+msg:n.message,context:s.slice(j-100,j+100),mode:n.mode},sofar:N,relevance:0,
+value:I(s),emitter:M};if(o)return{illegal:!1,relevance:0,value:I(s),emitter:M,
+language:e,top:y,errorRaised:n};throw n}}function m(e,n){
+n=n||d.languages||Object.keys(a);var t=function(e){const n={relevance:0,
+emitter:new d.__emitter(d),value:I(e),illegal:!1,top:g}
+;return n.emitter.addText(e),n}(e),r=t
+;return n.filter(E).filter(w).forEach((function(n){var a=p(n,e,!1);a.language=n,
+a.relevance>r.relevance&&(r=a),a.relevance>t.relevance&&(r=t,t=a)
+})),r.language&&(t.second_best=r),t}function b(e){
+return d.tabReplace||d.useBR?e.replace(l,(e=>"\n"===e?d.useBR?"<br>":e:d.tabReplace?e.replace(/\t/g,d.tabReplace):e)):e
+}function v(e){let n=null;const t=function(e){var n=e.className+" "
+;n+=e.parentNode?e.parentNode.className:"";const t=d.languageDetectRe.exec(n)
+;if(t){var r=E(t[1])
+;return r||(console.warn(u.replace("{}",t[1])),console.warn("Falling back to no-highlight mode for this block.",e)),
+r?t[1]:"no-highlight"}return n.split(/\s+/).find((e=>h(e)||E(e)))}(e)
+;if(h(t))return;N("before:highlightBlock",{block:e,language:t
+}),d.useBR?(n=document.createElement("div"),
+n.innerHTML=e.innerHTML.replace(/\n/g,"").replace(/<br[ /]*>/g,"\n")):n=e
+;const r=n.textContent,a=t?f(t,r,!0):m(r),s=S(n);if(s.length){
+const e=document.createElement("div");e.innerHTML=a.value,a.value=A(s,S(e),r)}
+a.value=b(a.value),N("after:highlightBlock",{block:e,result:a
+}),e.innerHTML=a.value,e.className=function(e,n,t){var r=n?i[n]:t,a=[e.trim()]
+;return e.match(/\bhljs\b/)||a.push("hljs"),
+e.includes(r)||a.push(r),a.join(" ").trim()
+}(e.className,t,a.language),e.result={language:a.language,re:a.relevance,
+relavance:a.relevance},a.second_best&&(e.second_best={
+language:a.second_best.language,re:a.second_best.relevance,
+relavance:a.second_best.relevance})}const x=()=>{if(!x.called){x.called=!0
+;var e=document.querySelectorAll("pre code");r.forEach.call(e,v)}}
+;function E(e){return e=(e||"").toLowerCase(),a[e]||a[i[e]]}
+function _(e,{languageName:n}){"string"==typeof e&&(e=[e]),e.forEach((e=>{i[e]=n
+}))}function w(e){var n=E(e);return n&&!n.disableAutodetect}function N(e,n){
+var t=e;s.forEach((function(e){e[t]&&e[t](n)}))}Object.assign(t,{highlight:f,
+highlightAuto:m,fixMarkup:function(e){
+return console.warn("fixMarkup is deprecated and will be removed entirely in v11.0"),
+console.warn("Please see https://github.com/highlightjs/highlight.js/issues/2534"),
+b(e)},highlightBlock:v,configure:function(e){
+e.useBR&&(console.warn("'useBR' option is deprecated and will be removed entirely in v11.0"),
+console.warn("Please see https://github.com/highlightjs/highlight.js/issues/2559")),
+d=T(d,e)},initHighlighting:x,initHighlightingOnLoad:function(){
+window.addEventListener("DOMContentLoaded",x,!1)},
+registerLanguage:function(e,n){var r=null;try{r=n(t)}catch(n){
+if(console.error("Language definition for '{}' could not be registered.".replace("{}",e)),
+!o)throw n;console.error(n),r=g}
+r.name||(r.name=e),a[e]=r,r.rawDefinition=n.bind(null,t),
+r.aliases&&_(r.aliases,{languageName:e})},listLanguages:function(){
+return Object.keys(a)},getLanguage:E,registerAliases:_,
+requireLanguage:function(e){var n=E(e);if(n)return n
+;throw Error("The '{}' language is required, but not loaded.".replace("{}",e))},
+autoDetection:w,inherit:T,addPlugin:function(e){s.push(e)},vuePlugin:j
+}),t.debugMode=function(){o=!1},t.safeMode=function(){o=!0
+},t.versionString="10.3.2";for(const n in y)"object"==typeof y[n]&&e(y[n])
+;return Object.assign(t,y),t}({})}()
+;"object"==typeof exports&&"undefined"!=typeof module&&(module.exports=hljs);hljs.registerLanguage("json",function(){"use strict";return function(n){var e={
+literal:"true false null"
+},i=[n.C_LINE_COMMENT_MODE,n.C_BLOCK_COMMENT_MODE],t=[n.QUOTE_STRING_MODE,n.C_NUMBER_MODE],a={
+end:",",endsWithParent:!0,excludeEnd:!0,contains:t,keywords:e},l={begin:"{",
+end:"}",contains:[{className:"attr",begin:/"/,end:/"/,
+contains:[n.BACKSLASH_ESCAPE],illegal:"\\n"},n.inherit(a,{begin:/:/
+})].concat(i),illegal:"\\S"},s={begin:"\\[",end:"\\]",contains:[n.inherit(a)],
+illegal:"\\S"};return t.push(l,s),i.forEach((function(n){t.push(n)})),{
+name:"JSON",contains:t,keywords:e,illegal:"\\S"}}}());
