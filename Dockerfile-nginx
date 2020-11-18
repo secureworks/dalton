@@ -1,5 +1,5 @@
 # spin up nginx with custom conf
-FROM nginx:1.13.5
+FROM nginx:1.19.4
 MAINTAINER David Wharton
 
 ARG DALTON_EXTERNAL_PORT

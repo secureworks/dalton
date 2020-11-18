@@ -7,8 +7,8 @@ ARG ENABLE_RUST
 
 # tcpdump is for pcap analysis; not *required* for
 #  the agent but nice to have....
-RUN apt-get update -y && apt-get install -y \
-    python3.7 \
+RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    python3.8 \
     tcpdump \
     libpcre3 libpcre3-dbg libpcre3-dev \
     build-essential autoconf automake libtool libpcap-dev libnet1-dev \
@@ -24,6 +24,15 @@ WORKDIR /src
 ADD http://downloads.suricata-ids.org/suricata-${SURI_VERSION}.tar.gz suricata-${SURI_VERSION}.tar.gz
 RUN tar -zxf suricata-${SURI_VERSION}.tar.gz -C suricata-${SURI_VERSION} --strip-components=1
 WORKDIR /src/suricata-${SURI_VERSION}
+# Note: Some Suricata versions between 2.0 and 5.0 won't compile on newer linux kernels (like
+# Ubuntu 20.04) without some patching/tweaking, which is why this Dockerfile uses Ubuntu 18.04.
+# However, this line will patch the Suricata code sufficiently to get Suricata compile on newer
+# kernel that Ubuntu 20.04 uses.  Keeping it here for if/when it is needed.
+# Ref: https://github.com/OISF/suricata/pull/4057/files
+#RUN if [ -n "$(echo $SURI_VERSION | grep -P '^[0-4]\x2E')" ] && [ -z "$(grep '#include <linux/sockios.h>' 'src/source-af-packet.c')" ]; then \
+#        sed -i 's|#ifdef HAVE_AF_PACKET|#ifdef HAVE_AF_PACKET\n\n#if HAVE_LINUX_SOCKIOS_H\n#include <linux/sockios.h>\n#endif\n|' src/source-af-packet.c; \
+#    fi;
+# configure, make, and install
 RUN ./configure --enable-profiling ${ENABLE_RUST} && make -j $(nproc) && make install && make install-conf && ldconfig
 
 RUN mkdir -p /opt/dalton-agent/
@@ -32,4 +41,4 @@ COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
 COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
 RUN sed -i 's/REPLACE_AT_DOCKER_BUILD-VERSION/'"${SURI_VERSION}"'/' /opt/dalton-agent/dalton-agent.conf
 
-CMD python3.7 /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1
+CMD python3.8 /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1

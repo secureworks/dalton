@@ -4,6 +4,6 @@ Flask-Script==2.0.6
 Flask-Caching==1.8.0
 Flask-Compress==1.4.0
 redis==2.10.6
-ruamel.yaml==0.16.5
-idstools
+ruamel.yaml==0.16.12
+idstools==0.6.4
 flowsynth

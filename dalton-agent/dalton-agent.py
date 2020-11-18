@@ -319,6 +319,7 @@ req_job_url = (f"{DALTON_API}/request_job?"
 
 logger.info("\n*******************")
 logger.info("Starting Dalton Agent version %s:"% AGENT_VERSION)
+logger.debug("\tDEBUG logging: enabled")
 logger.info("\tSENSOR_UID: %s" % SENSOR_UID)
 logger.info("\tSENSOR_ENGINE: %s" % SENSOR_ENGINE)
 logger.info("\tSENSOR_ENGINE_VERSION: %s" % SENSOR_ENGINE_VERSION)
@@ -510,7 +511,7 @@ class SocketController:
         # tail suricata_logging_outputs_file (default /tmp/dalton-suricata.log),
         # look for "engine started."
         with open(suricata_logging_outputs_file, 'r') as suri_output_fh:
-            logger.debug("tailing '%s' to see when engine has startup up fully" % suricata_logging_outputs_file)
+            logger.debug("tailing '%s' to see when engine has started up fully" % suricata_logging_outputs_file)
             now = datetime.datetime.now()
             keep_looking = True
             while keep_looking:
@@ -1219,10 +1220,16 @@ def submit_job(job_id, job_directory):
         try:
             useSuricataSC = manifest_data[0]['use-suricatasc']
             if useSuricataSC != USE_SURICATA_SOCKET_CONTROL:
-                msg = f"Changing Suricata Socket Control option to '{useSuricataSC}' per job settings."
-                logger.info(msg)
-                print_debug(msg)
-                USE_SURICATA_SOCKET_CONTROL = useSuricataSC
+                if useSuricataSC and float('.'.join(prefix_strip(SENSOR_ENGINE_VERSION_ORIG).split('.')[:2])) < 3.0:
+                    msg = f"Dalton Agent does not support Suricata Socket Control for Suricata versions before 3.0. This is running Suricata version {eng_ver}.  Cannot use Suricata Socket Control Mode."
+                    logger.warn(msg)
+                    # should not be necessary but just in case
+                    USE_SURICATA_SOCKET_CONTROL = False
+                else:
+                    msg = f"Changing Suricata Socket Control option to '{useSuricataSC}' per job settings."
+                    logger.info(msg)
+                    print_debug(msg)
+                    USE_SURICATA_SOCKET_CONTROL = useSuricataSC
         except Exception as e:
             logger.warn("Problem getting 'use-suricatasc' value from manifest: %s" % e)
 
@@ -1505,8 +1512,6 @@ while True:
             # remove job directory and contained files
             if not KEEP_JOB_FILES:
                 shutil.rmtree(JOB_DIRECTORY)
-                if not USE_SURICATA_SOCKET_CONTROL and os.path.exists(suricata_logging_outputs_file):
-                    os.unlink(suricata_logging_outputs_file)
             logger.info("Job %s complete" % JOB_ID)
             JOB_ID = None
         else:

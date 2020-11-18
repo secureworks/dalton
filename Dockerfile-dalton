@@ -1,4 +1,4 @@
-FROM python:3.7.3
+FROM python:3.9.0
 MAINTAINER David Wharton
 
 # wireshark needed for mergecap; statically compiled
@@ -24,6 +24,6 @@ COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
 # flowsynth
-RUN cp /usr/local/lib/python3.7/site-packages/flowsynth/flowsynth.py /opt/flowsynth/src/flowsynth.py && chmod +x /opt/flowsynth/src/flowsynth.py
+RUN cp /usr/local/lib/python3.9/site-packages/flowsynth/flowsynth.py /opt/flowsynth/src/flowsynth.py && chmod +x /opt/flowsynth/src/flowsynth.py
 
 CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf

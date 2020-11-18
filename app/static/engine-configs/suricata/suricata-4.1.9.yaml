@@ -44,6 +44,7 @@ vars:
     MODBUS_PORTS: 502
     FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
     FTP_PORTS: 21
+    VXLAN_PORTS: 4789
 
 ##
 ## Step 2: select outputs to enable
@@ -62,6 +63,9 @@ stats:
   interval: 8
   # Add decode events as stats.
   #decoder-events: true
+  # Decoder event prefix in stats. Has been 'decoder' before, but that leads
+  # to missing events in the eve.stats records. See issue #2225.
+  decoder-events-prefix: "decoder.event"
   # Add stream events as stats.
   #stream-events: false
 
@@ -104,6 +108,7 @@ outputs:
       # Include top level metadata. Default yes.
       #metadata: no
 
+      # include the name of the input pcap file in pcap file processing mode
       pcap-file: false
 
       # Community Flow ID
@@ -164,7 +169,6 @@ outputs:
             # rather than an event for each of it.
             # Without setting a version the version
             # will fallback to 1 for backwards compatibility.
-            # Note: version 1 is not available with rust enabled
             version: 2
 
             # Enable/disable this logger. Default: enabled.
@@ -217,14 +221,14 @@ outputs:
             #md5: [body, subject]
 
         #- dnp3
-        #- nfs
-        #- smb
-        #- tftp
-        #- ikev2
-        #- krb5
+        - nfs
+        - smb
+        - tftp
+        - ikev2
+        - krb5
         - dhcp:
             # DHCP logging requires Rust.
-            enabled: no
+            enabled: yes
             # When extended mode is on, all DHCP messages are logged
             # with full detail. When extended mode is off (the
             # default), just enough information to map a MAC address
@@ -393,7 +397,7 @@ outputs:
       append: yes
       #filetype: regular # 'regular', 'unix_stream' or 'unix_dgram'
 
-  # alert output to prelude (http://www.prelude-technologies.com/) only
+  # alert output to prelude (https://www.prelude-siem.org/) only
   # available if Suricata has been compiled with --enable-prelude
   - alert-prelude:
       enabled: no
@@ -637,7 +641,7 @@ af-packet:
     #  Requires at least Linux 3.14.
     #  * cluster_rollover: kernel rotates between sockets filling each socket before moving
     #  to the next. Requires at least Linux 3.10.
-    #  * cluster_ebpf: eBPF file load balancing. See doc/userguide/capture/ebpf-xdt.rst for
+    #  * cluster_ebpf: eBPF file load balancing. See doc/userguide/capture-hardware/ebpf-xdp.rst for
     #  more info.
     # Recommended modes are cluster_flow on most boxes and cluster_cpu or cluster_qm on system
     # with capture card using RSS (require cpu affinity tuning and system irq tuning)
@@ -767,7 +771,7 @@ pcap-file:
 app-layer:
   protocols:
     krb5:
-      enabled: no
+      enabled: yes
     ikev2:
       enabled: yes
     tls:
@@ -790,7 +794,7 @@ app-layer:
       #
       # For best performance, select 'bypass'.
       #
-      #encrypt-handling: default
+      #encryption-handling: default
 
     dcerpc:
       enabled: yes
@@ -844,9 +848,9 @@ app-layer:
     # Note: NFS parser depends on Rust support: pass --enable-rust
     # to configure.
     nfs:
-      enabled: no
+      enabled: yes
     tftp:
-      enabled: no
+      enabled: yes
     dns:
       # memcaps. Globally and per flow/state.
       #global-memcap: 16mb
@@ -958,6 +962,10 @@ app-layer:
            double-decode-path: no
            double-decode-query: no
 
+           # LZMA decompression memory limit. Disabled by default.
+           #lzma-memlimit: 1 Mb
+           #lzma-enabled: no
+
          server-config:
 
            #- apache:
@@ -1019,10 +1027,10 @@ app-layer:
 
     # Note: parser depends on Rust support
     ntp:
-      enabled: no
+      enabled: yes
 
     dhcp:
-      enabled: no
+      enabled: yes
 
 # Limit for the maximum number of asn1 frames to decode (default 256)
 asn1-max-frames: 256
@@ -1121,6 +1129,10 @@ unix-command:
 # Magic file. The extension .mgc is added to the value here.
 #magic-file: /usr/share/file/magic
 #magic-file: 
+
+# GeoIP2 database file. Specify path and filename of GeoIP2 database
+# if using rules with "geoip" rule option.
+#geoip-database: /usr/local/share/GeoLite2/GeoLite2-Country.mmdb
 
 legacy:
   uricontent: enabled
@@ -1388,9 +1400,18 @@ host:
 
 decoder:
   # Teredo decoder is known to not be completely accurate
-  # it will sometimes detect non-teredo as teredo.
+  # as it will sometimes detect non-teredo as teredo.
   teredo:
     enabled: true
+  # VXLAN decoder is assigned to up to 4 UDP ports. By default only the
+  # IANA assigned port 4789 is enabled.
+  vxlan:
+    enabled: false
+    ports: $VXLAN_PORTS # syntax: '8472, 4789'
+  # ERSPAN Type I decode support
+  erspan:
+    typeI:
+      enabled: false
 
 
 ##
@@ -1845,9 +1866,9 @@ mpipe:
 ## file configuration".
 ##
 
-default-rule-path: /usr/local/var/lib/suricata/rules
-rule-files:
- - suricata.rules
+#default-rule-path: /usr/local/etc/suricata/rules
+#rule-files:
+# - suricata.rules
 
 ##
 ## Advanced rule file configuration.
@@ -1857,9 +1878,9 @@ rule-files:
 ## installed with Suricata.
 ##
 
-#default-rule-path: /usr/local/var/lib/suricata/rules
+default-rule-path: /usr/local/etc/suricata/rules
 
-#rule-files:
+rule-files:
 # - botcc.rules
 # # - botcc.portgrouped.rules
 # - ciarmy.rules
