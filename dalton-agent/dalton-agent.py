@@ -786,21 +786,23 @@ def check_pcaps():
                 for pcap in PCAP_FILES:
                     # check for TCP packets
                     if len(subprocess.Popen("%s -nn -q -c 1 -r %s -p tcp 2>/dev/null" % (TCPDUMP_BINARY, pcap), shell=True, stdout=subprocess.PIPE).stdout.read()) > 0:
-                        # check for SYN packets
+                        # check for SYN packets; this only works on IPv4 packets
                         if len(subprocess.Popen("%s -nn -q -c 1 -r %s \"tcp[tcpflags] & tcp-syn != 0\" 2>/dev/null" % (TCPDUMP_BINARY, pcap), shell=True, stdout=subprocess.PIPE).stdout.read()) == 0:
-                            print_error("As Dalton says, \"pain don\'t hurt.\" But an incomplete pcap sure can."
-                                        "\n\n"
-                                        "The pcap file \'%s\' contains TCP traffic but does not "
-                                        "contain any TCP packets with the SYN flag set."
-                                        "\n\n"
-                                        "Almost all IDS rules that look for TCP traffic require "
-                                        "an established connection.\nYou will need to provide a more complete "
-                                        "pcap if you want accurate results."
-                                        "\n\n"
-                                        "If you need help crafting a pcap, Flowsynth may be able to help --\n"
-                                        "https://github.com/secureworks/flowsynth"
-                                        "\n\n"
-                                        "And, \"there's always barber college....\"" % os.path.basename(pcap))
+                            # check IPv6 packets too
+                            if len(subprocess.Popen("%s -nn -q -c 1 -r %s \"ip6 and tcp and ip6[0x35] & 0x2 != 0\" 2>/dev/null" % (TCPDUMP_BINARY, pcap), shell=True, stdout=subprocess.PIPE).stdout.read()) == 0:
+                                print_error("As Dalton says, \"pain don\'t hurt.\" But an incomplete pcap sure can."
+                                            "\n\n"
+                                            "The pcap file \'%s\' contains TCP traffic but does not "
+                                            "contain any TCP packets with the SYN flag set."
+                                            "\n\n"
+                                            "Almost all IDS rules that look for TCP traffic require "
+                                            "an established connection.\nYou will need to provide a more complete "
+                                            "pcap if you want accurate results."
+                                            "\n\n"
+                                            "If you need help crafting a pcap, Flowsynth may be able to help --\n"
+                                            "https://github.com/secureworks/flowsynth"
+                                            "\n\n"
+                                            "And, \"there's always barber college....\"" % os.path.basename(pcap))
             else:
                 print_debug("In check_pcaps() -- no tcpdump binary found at %s" % TCPDUMP_BINARY)
         except Exception as e:
