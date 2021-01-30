@@ -520,7 +520,7 @@ class SocketController:
                     time.sleep(0.1)
                     continue
                 self.suri_startup_log += line
-                if "engine started" in line:
+                if "engine started" in line.lower():
                     self.log_offset = suri_output_fh.tell()
                     break
                 if "<Error>" in line:

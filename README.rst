@@ -582,7 +582,7 @@ The JSON API can be utilized via HTTP GET requests in this format::
 
 For requests, ``<jobid>`` is the Job ID and::
 
-    <key> : [alert|alert_detailed|all|debug|error|eve||ids|other_logs|perf|start_time|statcode|status|submission_time|tech|time|user]
+    <key> : [alert|alert_detailed|all|debug|error|eve|ids|other_logs|perf|start_time|statcode|status|submission_time|tech|time|user]
 
 A JSON API request returns JSON with three root elements:
 
@@ -613,7 +613,7 @@ The RAW API can be utilized via the same HTTP GET requests appended with "/raw":
 
 The ``<jobid>`` and ``<key>`` are the same as the JSON API but a
 RAW API request returns the raw data from the Redis database, in the response body.
-This is basically what is returned from the JSON API but not encapsulated as JSON.  For
+This is basically what is returned from the JSON API but not encapsulated or encoded as JSON.  For
 RAW API responses, the Content-Type header is set to "text/plain" with the exception of
 the "eve" and "all" logs which
 use "application/json".  A RAW request for the "all" key return a string representation
