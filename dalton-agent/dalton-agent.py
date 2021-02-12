@@ -238,7 +238,7 @@ def hash_file(filenames):
 #*** Constant Variables ***
 #**************************
 
-AGENT_VERSION = "3.1.0"
+AGENT_VERSION = "3.1.1"
 HTTP_HEADERS = {
     "User-Agent" : f"Dalton Agent/{AGENT_VERSION}"
 }
@@ -373,6 +373,8 @@ URLLIB_TIMEOUT = 120
 # global class used for Suricata Socket Control
 # set later
 SCONTROL = None
+# boolean used to work around Suricata Redmine issue 4225
+SC_FIRST_RUN = True
 
 #****************#
 #*** Job Logs ***#
@@ -432,6 +434,10 @@ class SocketController:
             self.suricata_is_running = False
             logger.debug("%s" % traceback.format_exc())
             print_error("Problem connecting to Unix socket: %s" % e)
+            try:
+                self.close()
+            except Exception as e:
+                print_debug(f"... unable to close Unix socket: {e}")
 
     def send_command(self, command):
         try:
@@ -541,11 +547,13 @@ class SocketController:
         logger.debug("Suricata daemon started")
 
     def restart_suricata_socket_mode(self, newconfig):
+        global SC_FIRST_RUN
         if self.suricata_is_running:
             # Suricata daemon is running; stop it so we can start
             # a new one with a new config and/or rules
             self.stop_suricata_daemon()
         SCONTROL.start_suricata_daemon(newconfig)
+        SC_FIRST_RUN = True
 
 # Error Class
 class DaltonError(Exception):
@@ -901,7 +909,8 @@ def run_snort():
 
 
 def run_suricata_sc():
-    global SCONTROL
+    global SCONTROL, SC_FIRST_RUN
+
     print_debug("Using Suricata Socket Control ... run_suricata_sc() called")
     if not IDS_BINARY:
         print_error("No Suricata binary found on system.")
@@ -927,6 +936,41 @@ def run_suricata_sc():
             print_debug("New job has same config and ruleset hash, not restarting.")
 
     SCONTROL.connect()
+    if SC_FIRST_RUN:
+        bug4225_versions = ["5.0.5", "6.0.1", "7.0.0-dev"]
+        if SENSOR_ENGINE_VERSION_ORIG in bug4225_versions:
+            # Re: https://redmine.openinfosecfoundation.org/issues/4225
+            # Certain Suricata versions will throw an error on the
+            # first (after starting up) attempt to run a pcap using
+            # the socket control pcap-file command if
+            # 'anomaly' logger and/or 'drop' logger are enabled.
+            # To work around this for now, we make an initial dummy "pcap-file"
+            # request with a small benign pcap so the error condition can
+            # work itself out.
+            dummy_pcap_bytes = b'\xD4\xC3\xB2\xA1\x02\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00' \
+                               b'\xFF\xFF\x00\x00\x01\x00\x00\x00\x20\xD0\x23\x60\x84\xE8\x0C\x00' \
+                               b'\x2B\x00\x00\x00\x2B\x00\x00\x00\x53\x07\x1D\x71\x7F\xB3\xCB\xDA' \
+                               b'\x12\x16\x20\xAF\x08\x00\x45\x00\x00\x1D\x00\x01\x00\x00\x40\x11' \
+                               b'\xB0\x32\xC0\xA8\x7A\x95\xAC\x10\xE3\x4E\x1F\x48\x05\x39\x00\x09' \
+                               b'\xCC\xBD\x44'
+            dummy_pcap_file = "/tmp/dalton-dummy-pcap"
+            with open(dummy_pcap_file, "wb") as dfh:
+                dfh.write(dummy_pcap_bytes)
+            logger.debug("Sending dummy pcap to socket control to work around Redmine 4225")
+            resp = SCONTROL.send_command(f"pcap-file {dummy_pcap_file} /tmp")
+            logger.debug(f"Sent dummy pcap. Response: {resp}")
+            while int(SCONTROL.send_command("pcap-file-number")) > 0 or SCONTROL.send_command("pcap-current") != "\"None\"":
+                # wait for dummy pcap run to finish
+                # TODO: check for timeout/infinite loop?
+                time.sleep(.05)
+            SC_FIRST_RUN = False
+            # skip over output from dummy pcap run in global suri output log
+            with open(suricata_logging_outputs_file, 'r') as fh:
+                fh.seek(SCONTROL.log_offset, 0)
+                fh.read()
+                SCONTROL.log_offset = fh.tell()
+
+    # queue up the real pcaps
     for pcap in PCAP_FILES:
         resp = SCONTROL.send_command(f"pcap-file {pcap} {IDS_LOG_DIRECTORY}")
         logger.debug("Sent pcap %s. Response: %s" % (pcap, resp))
@@ -935,6 +979,7 @@ def run_suricata_sc():
     # note that "pcap-file-number" command returns the number in the queue, and
     # does not inlude the current pcap being processed, so wait until that
     # ("pcap-current") is None.
+    # TODO: check for timeout/infinite loop?
     files_remaining = 1
     current_pcap = "dummy.pcap"
     # TODO: change dynamically based on number of pcap files?
@@ -990,7 +1035,7 @@ def process_suri_alerts():
     global JOB_ALERT_LOG, IDS_LOG_DIRECTORY
     print_debug("process_suri_alerts() called")
     print_msg("Processing alerts")
-    alerts_file = "%s/dalton-fast.log" % IDS_LOG_DIRECTORY
+    alerts_file = os.path.join(IDS_LOG_DIRECTORY, "dalton-fast.log")
     if os.path.exists(alerts_file):
         job_alert_log_fh = open(JOB_ALERT_LOG, "w")
         alert_filehandle = open(alerts_file, "r")
@@ -1015,7 +1060,7 @@ def process_eve_log():
         print_debug("No EVE JSON file found. File \'%s\' does not exist." % eve_file)
 
 def process_other_logs(other_logs):
-    """ 
+    """
     Takes a dictionary of Display Name, filename pairs for logs in the IDS_LOG_DIRECTORY and poulates
     the JOB_OTHER_LOGS with a dictonary containing the Display Name and file contents.
     """
