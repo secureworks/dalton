@@ -582,18 +582,19 @@ The JSON API can be utilized via HTTP GET requests in this format::
 
 For requests, ``<jobid>`` is the Job ID and::
 
-    <key> : [alert|alert_detailed|all|debug|error|eve|ids|other_logs|perf|start_time|statcode|status|submission_time|tech|time|user]
+    <key> : [alert|alert_debug|alert_detailed|all|debug|dns_log|
+             error|engine_stats|eve|fast_pattern|http_log|ids|
+             keyword_perf|other_logs|packet_stats|perf|start_time|
+             statcode|status|submission_time|tech|time|tls_log|user]
 
 A JSON API request returns JSON with three root elements:
 
--  | **name**
-   | The requested data.   **All data is returned as a quoted string if it is
-     not null**.  If the 'all' key is requested, this contains key/value
-     pairs of all valid keys (so the JSON will need to be double-read to get
-     to the data).  If the 'other\_logs' keyword is requested, this is
-     key/value pairs the JSON will need to be double-read to get to the
-     data or triple-read it if it is part of an 'all' request. This is null
-     if there is no data for the requested key.
+-  | **data**
+   | The requested data.  If the key is invalid for the
+     job, then an error is returned, along with an error message stating
+     as such. If there is no data for the requested Job ID and key, then
+     this ``data`` parameter value is an empty string and ``error`` is set
+     to false..
 
 -  | **error**
    | [true\|false] depending if the API request generated an error. This is
@@ -616,7 +617,7 @@ RAW API request returns the raw data from the Redis database, in the response bo
 This is basically what is returned from the JSON API but not encapsulated or encoded as JSON.  For
 RAW API responses, the Content-Type header is set to "text/plain" with the exception of
 the "eve" and "all" logs which
-use "application/json".  A RAW request for the "all" key return a string representation
+use "application/json".  A RAW request for the "all" key returns a string representation
 of a Python dictionary with all the key-value pairs.
 The RAW responses also include "attachment" and "filename"
 in the Content-Disposition header that prompt browsers to download/save the file.
@@ -625,6 +626,11 @@ in the Content-Disposition header that prompt browsers to download/save the file
 
 -  **alert** - Alert data from the job. This is the same as what is
    displayed in the "Alerts" tab in the job results page.
+
+-  **alert\_debug** - A full alert log containing much information for
+   signature writers or for investigating suspected false positives (Suricata only).
+   This is the same as what is displayed in the "Alert Debug" tab in the job
+   results page.
 
 -  **alert\_detailed** - Detailed alert data from the job. This is the
    same as what is displayed in the "Alert Details" tab in the job
@@ -635,20 +641,45 @@ in the Content-Disposition header that prompt browsers to download/save the file
 -  **debug** - Debug data from the job.  This is the same as what is
    displayed in the "Debug" tab in the job results page.
 
+-  **dns\_log** - A line based log of DNS requests and responses (Suricata only).
+   This is the same as what is displayed in the "DNS Log" tab in the job
+   results page.
+
+-  **engine\_stats** - Contains data from various counters of the Suricata
+   engine (Suricata only).  This is the same as what is displayed in
+   the "Engine Stats" tab in the job results page.
+
 -  **error** - Error data from the job.  This is the same as what is
    displayed in the "Error" tab in the job results page.
 
 -  **eve** - EVE JSON output from the job (Suricata only).  This is the same as what is
    displayed in the "EVE JSON" tab in the job results page.
 
+-  **fast\_pattern** - Fast pattern details for the submitted rules (Suricata only).
+   This is the same as what is displayed in the "Fast Pattern" tab in the job
+   results page.
+
+-  **http\_log** - A line based log of HTTP requests (Suricata only).  This is the
+   same as what is displayed in the "HTTP Log" tab in the job results page.
+
 -  **ids** - IDS Engine output from the job.  This is the same as what
    is displayed in the "IDS Engine" tab in the job results page.  
    For Snort Agents, engine statistics output at the end of the job 
    run are populated here.
 
--  **other\_logs** - Other logs from the job (Suricata only). 
+-  **keyword\_perf** - Contains data of per keyword profiling (Suricata only).
+   This is the same as what is displayed in the "Keyword Perf" tab in the job
+   results page.
+
+-  **other\_logs** - *deprecated* - Other logs from the job (Suricata only).
    This is returned as key/value pairs with the key being the
-   name of the log and the value being the contents of the log.
+   name of the log and the value being the contents of the log. This key
+   is deprecated and is not included in the ``all`` key response. The contents
+   of ``other_logs``, e.g. "http_log", "tls_log", etc., can and should be
+   accessed directly.
+
+-  **packet\_stats** - Statistics from the pcap(s) (Suricata only).  This is the
+   same as what is displayed in the "Engine Stats" tab in the job results page.
 
 -  **perf** - Performance data from the job (if the job generated
    performance data).   This is the same as what is displayed in the
@@ -702,6 +733,10 @@ in the Content-Disposition header that prompt browsers to download/save the file
    This is returned as a string and is the same as the "Processing Time"
    displayed in the job results page.
 
+-  **tls\_log** - A line based log of TLS handshake parameters (Suricata only).
+   This is the same as what is displayed in the "TLS Log" tab in the job
+   results page.
+
 -  **user** - The user who submitted the job. This will always be "undefined" 
    since authentication is not implemented in this release.
 
@@ -716,22 +751,16 @@ JSON API Response:
 .. code::
 
     {
-    "data": "06/26/2017-12:08:13.255103  [**] [1:2023754:6] ET CURRENT_EVENTS 
-            Malicious JS.Nemucod to PS Dropping PE Nov 14 M2 [**] [Classification: 
+    "data": "06/26/2017-12:08:13.255103  [**] [1:180043530:4] Nemucod Downloader
+            Trojan Request Outbound [**] [Classification: 
             A Network Trojan was detected] [Priority: 1] {TCP} 192.168.1.201:65430 
-            -> 47.91.93.208:80\n\n06/26/2017-12:08:13.255103  [**] [1:2023882:2] 
-            ET INFO HTTP Request to a *.top domain [**] [Classification: Potentially 
+            -> 47.91.93.208:80\n\n06/26/2017-12:08:13.255103  [**] [1:180056733:3] 
+            Suspicious HTTP Request to a *.top TLD - Outbound [**] [Classification: Potentially 
             Bad Traffic] [Priority: 2] {TCP} 192.168.1.201:65430 -> 47.91.93.208:80\n
-            \n06/26/2017-12:08:13.646674  [**] [1:2023754:6] ET CURRENT_EVENTS 
-            Malicious JS.Nemucod to PS Dropping PE Nov 14 M2 [**] [Classification: 
+            \n06/26/2017-12:08:13.646674  [**] [1:180043530:4] Nemucod Downloader
+            Trojan Request Outbound [**] [**] [Classification: 
             A Network Trojan was detected] [Priority: 1] {TCP} 192.168.1.201:65430 
-            -> 47.91.93.208:80\n\n06/26/2017-12:08:14.053075  [**] [1:2023754:6] ET 
-            CURRENT_EVENTS Malicious JS.Nemucod to PS Dropping PE Nov 14 M2 [**] 
-            [Classification: A Network Trojan was detected] [Priority: 1] {TCP} 
-            192.168.1.201:65430 -> 47.91.93.208:80\n\n06/26/2017-12:08:12.097144  
-            [**] [1:2023883:1] ET DNS Query to a *.top domain - Likely Hostile 
-            [**] [Classification: Potentially Bad Traffic] [Priority: 2] {UDP} 
-            192.168.1.201:54947 -> 192.168.1.1:53\n\n",
+            -> 47.91.93.208:80\n\n",
     "error_msg": null,
     "error": false
     }
@@ -744,7 +773,7 @@ JSON API Response:
 
 .. code:: javascript
 
-    {"data": null, "error_msg": "value 'ninjalevel' invalid", "error": true}
+    {"data": null, "error_msg": "No data found for 'ninjalevel' for Job ID ae42737ab4f52862", "error": true}
 
 RAW API Request::
 
@@ -771,7 +800,7 @@ provided here but can be easily obtained by making the request in a web browser.
      filename, separated by forward slashes.  For example:
      ``suricata/5.0.0`` or ``suricata/5.0.0/mycustomconfig.yaml``.
      Suricata version 4.x compiled with Rust support will have
-     the prefix "rust_" before the version, e.g. ``suricata/rust_4.1.5``.
+     the prefix "rust\_" before the version, e.g. ``suricata/rust_4.1.5``.
 
    | If no exact match is found for a config file on disk, the closest file
      that matches is returned.
@@ -1255,8 +1284,12 @@ Frequently Asked Questions
      open source release.  However, if there is a demand for such support, then
      adding support for older Snort versions will be reconsidered.
 
-#. | **Are other sensor engines supported such as Bro?**
+#. | **Are other sensor engines supported such as Bro/Zeek?**
    | No; currently only Suricata and Snort are supported.
+
+#. | **So then is Snort 3 supported?**
+   | Not at this time.  Snort 3 support is certainly possible and is being
+     considered.
 
 #. | **Does Dalton support authentication such as username/password/API tokens or 
      authorization enforcement like discretionary access control?**
@@ -1278,11 +1311,13 @@ Frequently Asked Questions
 #. | **When I submit jobs to Suricata Agents with multiple pcaps, the job zipfile
      only has one pcap. What's going on?**
    | In read pcap mode, which is how the Suricata and Snort engines process pcaps,
-     Suricata only supports the reading of a single pcap.  Therefore, to support 
+     older version of Suricata only support the reading of a single pcap.  Therefore,
+     *for jobs submitted to such older Suricata Agents*, to support
      multiple pcaps in the same Suricata job, the Dalton Controller will combine 
      the pcaps into a single file before making the job available for Agents to
-     grab.  By default, the pcap merging is done with 
+     grab. By default, the pcap merging is done with
      `mergecap <https://www.wireshark.org/docs/man-pages/mergecap.html>`__.
+     For more details see `Packet Captures <#Packet-Captures>`__.
 
 #. | **Can I have more than one Agent with the same engine/version? For example, can
      I have multiple Agents running Suricata 4.0.1?**

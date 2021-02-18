@@ -2072,10 +2072,13 @@ def page_about_default():
 # API handling code (some of it)
 #########################################
 
-def controller_api_get_job_data(jid, requested_data, raw=False):
+def controller_api_get_job_data(jid, requested_data):
     global r
     # add to as necessary
-    valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'eve', 'perf', 'tech', 'error', 'time', 'statcode', 'debug', 'status', 'submission_time', 'start_time', 'user', 'all')
+    valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'eve',
+                  'perf', 'tech', 'error', 'time', 'statcode', 'debug',
+                  'status', 'submission_time', 'start_time', 'user', 'all'
+                 )
     json_response = {'error':False, 'error_msg':None, 'data':None}
     # some input validation
     if not validate_jobid(jid):
@@ -2096,57 +2099,72 @@ def controller_api_get_job_data(jid, requested_data, raw=False):
             json_response["error"] = True
             json_response["error_msg"] = "Job ID %s does not exist" % jid
         else:
-            # inspect the requested_data value and return the needful :)
+            # inspect the requested_data value and return the data
             # check 'valid_keys'
             if requested_data not in valid_keys:
-                json_response["error"] = True
-                json_response["error_msg"] = "value '%s' invalid" % requested_data
+                # check other_logs
+                try:
+                    ologs = r.get("%s-%s" % (jid, 'other_logs'))
+                    if len(ologs) > 0:
+                        ologs = json.loads(ologs)
+                        for k in ologs.keys():
+                            kkey = k.lower().strip()
+                            kkey = kkey.replace(' ', '_')
+                            if kkey == requested_data:
+                                json_response["data"] = ologs[k]
+                                break
+                    if json_response["data"] is None:
+                        json_response["error"] = True
+                        json_response["error_msg"] = f"No data found for '{requested_data}' for Job ID {jid}"
+
+                except Exception as e:
+                    json_response["error"] = True
+                    json_response["error_msg"] = "Unexpected error1: cannot pull '%s' data for Job ID %s" % (requested_data, jid)
+                    logger.debug(f"{json_response['error_msg']}: {e}")
             else:
                 ret_data = None
                 if requested_data == "all":
-                    # 'all' returns a dict of all data (other values just return a string)
+                    # 'all' returns a structure of all data (other values just return a string)
                     ret_data = {}
                     try:
                         for key in valid_keys:
                             if key == "all":
                                 continue
+                            elif key == "other_logs":
+                                # go thru other_logs struct and make each top-level entries in the response
+                                ologs = r.get("%s-%s" % (jid, key))
+                                if len(ologs) > 0:
+                                    ologs = json.loads(ologs)
+                                    for k in ologs.keys():
+                                        kdata = ologs[k]
+                                        k = k.lower().strip()
+                                        k = k.replace(' ', '_')
+                                        ret_data[k] = kdata
                             else:
-                                if raw:
-                                    ret_data[key] = r.get("%s-%s" % (jid, key))
-                                else:
-                                    ret_data[key] = json.dumps(r.get("%s-%s" % (jid, key)))
-                    except:
+                                ret_data[key] = r.get("%s-%s" % (jid, key))
+                    except Exception as e:
                         json_response["error"] = True
                         json_response["error_msg"] = "Unexpected error: cannot pull '%s' data for Job ID %s" % (requested_data, jid)
+                        logger.debug(f"{json_response['error_msg']}: {e}")
                 else:
                     try:
-                        if raw:
-                            ret_data = r.get("%s-%s" % (jid, requested_data))
-                        else:
-                            ret_data = json.dumps(r.get("%s-%s" % (jid, requested_data)))
+                        ret_data = r.get("%s-%s" % (jid, requested_data))
                     except:
                         json_response["error"] = True
                         json_response["error_msg"] = "Unexpected error: cannot pull '%s' for jobid %s," % (requested_data, jid)
-
-                if requested_data == "all" and not raw:
-                    json_response["data"] = "%s" % json.dumps(ret_data)
-                else:
-                    json_response["data"] = "%s" % ret_data
+                    if requested_data == "other_logs" and len(ret_data) > 0:
+                        ret_data = json.loads(ret_data)
+                json_response["data"] = ret_data
     return json_response
 
-@dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>', methods=['GET'])
+@dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>', defaults={'raw': ''})
+@dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>/<raw>', methods=['GET'])
 #@auth_required()
-def controller_api_get_request(jid, requested_data):
+def controller_api_get_request(jid, requested_data, raw):
+    logger.debug(f"controller_api_get_request() called, raw: {'True' if raw == 'raw' else 'False'}")
     json_response = controller_api_get_job_data(jid=jid, requested_data=requested_data)
-    return Response(json.dumps(json_response), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
-
-@dalton_blueprint.route('/dalton/controller_api/v2/<jid>/<requested_data>/raw', methods=['GET'])
-#@auth_required()
-def controller_api_get_request_raw(jid, requested_data):
-    logger.debug("controller_api_get_request_raw() called")
-    json_response = controller_api_get_job_data(jid=jid, requested_data=requested_data, raw=True)
-    if json_response['error']:
-        return Response(f"ERROR: {json_response['error_msg']}", status=400, mimetype='text/plan', headers = {'X-Dalton-Webapp':'OK'})
+    if raw != 'raw' or json_response['error']:
+        return Response(json.dumps(json_response), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
     else:
         filename = f"{jid}_{requested_data}"
         if requested_data in ["eve", "all"]:
@@ -2155,7 +2173,7 @@ def controller_api_get_request_raw(jid, requested_data):
         else:
             mimetype = "text/plain"
             filename = f"{filename}.txt"
-        return Response(json_response['data'], status=200, mimetype=mimetype, headers = {'X-Dalton-Webapp':'OK', "Content-Disposition":f"attachment; filename={filename}"})
+        return Response(f"{json_response['data']}", status=200, mimetype=mimetype, headers = {'X-Dalton-Webapp':'OK', "Content-Disposition":f"attachment; filename={filename}"})
 
 @dalton_blueprint.route('/dalton/controller_api/get-current-sensors/<engine>', methods=['GET'])
 def controller_api_get_current_sensors(engine):
