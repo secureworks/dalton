@@ -3,12 +3,6 @@
     {% if eve_json != "" %}
         // default syntax hilighting limit (bytes); if lengh greater than this, don't hilight by default.
         var hilightThreshold = 1048576
-        // 20191221 - cursory tests show that Google Chrome seems to really strugle with the hilighting
-        //            so setting to 100K
-        var hilightThresholdChrome = 102400
-        if ($.browser.chrome) {
-            hilightThreshold = hilightThresholdChrome;
-        }
 
         var eveJSON = JSON.parse('[' + {{eve_json|tojson}}.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
         var eventTypeFilters = [];
