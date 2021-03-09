@@ -6,4 +6,5 @@ Flask-Compress==1.4.0
 redis==2.10.6
 ruamel.yaml==0.16.12
 idstools==0.6.4
-flowsynth
+flowsynth>=1.4.1
+werkzeug==0.16.1
