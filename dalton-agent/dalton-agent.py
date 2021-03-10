@@ -937,7 +937,7 @@ def run_suricata_sc():
 
     SCONTROL.connect()
     if SC_FIRST_RUN:
-        bug4225_versions = ["5.0.5", "5.0.6", "6.0.1", "6.0.2", "7.0.0-dev"]
+        bug4225_versions = ["5.0.5", "5.0.6", "5.0.7", "6.0.1", "6.0.2", "6.0.3", "7.0.0-dev"]
         if SENSOR_ENGINE_VERSION_ORIG in bug4225_versions:
             # Re: https://redmine.openinfosecfoundation.org/issues/4225
             # Certain Suricata versions will throw an error on the

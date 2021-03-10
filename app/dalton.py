@@ -95,15 +95,6 @@ if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
     logger.error("mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap." % MERGECAP_BINARY)
     MERGECAP_BINARY = None
 
-if not os.path.exists(U2_ANALYZER):
-    logger.error("U2 Analyzer '%s' not found.  Cannot process alert details." % U2_ANALYZER)
-    U2_ANALYZER = None
-elif  U2_ANALYZER.endswith(".py"):
-    # assumes 'python' binary in path
-    U2_ANALYZER = "%s %s" % ("python", U2_ANALYZER)
-else:
-    logger.error("U2 Analyzer '%s' does not end in .py.  Cannot process alert details." % U2_ANALYZER)
-
 #connect to the datastore
 try:
     # redis values are retured as byte objects by default. Automatically
@@ -115,23 +106,22 @@ except Exception as e:
 # if there are no rules, use idstools rulecat to download a set for Suri and Snort
 # if rulecat fails (eaten by proxy), empty rules file(s) may be created
 # TODO: change this to use suricata-update?
-if os.path.exists(RULECAT_SCRIPT):
-    for engine in ['suricata', 'snort']:
-        ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
-        rules = [f for f in os.listdir(ruleset_dir) if (os.path.isfile(os.path.join(ruleset_dir, f)) and f.endswith(".rules"))]
-        if len(rules) == 0:
-            filename = "ET-%s-all-%s.rules" % (datetime.datetime.utcnow().strftime("%Y%m%d"), engine)
-            logger.info("No rulesets for %s found. Downloading the latest ET set as '%s'" % (engine, filename))
-            if engine == "suricata":
-                url = "https://rules.emergingthreats.net/open/suricata-2.0/emerging.rules.tar.gz"
-            if engine == "snort":
-                url = "https://rules.emergingthreats.net/open/snort-2.9.0/emerging.rules.tar.gz"
-            command = "python %s --url %s --merged %s" % (RULECAT_SCRIPT, url, os.path.join(ruleset_dir, filename))
-            try:
-                subprocess.call(command, stdin=None, stdout=None, stderr=None, shell=True)
-            except Exception as e:
-                logger.info("Unable to download ruleset for %s" % engine)
-                logger.debug("Exception: %s" % e)
+for engine in ['suricata', 'snort']:
+    ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
+    rules = [f for f in os.listdir(ruleset_dir) if (os.path.isfile(os.path.join(ruleset_dir, f)) and f.endswith(".rules"))]
+    if len(rules) == 0:
+        filename = "ET-%s-all-%s.rules" % (datetime.datetime.utcnow().strftime("%Y%m%d"), engine)
+        logger.info("No rulesets for %s found. Downloading the latest ET set as '%s'" % (engine, filename))
+        if engine == "suricata":
+            url = "https://rules.emergingthreats.net/open/suricata-4.0/emerging.rules.tar.gz"
+        if engine == "snort":
+            url = "https://rules.emergingthreats.net/open/snort-2.9.0/emerging.rules.tar.gz"
+        command = "%s --url %s --merged %s" % (RULECAT_SCRIPT, url, os.path.join(ruleset_dir, filename))
+        try:
+            subprocess.call(command, stdin=None, stdout=None, stderr=None, shell=True)
+        except Exception as e:
+            logger.info("Unable to download ruleset for %s" % engine)
+            logger.debug("Exception: %s" % e)
 
 # check for sane timeout values
 if REDIS_EXPIRE <= 0:
@@ -690,7 +680,7 @@ def post_job_results(jobid):
         time = ""
     # alert_detailed is base64 encoded unified2 binary data
     alert_detailed = ""
-    if 'alert_detailed' in result_obj and U2_ANALYZER:
+    if 'alert_detailed' in result_obj:
         try:
             # write to disk and pass to u2spewfoo.py; we could do
             #  myriad other things here like modify or import that
