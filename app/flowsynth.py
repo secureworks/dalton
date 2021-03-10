@@ -117,21 +117,24 @@ def payload_cert(formobj):
         logger.error("No cert submitted")
         return None
 
-    file_content = request.files['cert_file'].read()
-    if formobj.get('cert_file_type') == 'pem':
-        file_content = file_content.decode('utf-8')
-        if certsynth.pem_cert_validate(file_content.strip()):
-            return certsynth.cert_to_synth(file_content.strip(), 'PEM')
+    try:
+        file_content = request.files['cert_file'].read()
+        if formobj.get('cert_file_type') == 'pem':
+            file_content = file_content.decode('utf-8')
+            if certsynth.pem_cert_validate(file_content.strip()):
+                return certsynth.cert_to_synth(file_content.strip(), 'PEM')
+            else:
+                logger.error("Unable to validate submitted pem file.")
+                return None
+        elif formobj.get('cert_file_type') == 'der':
+            return certsynth.cert_to_synth(file_content, 'DER')
         else:
-            logger.error("Unable to validate submitted pem file.")
+            # this shouldn't happen if people are behaving
+            logger.error(f"Invalid certificate format given: '{cert_file_type}'")
             return None
-    elif formobj.get('cert_file_type') == 'der':
-        return certsynth.cert_to_synth(file_content, 'DER')
-    else:
-        # this shouldn't happen if people are behaving
-        logger.error(f"Invalid certificate format given: '{cert_file_type}'")
+    except Exception as e:
+        logger.error(f"Error processing submitted certificate file: {e}")
         return None
-
 
 def fs_replace_badchars(payload):
     """replace characters that conflict with the flowsynth syntax"""
