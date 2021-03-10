@@ -1,5 +1,5 @@
 from flask import Flask
-from flask_cache import Cache
+from flask_caching import Cache
 from flask_compress import Compress
 from app.dalton import dalton_blueprint
 from app.flowsynth import flowsynth_blueprint
