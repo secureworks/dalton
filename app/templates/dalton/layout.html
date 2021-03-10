@@ -1,12 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <title>Dalton</title>
+
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
 
     <link href="{{ url_for('static', filename='bootstrap/css/bootstrap.css') }}" rel="stylesheet" type="text/css">
     <link href="{{ url_for('static', filename='css/dalton.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='highlightjs/styles/eve-light.css') }}" rel="stylesheet" type="text/css" id="eve-css">
+    <script src="{{ url_for('static', filename='highlightjs/highlight.pack.js') }}"></script>
     <script src="{{ url_for('static', filename='bootstrap/js/jquery.js') }}"></script>
     <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.js') }}"></script>
     <style>
