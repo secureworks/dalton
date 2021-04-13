@@ -1384,6 +1384,14 @@ def page_coverage_summary():
         except:
             pass
 
+        # get dumps from buffers
+        bGetBufferDumps = False
+        try:
+            if request.form.get('optionDumpBuffers'):
+                bGetBufferDumps = True
+        except:
+            pass
+
         #get custom rules (if defined)
         bCustomRules = False
         custom_rules_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_custom.rules")
@@ -1893,6 +1901,7 @@ def page_coverage_summary():
                 json_job['alert-detailed'] = bGetAlertDetailed
                 json_job['get-fast-pattern'] = bGetFastPattern
                 json_job['get-other-logs'] = bGetOtherLogs
+                json_job['get-buffer-dumps'] = bGetBufferDumps
                 json_job['sensor-tech'] = sensor_tech
                 json_job['prod-ruleset'] = prod_ruleset_name
                 json_job['engine-conf'] = os.path.basename(engine_conf_file)
