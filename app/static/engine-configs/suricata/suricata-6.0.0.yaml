@@ -1,6 +1,6 @@
 %YAML 1.1
 ---
-
+# You found it!! /opt/dalton/engine-configs/suricata/suricata-6.0.0.yaml
 # Suricata configuration file. In addition to the comments describing all
 # options in this file, full documentation can be found at:
 # https://suricata.readthedocs.io/en/latest/configuration/suricata-yaml.html
@@ -523,10 +523,10 @@ outputs:
   # Documented at:
   # https://suricata.readthedocs.io/en/latest/output/lua-output.html
   - lua:
-      enabled: no
-      #scripts-dir: /etc/suricata/lua-output/
+      enabled: yes
+      scripts-dir: /etc/suricata/lua-output/
       scripts:
-      #   - script1.lua
+         - http.lua
 
 # Logging configuration.  This is not about logging IDS alerts/events, but
 # output about what Suricata is doing, like startup messages, errors, etc.
