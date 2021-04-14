@@ -524,7 +524,7 @@ outputs:
   # https://suricata.readthedocs.io/en/latest/output/lua-output.html
   - lua:
       enabled: yes
-      scripts-dir: /etc/suricata/lua-output/
+      scripts-dir: /opt/dalton-agent
       scripts:
          - http.lua
 
