@@ -76,7 +76,6 @@ try:
     MERGECAP_BINARY = dalton_config.get('dalton', 'mergecap_binary')
     U2_ANALYZER = dalton_config.get('dalton', 'u2_analyzer')
     RULECAT_SCRIPT = dalton_config.get('dalton', 'rulecat_script')
-    MAX_PCAP_FILES = dalton_config.getint('dalton', 'max_pcap_files')
     DEBUG = dalton_config.getboolean('dalton', 'debug')
 
     #options for flowsynth
@@ -134,12 +133,6 @@ if JOB_RUN_TIMEOUT <= 4:
     logger.critical("job_run_time value of %d seconds is invalid.  Expect problems." % JOB_RUN_TIMEOUT)
 if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
     logger.warn("teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis." % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE))
-
-# other checks
-if MAX_PCAP_FILES < 1:
-    default_max = 8
-    logger.warn("max_pcap_files value of '%d' invalid.  Using '%d'" % (MAX_PCAP_FILES, default_max))
-    MAX_PCAP_FILES = default_max
 
 #global values used by Flask
 TRAP_BAD_REQUEST_KEY_ERRORS = True
@@ -866,7 +859,7 @@ def validate_jobid(jid):
 #@login_required()
 def page_coverage_default(sensor_tech, error=None):
     """the default coverage wizard page"""
-    global CONF_STORAGE_PATH, MAX_PCAP_FILES
+    global CONF_STORAGE_PATH
     global r
     ruleset_dirs = []
     sensor_tech = sensor_tech.split('-')[0]
@@ -934,7 +927,7 @@ def page_coverage_default(sensor_tech, error=None):
     else:
         # no sensors available.
         engine_conf = "# not found"
-    return render_template('/dalton/coverage.html', sensor_tech=sensor_tech, rulesets=rulesets, error=error, engine_conf=engine_conf, sensors=sensors, fspcap=fspcap, max_pcaps=MAX_PCAP_FILES)
+    return render_template('/dalton/coverage.html', sensor_tech=sensor_tech, rulesets=rulesets, error=error, engine_conf=engine_conf, sensors=sensors, fspcap=fspcap)
 
 @dalton_blueprint.route('/dalton/job/<jid>')
 #@auth_required()
@@ -1170,7 +1163,6 @@ def page_coverage_summary():
     global r
     global STAT_CODE_QUEUED
     global FS_PCAP_PATH
-    global MAX_PCAP_FILES
 
     verify_temp_storage_path()
     digest = hashlib.md5()
@@ -1211,8 +1203,7 @@ def page_coverage_summary():
     except:
         pass
 
-    # grab the user submitted files from the web form (max number of arbitrary files allowed on the web form
-    # governed by max_pcap_files variable in dalton.conf)
+    # grab the user submitted files from the web form
     # note that these are file handle objects? have to get filename using .filename
     # make this a list so I can pass by reference
     dupcount = [0]
@@ -2207,12 +2198,3 @@ def controller_api_get_current_sensors_json_full():
     """Returns json with details about all the current active sensors"""
     sensors = page_sensor_default(return_dict = True)
     return Response(json.dumps(sensors), status=200, mimetype='application/json', headers = {'X-Dalton-Webapp':'OK'})
-
-@dalton_blueprint.route('/dalton/controller_api/get-max-pcap-files', methods=['GET'])
-def controller_api_get_max_pcap_files():
-    """Returns the config value of max_pcap_files (the number of
-       pcap or compressed that can be uploaded per job).
-       This could be useful for programmatic submissions where the
-       submitter can ensure all the files will be processed.
-    """
-    return str(MAX_PCAP_FILES)
