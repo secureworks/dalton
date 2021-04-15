@@ -57,18 +57,6 @@
             $('#showHideOptionCustomEngineConf').find('i').removeClass('icon-chevron-down').addClass('icon-chevron-right');
 		}
 
-		for(i=1; i < {{max_pcaps}}; i++) {
-			if ($('#coverage-pcap'+i).val()) {
-				$('#pcap'+i).show();
-				if (i == {{max_pcaps}} -1) {
-					$('#addpcap').hide();
-				}
-			}
-		}		
-        if ({{max_pcaps}} == 1) {
-		    $('#addpcap').hide();
-        }
-
 		$('#submitjob').submit( function() {
 			$('#uploadDialog').modal()
 		});
@@ -103,36 +91,13 @@
             }
 		});
 
-		$('#addpcap').click( function() {
-			for(i=1; i < {{max_pcaps}}; i++) {
-				if ($('#pcap'+i).is(':hidden')) {
-					$('#pcap'+i).show();
-					if (i == {{max_pcaps}} - 1) {
-						$('#addpcap').hide();
-					}
-					break;
-				}
-			}
-		});
-
 		$('#resetpcap').click( function() {
-			<!-- reset file input fields before making them hidden (important!) -->
-			for(i=0; i < {{max_pcaps}}; i++) {
-				reset_file_input($('#coverage-pcap'+i));
-				if (i > 0) {
-					$('#pcap'+i).hide();
-				}
-			}
-            if ({{max_pcaps}} > 1) {
-			    $('#addpcap').show();
-            }
+			$('#coverage-pcaps').wrap('<form>').closest('form').get(0).reset();
+			$('#coverage-pcaps').unwrap();
 		});
 
 		function reset_file_input(id) {
-			<!--	id.replaceWith(id=id.clone(false).val("")); -->
-			id.wrap('<form>').closest('form').get(0).reset();
-			id.unwrap();
-		}
+				}
 
         function show_hide_log_options(sensor_tech) {
             {# Unified2 is dead. Long live unifed2. #}
@@ -220,20 +185,8 @@
                             {% if fspcap %}
                                 <input type="text" name="fspcap" id="fspcap" readonly="readonly" value={{fspcap}}><p/>
                             {% endif %}
-                            {% for n in range(max_pcaps|int) %}
-                                {% if n != 0 %}
-                                    <div id="pcap{{n}}" style="display:none;">
-                                {% endif %}
-                                    <input type="file" name="coverage-pcap{{n}}" id="coverage-pcap{{n}}" placeholder='Select a PCAP'><p/>
-                                {% if n != 0 %}
-                                    </div>
-                                {% endif %}
-                            {% endfor %}
+                            <input type="file" name="coverage-pcaps[]" id="coverage-pcaps" placeholder='Select PCAPs' multiple><p/>
 	
-							<div id="addpcap" style="display:inline;">
-								<a href="#">Add another pcap</a>
-								&nbsp;|&nbsp;
-							</div>
 							<div id="resetpcap" style="display:inline;">
 								<a href="#">Reset Pcaps</a>
 							</div>

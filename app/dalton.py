@@ -1039,7 +1039,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
             zf = zipfile.ZipFile(archivename, mode='r')
             for file in zf.namelist():
                 logger.debug("Processing file '%s' from ZIP archive" % file)
-                if file.endswith('/'):
+                if file.endswith('/') or "__MACOSX/" in file:
                     continue
                 filename = clean_filename(os.path.basename(file))
                 if os.path.splitext(filename)[1].lower() not in ['.pcap', '.pcapng', '.cap']:
@@ -1216,9 +1216,13 @@ def page_coverage_summary():
     # note that these are file handle objects? have to get filename using .filename
     # make this a list so I can pass by reference
     dupcount = [0]
-    for i in range(MAX_PCAP_FILES):
+    try:
+        coverage_pcaps = request.files.getlist("coverage-pcaps[]")
+    except:
+        coverage_pcaps = []
+
+    for pcap_file in coverage_pcaps:
         try:
-            pcap_file = request.files['coverage-pcap%d' % i]
             if (pcap_file != None and pcap_file.filename != None and pcap_file.filename != '<fdopen>' and (len(pcap_file.filename) > 0) ):
                 if os.path.splitext(pcap_file.filename)[1].lower() in ['.zip', '.tar', '.gz', '.tgz', '.gzip', '.bz2']:
                     filename = clean_filename(os.path.basename(pcap_file.filename))
