@@ -487,10 +487,12 @@ outputs:
   # Documented at:
   # https://redmine.openinfosecfoundation.org/projects/suricata/wiki/Lua_Output
   - lua:
-      enabled: no
-      #scripts-dir: /etc/suricata/lua-output/
+      enabled: yes
+      scripts-dir: /opt/dalton-agent
       scripts:
-      #   - script1.lua
+         - http.lua
+         - dns.lua
+         - tls.lua
 
 # Logging configuration.  This is not about logging IDS alerts/events, but
 # output about what Suricata is doing, like startup messages, errors, etc.
