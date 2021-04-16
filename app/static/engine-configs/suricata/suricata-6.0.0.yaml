@@ -527,6 +527,7 @@ outputs:
       scripts-dir: /opt/dalton-agent
       scripts:
          - http.lua
+         - dns.lua
 
 # Logging configuration.  This is not about logging IDS alerts/events, but
 # output about what Suricata is doing, like startup messages, errors, etc.
