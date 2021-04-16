@@ -1453,9 +1453,12 @@ def submit_job(job_id, job_directory):
             other_logs['Fast Pattern'] = 'rules_fast_pattern.txt'
         if trackPerformance:
             other_logs['Keyword Perf'] = 'dalton-keyword_perf.log'
+        if getBufferDumps:
+            other_logs['HTTP Buffers'] = 'dalton-http-buffers.log'
     # elif ... can add processing of logs from other engines here
-    if getBufferDumps:
-        other_logs['Buffer Dump'] = 'dalton-buffers.log'
+    elif SENSOR_ENGINE.startswith('snort'):
+        if getBufferDumps:
+            other_logs['Buffer Dump'] = 'dalton-buffers.log'
     if len(other_logs) > 0:
         process_other_logs(other_logs)
 
