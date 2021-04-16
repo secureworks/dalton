@@ -42,6 +42,8 @@ WORKDIR /opt/dalton-agent
 COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
 COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
 COPY http.lua /opt/dalton-agent/http.lua
+COPY dns.lua /opt/dalton-agent/dns.lua
+COPY tls.lua /opt/dalton-agent/tls.lua
 RUN sed -i 's/REPLACE_AT_DOCKER_BUILD-VERSION/'"${SURI_VERSION}"'/' /opt/dalton-agent/dalton-agent.conf
 
 CMD python3.8 /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1

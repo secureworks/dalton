@@ -528,6 +528,7 @@ outputs:
       scripts:
          - http.lua
          - dns.lua
+         - tls.lua
 
 # Logging configuration.  This is not about logging IDS alerts/events, but
 # output about what Suricata is doing, like startup messages, errors, etc.

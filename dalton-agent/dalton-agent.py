@@ -1455,6 +1455,8 @@ def submit_job(job_id, job_directory):
             other_logs['Keyword Perf'] = 'dalton-keyword_perf.log'
         if getBufferDumps:
             other_logs['HTTP Buffers'] = 'dalton-http-buffers.log'
+            other_logs['DNS Buffers'] = 'dalton-dns-buffers.log'
+            other_logs['TLS Buffers'] = 'dalton-tls-buffers.log'
     # elif ... can add processing of logs from other engines here
     elif SENSOR_ENGINE.startswith('snort'):
         if getBufferDumps:
