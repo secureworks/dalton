@@ -24,7 +24,7 @@ function HexDump(buf)
         s.output = s.output .. string.format('%08X  ',byte-1)
         chunk:gsub('.', function (c) s.output = s.output .. string.format('%02X ',string.byte(c)) end)
         s.output = s.output .. string.rep(' ',3*(16-#chunk))
-        s.output = s.output .. string.format("|%-16s|", chunk:gsub('%c','.')) .. "\n"
+        s.output = s.output .. string.format("|%-16s|", chunk:gsub('[^\32-\126]','.')) .. "\n"
     end
     return s.output
 end
