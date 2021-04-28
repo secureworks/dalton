@@ -1,6 +1,5 @@
 %YAML 1.1
 ---
-# You found it!! /opt/dalton/engine-configs/suricata/suricata-6.0.0.yaml
 # Suricata configuration file. In addition to the comments describing all
 # options in this file, full documentation can be found at:
 # https://suricata.readthedocs.io/en/latest/configuration/suricata-yaml.html
