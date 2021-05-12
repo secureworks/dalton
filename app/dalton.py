@@ -1710,6 +1710,17 @@ def page_coverage_summary():
                         config['profiling']['keywords'] = {'enabled': True, \
                                                            'filename': "dalton-keyword_perf.log", \
                                                            'append': True}
+
+                if bGetBufferDumps:
+                    buff_dump_config = {'lua': {'enabled': True, \
+                                        'scripts-dir': "/opt/dalton-agent", \
+                                        'scripts': ["http.lua","tls.lua","dns.lua"]}}
+
+                    if 'lua' in olist: # someone added something
+                        config['outputs'][olist.index('lua')] = buff_dump_config
+                    else:
+                        config['outputs'].append(buff_dump_config)
+
                 # write out
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_suricata.yaml")
                 engine_conf_fh = open(engine_conf_file, "w")

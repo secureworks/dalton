@@ -483,18 +483,6 @@ outputs:
       type: file
       filename: http-data.log
 
-  # Lua Output Support - execute lua script to generate alert and event
-  # output.
-  # Documented at:
-  # https://redmine.openinfosecfoundation.org/projects/suricata/wiki/Lua_Output
-  - lua:
-      enabled: yes
-      scripts-dir: /opt/dalton-agent
-      scripts:
-         - http.lua
-         - dns.lua
-         - tls.lua
-
 # Logging configuration.  This is not about logging IDS alerts/events, but
 # output about what Suricata is doing, like startup messages, errors, etc.
 logging:
