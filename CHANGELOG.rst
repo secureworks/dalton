@@ -31,3 +31,12 @@ Tweaks, fixes, and updates over the years; not well-documented here.
 * Address issues # 113, 123, 128, 132 (https://github.com/secureworks/dalton/issues/).
 * Updated documentation to reflect current reality.
 * Sundry other bug fixes and enhancements.
+
+3.1.0 (2021-06-18)
+##################
+
+Contributors: Donald Campbell, Adam Mosesso
+
+* Added ability to select multiple pcaps from the file upload dialog.
+* Support for dumping (displaying) inspection buffers from alerts.
+* Minor cleanup.
