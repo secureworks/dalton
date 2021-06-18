@@ -441,6 +441,20 @@ number of user-configurable options:
            or if the version of Suricata is 5.0 or later.
       -  | **TLS Log**
          | A log of SSL/TLS traffic as provided by Suricata.
+   -  | **Dump buffers (alerts only)**
+      | This will display the contents of buffers used by the detection
+        engines. Useful for troubleshooting signature creation with traffic
+        that may not be parsing as expected. 
+        Snort will output buffer contents into a "Buffer Dump" log output.
+        Suricata works differently and will place contents into "HTTP Buffers",
+        "TLS Buffers" and/or "DNS Buffers". These are Lua script outputs
+        intended to be visually similar to the Snort buffer dump output.
+        However on Suricata the protocol must be specified for the buffer dump
+        to work. Examples: ``alert http``, ``alert tls``, ``alert dns``.
+        To avoid excessive output on large PCAPs, both only output buffers of
+        traffic being alerted on. If you wish for exhaustive buffer contents
+        simply create rules using ``any any -> any any`` and your protocol of
+        choice.
 
    -  | **Rule profiling**
         Return per-rule performance statistics. This is data from the
@@ -1369,6 +1383,8 @@ Contributors
 
 -  Rob Vinson
 -  George P. Burdell
+-  Adam Mosesso
+-  Donald Campbell
  
 
 Feedback including bug reports, suggestions, improvements, questions,
