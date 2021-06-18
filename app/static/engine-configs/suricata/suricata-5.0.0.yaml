@@ -520,7 +520,7 @@ outputs:
   # Lua Output Support - execute lua script to generate alert and event
   # output.
   # Documented at:
-  # https://redmine.openinfosecfoundation.org/projects/suricata/wiki/Lua_Output
+  # https://suricata.readthedocs.io/en/latest/output/lua-output.html
   - lua:
       enabled: no
       #scripts-dir: /etc/suricata/lua-output/
