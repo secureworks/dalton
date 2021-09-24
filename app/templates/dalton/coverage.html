@@ -134,6 +134,50 @@
 			id.unwrap();
 		}
 
+        function version_compare(ver1, op, ver2) {
+            {# manipulate values so it is always ver1 gte ver2 #}
+            if (['lt', 'lte', 'gt', 'gte'].includes(op)) {
+                try {
+                    vals1 = ver1.split('.').map(Number);
+                    vals2 = ver2.split('.').map(Number);
+                    if (vals1.includes(NaN)
+                        || vals2.includes(NaN)
+                        || vals1.length == 0
+                        || vals2.length == 0) {
+                      throw "provided version is not a nubmer.";
+                    }
+                    while (vals1.length > vals2.length) {
+                      vals2.push(0);
+                    }
+                    while (vals2.length > vals1.length) {
+                      vals1.push(0);
+                    }
+                    if (op.startsWith("lt")) {
+                        var temp = vals1;
+                        vals1 = vals2;
+                        vals2 = temp;
+                    }
+                    if (!op.endsWith('e')) {
+                        vals2[vals2.length - 1] = vals2[vals2.length - 1] + 1;
+                    }
+                    for (let i = 0; i < vals1.length; i++) {
+                        if (vals1[i] > vals2[i]) {
+                            return true;
+                        } else if (vals1[i] < vals2[i]) {
+                            return false;
+                        }
+                   }
+                   return true;
+                }
+                catch(err) {
+                    console.error("Error doing version compare: " + err);
+                }
+            } else {
+                console.error("bad value '" + operator + "' passed to version_compare()");
+                return false;
+            }
+        }
+
         function show_hide_log_options(sensor_tech) {
             {# Unified2 is dead. Long live unifed2. #}
             {# Suricata 6 ends support for unified2 #}
@@ -149,6 +193,15 @@
             } else {
                 $('#optionEveLogDiv').show();
             }
+
+            {# Dump Buffer option valid for Suri > version 2 and Snort >= 2.9.9.0 #}
+            if ((sensor_tech.startsWith("suri") && Number(sensor_tech.split('/')[1].replace(/^rust_/,"").split('.')[0]) < 2)
+               || (sensor_tech.startsWith("snort") && version_compare(sensor_tech.split('/')[1], 'lt', '2.9.9.0'))) {
+                $('#optionDumpBuffersDiv').hide();
+            } else {
+                $('#optionDumpBuffersDiv').show();
+            }
+
         }
 
         function show_hide_suricatasc_options(sensor_tech) {
@@ -332,10 +385,12 @@
                                     Fast pattern info
                                 </label>
                             {% endif %}
-							<label class="checkbox">
-								<input type="checkbox" name="optionDumpBuffers" id="optionDumpBuffers" value="optionDumpBuffers">
-								Dump buffers (alerts only)
-							</label>
+                            <div id="optionDumpBuffersDiv">
+							    <label class="checkbox">
+								    <input type="checkbox" name="optionDumpBuffers" id="optionDumpBuffers" value="optionDumpBuffers">
+								    Dump buffers (alerts only)
+							    </label>
+                            </div>
 						</div>
 						<div class="tab-pane" id="sensorconf">
 							<label class="checkbox inline">
