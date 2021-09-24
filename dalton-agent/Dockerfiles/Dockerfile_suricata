@@ -13,7 +13,9 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libpcre3 libpcre3-dbg libpcre3-dev libnss3-dev\
     build-essential autoconf automake libtool libpcap-dev libnet1-dev \
     libyaml-0-2 libyaml-dev zlib1g zlib1g-dev libcap-ng-dev libcap-ng0 \
-    make libmagic-dev libjansson-dev libjansson4 pkg-config rustc cargo
+    make libmagic-dev libjansson-dev libjansson4 pkg-config rustc cargo \
+    liblua5.1-dev libevent-dev
+
 
 # for debugging agent
 #RUN apt-get install -y less nano
@@ -33,12 +35,15 @@ WORKDIR /src/suricata-${SURI_VERSION}
 #        sed -i 's|#ifdef HAVE_AF_PACKET|#ifdef HAVE_AF_PACKET\n\n#if HAVE_LINUX_SOCKIOS_H\n#include <linux/sockios.h>\n#endif\n|' src/source-af-packet.c; \
 #    fi;
 # configure, make, and install
-RUN ./configure --enable-profiling ${ENABLE_RUST} && make -j $(nproc) && make install && make install-conf && ldconfig
+RUN ./configure --enable-profiling ${ENABLE_RUST} --enable-lua && make -j $(nproc) && make install && make install-conf && ldconfig
 
 RUN mkdir -p /opt/dalton-agent/
 WORKDIR /opt/dalton-agent
 COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
 COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
+COPY http.lua /opt/dalton-agent/http.lua
+COPY dns.lua /opt/dalton-agent/dns.lua
+COPY tls.lua /opt/dalton-agent/tls.lua
 RUN sed -i 's/REPLACE_AT_DOCKER_BUILD-VERSION/'"${SURI_VERSION}"'/' /opt/dalton-agent/dalton-agent.conf
 
 CMD python3.8 /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1

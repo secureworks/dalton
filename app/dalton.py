@@ -1039,7 +1039,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
             zf = zipfile.ZipFile(archivename, mode='r')
             for file in zf.namelist():
                 logger.debug("Processing file '%s' from ZIP archive" % file)
-                if file.endswith('/'):
+                if file.endswith('/') or "__MACOSX/" in file:
                     continue
                 filename = clean_filename(os.path.basename(file))
                 if os.path.splitext(filename)[1].lower() not in ['.pcap', '.pcapng', '.cap']:
@@ -1218,18 +1218,19 @@ def page_coverage_summary():
     dupcount = [0]
     for i in range(MAX_PCAP_FILES):
         try:
-            pcap_file = request.files['coverage-pcap%d' % i]
-            if (pcap_file != None and pcap_file.filename != None and pcap_file.filename != '<fdopen>' and (len(pcap_file.filename) > 0) ):
-                if os.path.splitext(pcap_file.filename)[1].lower() in ['.zip', '.tar', '.gz', '.tgz', '.gzip', '.bz2']:
-                    filename = clean_filename(os.path.basename(pcap_file.filename))
-                    filename = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
-                    pcap_file.save(filename)
-                    err_msg = extract_pcaps(filename, pcap_files, job_id, dupcount)
-                    if err_msg:
-                        delete_temp_files(job_id)
-                        return render_template('/dalton/error.html', jid='', msg=[err_msg])
-                else:
-                    form_pcap_files.append(pcap_file)
+            coverage_pcaps = request.files.getlist("coverage-pcap%d" % i)
+            for pcap_file in coverage_pcaps:
+                if (pcap_file != None and pcap_file.filename != None and pcap_file.filename != '<fdopen>' and (len(pcap_file.filename) > 0) ):
+                    if os.path.splitext(pcap_file.filename)[1].lower() in ['.zip', '.tar', '.gz', '.tgz', '.gzip', '.bz2']:
+                        filename = clean_filename(os.path.basename(pcap_file.filename))
+                        filename = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
+                        pcap_file.save(filename)
+                        err_msg = extract_pcaps(filename, pcap_files, job_id, dupcount)
+                        if err_msg:
+                            delete_temp_files(job_id)
+                            return render_template('/dalton/error.html', jid='', msg=[err_msg])
+                    else:
+                        form_pcap_files.append(pcap_file)
         except:
             logger.debug("%s" % traceback.format_exc())
             pass
@@ -1381,6 +1382,14 @@ def page_coverage_summary():
         try:
             if request.form.get('optionOtherLogs'):
                 bGetOtherLogs = True
+        except:
+            pass
+
+        # get dumps from buffers
+        bGetBufferDumps = False
+        try:
+            if request.form.get('optionDumpBuffers'):
+                bGetBufferDumps = True
         except:
             pass
 
@@ -1702,6 +1711,17 @@ def page_coverage_summary():
                         config['profiling']['keywords'] = {'enabled': True, \
                                                            'filename': "dalton-keyword_perf.log", \
                                                            'append': True}
+
+                if bGetBufferDumps:
+                    buff_dump_config = {'lua': {'enabled': True, \
+                                        'scripts-dir': "/opt/dalton-agent", \
+                                        'scripts': ["http.lua","tls.lua","dns.lua"]}}
+
+                    if 'lua' in olist: # someone added something
+                        config['outputs'][olist.index('lua')] = buff_dump_config
+                    else:
+                        config['outputs'].append(buff_dump_config)
+
                 # write out
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_suricata.yaml")
                 engine_conf_fh = open(engine_conf_file, "w")
@@ -1893,6 +1913,7 @@ def page_coverage_summary():
                 json_job['alert-detailed'] = bGetAlertDetailed
                 json_job['get-fast-pattern'] = bGetFastPattern
                 json_job['get-other-logs'] = bGetOtherLogs
+                json_job['get-buffer-dumps'] = bGetBufferDumps
                 json_job['sensor-tech'] = sensor_tech
                 json_job['prod-ruleset'] = prod_ruleset_name
                 json_job['engine-conf'] = os.path.basename(engine_conf_file)

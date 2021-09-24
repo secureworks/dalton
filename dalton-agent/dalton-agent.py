@@ -895,8 +895,9 @@ def check_pcaps():
 #*************************
 def run_snort():
     print_debug("run_snort() called")
+    IDS_BUFFERS_LOG = os.path.join(IDS_LOG_DIRECTORY, "dalton-buffers.log")
     # note: if we don't have '--treat-drop-as-alert' then some alerts in a stream that has already triggered a 'drop' rule won't fire since they are assumed to already blocked by the DAQ
-    snort_command = "%s -Q --daq dump --daq-dir /usr/lib/daq/ --daq-var load-mode=read-file --daq-var file=/tmp/inline-out.pcap -l %s -c %s -k none -X --conf-error-out --process-all-events --treat-drop-as-alert --pcap-dir=%s 2>&1" % (IDS_BINARY, IDS_LOG_DIRECTORY, IDS_CONFIG_FILE, os.path.split(PCAP_FILES[0])[0])
+    snort_command = "%s -Q --daq dump --daq-dir /usr/lib/daq/ --daq-var load-mode=read-file --daq-var file=/tmp/inline-out.pcap -l %s -c %s -k none -X --conf-error-out --process-all-events --treat-drop-as-alert --pcap-dir=%s --buffer-dump-alert=%s 2>&1" % (IDS_BINARY, IDS_LOG_DIRECTORY, IDS_CONFIG_FILE, os.path.split(PCAP_FILES[0])[0], IDS_BUFFERS_LOG)
     print_msg("Starting Snort and Running Pcap(s)...")
     print_debug("Running Snort with the following command command:\n%s" % snort_command)
     snort_output_fh = open(JOB_IDS_LOG, "w")
@@ -1317,6 +1318,13 @@ def submit_job(job_id, job_directory):
     except Exception:
         getOtherLogs = False
 
+    # get dumps from buffers
+    getBufferDumps = False
+    try:
+        getBufferDumps = manifest_data[0]['get-buffer-dumps']
+    except Exception:
+        getBufferDumps = False
+
     # make a directory for engine to use for alert, perf, and other sundry logs
     IDS_LOG_DIRECTORY = '%s/raw_ids_logs' % JOB_DIRECTORY
     if os.path.isdir(IDS_LOG_DIRECTORY):
@@ -1445,7 +1453,14 @@ def submit_job(job_id, job_directory):
             other_logs['Fast Pattern'] = 'rules_fast_pattern.txt'
         if trackPerformance:
             other_logs['Keyword Perf'] = 'dalton-keyword_perf.log'
+        if getBufferDumps:
+            other_logs['HTTP Buffers'] = 'dalton-http-buffers.log'
+            other_logs['DNS Buffers'] = 'dalton-dns-buffers.log'
+            other_logs['TLS Buffers'] = 'dalton-tls-buffers.log'
     # elif ... can add processing of logs from other engines here
+    elif SENSOR_ENGINE.startswith('snort'):
+        if getBufferDumps:
+            other_logs['Buffer Dump'] = 'dalton-buffers.log'
     if len(other_logs) > 0:
         process_other_logs(other_logs)
 

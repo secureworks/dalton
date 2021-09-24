@@ -33,7 +33,7 @@ To configure what rulesets are available, see
 To configure what sensors are available, see 
 `Adding Sensors <#adding-sensors>`__.
 
-If you are building behind a proxy, see
+If Dalton is being built behind a proxy, see
 `Building Behind A Proxy <#building-behind-a-proxy>`__
 
 Contents
@@ -313,8 +313,8 @@ the ``suricatasc`` module was not Python 3 compatible until Suricata
 
 -  | **Problems with Suricata Socket Control Mode**
    | There are some known issues with Suricata Socket Control, not related to Dalton.
-     If you experience
-     problems with it, try running the job with this option disabled.
+     If problems are encountered
+     with it, try running the job with this option disabled.
 
    -  | **Sample Issues**
       | `Docker Suricata Socket Control crashing using command 'reopen-log-files <https://redmine.openinfosecfoundation.org/issues/3436>`__
@@ -441,7 +441,19 @@ number of user-configurable options:
            or if the version of Suricata is 5.0 or later.
       -  | **TLS Log**
          | A log of SSL/TLS traffic as provided by Suricata.
-
+   -  | **Dump buffers (alerts only)**
+      | This will display the contents of buffers used by the detection
+        engines, which can be useful for troubleshooting signature creation with traffic
+        that may not be parsing as expected. Since such output can be voluminous,
+        only buffer content associated with alerts are returned.  To see buffer content from
+        more traffic, use rule(s) that match on more traffic (or even
+        a generic rule that matches on all traffic).
+        Snort will output buffer contents into a "Buffer Dump" log output.
+        Suricata works differently and will place contents into "HTTP Buffers",
+        "TLS Buffers" and/or "DNS Buffers". These are Lua script outputs
+        intended to be visually similar than the Snort buffer dump output.
+        However on Suricata the protocol must be specified for the buffer dump
+        to work. Examples: ``alert http``, ``alert tls``, ``alert dns``.
    -  | **Rule profiling**
         Return per-rule performance statistics. This is data from the
         engine's rule performance profiling output. This data will show up
@@ -1369,6 +1381,8 @@ Contributors
 
 -  Rob Vinson
 -  George P. Burdell
+-  Adam Mosesso
+-  Donald Campbell
  
 
 Feedback including bug reports, suggestions, improvements, questions,
