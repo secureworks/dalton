@@ -39,7 +39,7 @@ Depending on how many Dalton Agents are running, rulesets, etc.:
 The following were done using the Amazon Linux 2 AMI on a
 t2.micro instance (free tier).  The entire process took less
 than half an hour, with the bulk of the time -- just under
-24 mins -- spent doing the
+24 mins -- spent in Step 4 doing the
 initial download, build, and config of the containers.
 
 Step 1: Install Docker
