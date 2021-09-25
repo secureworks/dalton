@@ -33,8 +33,8 @@ Notes
 
 Depending on how many Dalton Agents are running, rulesets, etc.:
 
-  - More than 8GB of storage is likey needed; configure for at least 12GB but more is recommended.
-  - 1GB memory will work (most of the time) but more is recommended; try at least twice that or more.
+- More than 8GB of storage is likey needed; configure for at least 12GB but more is recommended.
+- 1GB memory will work (most of the time) but more is recommended; try at least twice that or more.
 
 The following were done using the Amazon Linux 2 AMI on a
 t2.micro instance (free tier).  The entire process took less
@@ -65,13 +65,20 @@ Step 2: Install Docker Compose
     sudo chmod +x /usr/local/bin/docker-compose
 
 
-Step 3: Download and install Dalton
-===================================
+Step 3: Download Dalton
+=======================
 
 .. code:: bash
 
     sudo yum install -y git
     git clone https://github.com/secureworks/dalton.git
     cd dalton
-    (edit docker-compose.yml as desired)
+
+**(edit docker-compose.yml as desired)**
+
+Step 4: Build and Run Dalton
+============================
+
+.. code:: bash
+
     ./start-dalton.sh
