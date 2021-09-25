@@ -17,7 +17,7 @@ and then run:
 
     ./start-dalton.sh
 
-All this and more are covered in the README.
+All this and more are covered in the `README <README.rst#installing-and-running-dalton>`_.
 
 This can be done almost anywhere, including the cloud.  The following
 example shows how easy it is to get Dalton up and running in AWS
