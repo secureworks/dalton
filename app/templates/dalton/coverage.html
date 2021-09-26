@@ -194,8 +194,8 @@
                 $('#optionEveLogDiv').show();
             }
 
-            {# Dump Buffer option valid for Suri > version 2 and Snort >= 2.9.9.0 #}
-            if ((sensor_tech.startsWith("suri") && Number(sensor_tech.split('/')[1].replace(/^rust_/,"").split('.')[0]) < 2)
+            {# Dump Buffer option valid for Suri >= version 2.1 and Snort >= 2.9.9.0 #}
+            if ((sensor_tech.startsWith("suri") && version_compare(sensor_tech.split('/')[1].replace(/^rust_/,""), 'lt', '2.1'))
                || (sensor_tech.startsWith("snort") && version_compare(sensor_tech.split('/')[1], 'lt', '2.9.9.0'))) {
                 $('#optionDumpBuffersDiv').hide();
             } else {
