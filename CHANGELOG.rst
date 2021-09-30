@@ -44,7 +44,7 @@ Contributors: Donald Campbell, Adam Mosesso
 3.1.1 (2021-09-29)
 ##################
 
-* Fixed UI issue where the "Dump buffers" option was being shown for incompatible engine versions. (issue #134)
+* Fixed UI issue where the "Dump buffers" option was being shown for incompatible engine versions. (issue #139)
 * Server side enforcement ensuring "Dump buffers" will only be attempted for compatible versions.
 * Bumped the default agent versions in the ``docker-compose.yml`` file to be the latest.
 * Added ``INSTALL-AWS.rst`` file with instructions for quickly and easily spinning up Dalton in AWS.
