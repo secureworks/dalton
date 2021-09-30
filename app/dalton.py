@@ -1390,6 +1390,11 @@ def page_coverage_summary():
         try:
             if request.form.get('optionDumpBuffers'):
                 bGetBufferDumps = True
+            # Dump Buffer option valid for Suri >= version 2.1 and Snort >= 2.9.9.0
+            if sensor_tech_engine == "suricata" and LooseVersion(sensor_tech_version) < LooseVersion("2.1"):
+                bGetBufferDumps = False
+            if sensor_tech_engine == "snort" and LooseVersion(sensor_tech_version) < LooseVersion("2.9.9.0"):
+                bGetBufferDumps = False
         except:
             pass
 
