@@ -84,18 +84,18 @@ services:
     restart: always
 
 # Suricata 5.0.6 from source, with Rust support
-  agent-suricata-5.0.6:
+  agent-suricata-5.0.7:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_suricata
       args:
-        - SURI_VERSION=5.0.6
+        - SURI_VERSION=5.0.7
         - ENABLE_RUST=--enable-rust
         - http_proxy=${http_proxy}
         - https_proxy=${https_proxy}
         - no_proxy=${no_proxy}
-    image: suricata-5.0.6:latest
-    container_name: suricata-5.0.6
+    image: suricata-5.0.7:latest
+    container_name: suricata-5.0.7
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
@@ -243,18 +243,18 @@ services:
 #
 
 # Snort 2.9.18 from source
-  agent-snort-2.9.18:
+  agent-snort-2.9.18.1:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_snort
       args:
-        - SNORT_VERSION=2.9.18
+        - SNORT_VERSION=2.9.18.1
         - DAQ_VERSION=2.0.7
         - http_proxy=${http_proxy}
         - https_proxy=${https_proxy}
         - no_proxy=${no_proxy}
-    image: snort-2.9.18:latest
-    container_name: snort-2.9.18
+    image: snort-2.9.18.1:latest
+    container_name: snort-2.9.18.1
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
