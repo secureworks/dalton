@@ -172,7 +172,7 @@ def get_engine_version(path):
     try:
         process = subprocess.Popen("%s -V" % path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         stdout, stderr = process.communicate()
-        regex = re.compile(r"(Version|Suricata version)\s+(?P<version>\d+[\d\x2E\x2D\5FA-Za-z]*)")
+        regex = re.compile(r"(Version|(Suricata|zeek) version)\s+(?P<version>\d+[\d\x2E\x2D\5FA-Za-z]*)")
         if stderr:
             # apparently 'Snort -V' outputs to stderr....
             output = stderr
@@ -183,6 +183,8 @@ def get_engine_version(path):
             engine = "suricata"
         elif "Snort" in output.decode('utf-8'):
             engine = "snort"
+        elif "zeek" in output.decode('utf-8'):
+            engine = "zeek"
         else:
             # use filenname of binary
             engine = os.path.basename(path).lower()
@@ -276,6 +278,12 @@ if IDS_BINARY is None:
     IDS_BINARY = find_file('snort')
     if not IDS_BINARY or not os.path.exists(IDS_BINARY):
         logger.info("Could not find 'snort' binary.")
+        IDS_BINARY = None
+if IDS_BINARY is None:
+    # look for Zeek
+    IDS_BINARY = find_file('zeek')
+    if not IDS_BINARY or not os.path.exists(IDS_BINARY):
+        logger.info("Could not find 'snort' binary.")
         logger.critical("No IDS binary specified or found.  Cannot continue.")
         sys.exit(1)
 
@@ -360,6 +368,7 @@ JOB_ALERT_DETAILED_LOG = None
 JOB_OTHER_LOGS = None
 JOB_PERFORMANCE_LOG = None
 JOB_EVE_LOG = None
+JOB_ZEEK_JSON = False
 # end dalton's logs
 
 # used by Snort for logs/alerts
@@ -665,10 +674,13 @@ def send_results():
     results = ''
     with open(JOB_IDS_LOG, 'r') as fh:
         results = fh.read()
-    # make sure we have only ASCII
-    results_dict['ids'] = ""
-    for line in results:
-        results_dict['ids'] += nonprintable_re.sub(hexescape, line)
+    if not results:
+        results_dict['ids'] = "*** No Output ***\n"
+    else:
+        # make sure we have only ASCII
+        results_dict['ids'] = ""
+        for line in results:
+            results_dict['ids'] += nonprintable_re.sub(hexescape, line)
 
     # populate alert
     fh = open(JOB_ALERT_LOG, 'r')
@@ -716,6 +728,9 @@ def send_results():
     results = fh.read()
     results_dict['eve'] = results
     fh.close()
+
+    # set Zeek JSON
+    results_dict['zeek_json'] = JOB_ZEEK_JSON
 
     #comment this out for prod
     #logger.debug(results_dict)
@@ -1017,6 +1032,7 @@ def run_suricata():
     subprocess.call(suricata_command, shell = True, stderr=subprocess.STDOUT, stdout=suri_output_fh)
     suri_output_fh.close()
 
+
 # generate fast pattern info; this requires a separate Suricata run
 #   with the '--engine-analysis' flag set
 def generate_fast_pattern():
@@ -1181,6 +1197,35 @@ def process_performance_logs():
         print_debug("No rules performance log(s) found. File \'%s\' does not exist." % "dalton-rule_perf*")
     job_performance_log_fh.close()
 
+
+#************************
+#**** Zeek Functions ****
+#************************
+def run_zeek(json_logs):
+    print_debug("run_zeek() called")
+    zeek_command = "cd %s && %s -C -r %s" % (IDS_LOG_DIRECTORY, IDS_BINARY, PCAP_FILES[0])
+    if json_logs:
+        zeek_command += " -e 'redef LogAscii::use_json=T;redef LogAscii::json_timestamps=JSON::TS_ISO8601;'"
+    zeek_command += " 2>&1"
+    print_msg("Starting Zeek and Running Pcap(s)...")
+    print_debug("Running Zeek with the following command command:\n%s" % zeek_command)
+    zeek_output_fh = open(JOB_IDS_LOG, "w")
+    subprocess.call(zeek_command, shell=True, stderr=subprocess.STDOUT, stdout=zeek_output_fh)
+    zeek_output_fh.close()
+
+# process logs from Zeek
+def process_zeek_logs():
+    print_debug("process_zeek_logs() called")
+    print_msg("Processing logs")
+    os.system("chmod -R 755 %s" % IDS_LOG_DIRECTORY)
+
+    logs = {}
+    for log_file in os.listdir(IDS_LOG_DIRECTORY):
+        logs[log_file.split('.')[0]] = log_file
+
+    return logs
+
+
 #****************************
 #*** Submit Job Functions ***
 #****************************
@@ -1189,7 +1234,7 @@ def reset_globals():
     global JOB_ID, PCAP_FILES, IDS_RULES_FILES, IDS_CONFIG_FILE, \
            JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, \
            JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_PERFORMANCE_LOG, \
-           IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, JOB_OTHER_LOGS, JOB_EVE_LOG
+           IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, JOB_OTHER_LOGS, JOB_EVE_LOG, JOB_ZEEK_JSON
 
     JOB_ID = None
     PCAP_FILES = []
@@ -1212,6 +1257,7 @@ def reset_globals():
     IDS_LOG_DIRECTORY = None
     TOTAL_PROCESSING_TIME = ''
     JOB_OTHER_LOGS = None
+    JOB_ZEEK_JSON = False
 
 # primary function
 # gets passed directory of submitted files (rules file, pcap file(s)) and job ID
@@ -1220,7 +1266,7 @@ def submit_job(job_id, job_directory):
            JOB_DIRECTORY, JOB_LOG_DIRECTORY, JOB_ERROR_LOG, JOB_IDS_LOG, \
            JOB_DEBUG_LOG, JOB_ALERT_LOG, JOB_ALERT_DETAILED_LOG, JOB_OTHER_LOGS, \
            JOB_PERFORMANCE_LOG, IDS_LOG_DIRECTORY, TOTAL_PROCESSING_TIME, IDS_BINARY, \
-           JOB_EVE_LOG, USE_SURICATA_SOCKET_CONTROL
+           JOB_EVE_LOG, USE_SURICATA_SOCKET_CONTROL, JOB_ZEEK_JSON
     # reset and populate global vars
     reset_globals()
     (JOB_ID, JOB_DIRECTORY) = (job_id, job_directory)
@@ -1325,6 +1371,13 @@ def submit_job(job_id, job_directory):
     except Exception:
         getBufferDumps = False
 
+    # Zeek JSON logging
+    JOB_ZEEK_JSON = False
+    try:
+        JOB_ZEEK_JSON = manifest_data[0]['zeek-json-logs']
+    except Exception:
+        JOB_ZEEK_JSON = False
+
     # make a directory for engine to use for alert, perf, and other sundry logs
     IDS_LOG_DIRECTORY = '%s/raw_ids_logs' % JOB_DIRECTORY
     if os.path.isdir(IDS_LOG_DIRECTORY):
@@ -1345,10 +1398,11 @@ def submit_job(job_id, job_directory):
 
     # pcaps and config should be in manifest
     IDS_CONFIG_FILE = None
-    try:
-        IDS_CONFIG_FILE = os.path.join(JOB_DIRECTORY, os.path.basename(manifest_data[0]['engine-conf']))
-    except Exception:
-        print_error("Could not extract engine configuration file from job.")
+    if not SENSOR_ENGINE.startswith('zeek'):
+        try:
+            IDS_CONFIG_FILE = os.path.join(JOB_DIRECTORY, os.path.basename(manifest_data[0]['engine-conf']))
+        except Exception:
+            print_error("Could not extract engine configuration file from job.")
 
     try:
         PCAP_FILES = [os.path.join(JOB_DIRECTORY, PCAP_DIR, os.path.basename(cap)) for cap in manifest_data[0]['pcaps']]
@@ -1373,7 +1427,7 @@ def submit_job(job_id, job_directory):
     # input validation (sort of)
     if not PCAP_FILES:
         print_error("No pcap files found")
-    if not IDS_RULES_FILES:
+    if not IDS_RULES_FILES and not SENSOR_ENGINE.startswith('zeek'):
         print_error("No rules files found")
     if not JOB_ID:
         print_error("job id not defined")
@@ -1436,6 +1490,13 @@ def submit_job(job_id, job_directory):
         process_suri_alerts()
         process_eve_log()
 
+    elif SENSOR_ENGINE.startswith('zeek'):
+        # this section applies only to Zeek sensors
+        run_zeek(JOB_ZEEK_JSON)
+
+        # process zeek alerts
+        zeek_other_logs = process_zeek_logs()
+
     # the rest of this can apply to Snort and Suricata
 
     # other logs to return from the job; sensor specific
@@ -1461,6 +1522,8 @@ def submit_job(job_id, job_directory):
     elif SENSOR_ENGINE.startswith('snort'):
         if getBufferDumps:
             other_logs['Buffer Dump'] = 'dalton-buffers.log'
+    elif SENSOR_ENGINE.startswith('zeek'):
+            other_logs = zeek_other_logs
     if len(other_logs) > 0:
         process_other_logs(other_logs)
 
