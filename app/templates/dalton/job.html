@@ -289,7 +289,7 @@
                             {% elif zeek_json == "True" %}
                                 <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" class="hljs">{{other_logs[log_description]}}</pre>
 				            {% elif tech.startswith('zeek') %}
-                                <table class="table table-striped table-hover">
+                                <table class="table table-striped table-hover table-condensed">
                                 <thead><tr>
                                 {% for header in other_logs[log_description]["fields"] %}
                                     <th>{{header}}</th>
