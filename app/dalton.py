@@ -972,6 +972,9 @@ def page_show_job(jid):
             # this gets passed as json with log description as key and log contents as value
             # attempt to load it as json before we pass it to job.html
             other_logs = json.loads(r.get(f"{jid}-other_logs"))
+            if tech.startswith('zeek'):
+                for other_log in other_logs:
+                    other_logs[other_log] = parseZeekASCIILog(other_logs[other_log])
         except Exception as e:
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
@@ -2266,3 +2269,28 @@ def controller_api_get_max_pcap_files():
        submitter can ensure all the files will be processed.
     """
     return str(MAX_PCAP_FILES)
+
+def parseZeekASCIILog(logtext):
+    log = {}
+    rows = []
+    lines = logtext.splitlines()
+    for line in lines:
+        line = line.strip()
+        if line.startswith('#'):
+            if line.startswith('#separator'):
+                separator = line.split()[1].encode().decode('unicode-escape')
+            elif line.startswith('#fields'):
+                log['fields'] = line.split(separator)[1:]
+            elif line.startswith('#types'):
+                log['types'] = line.split(separator)[1:]
+            elif line.startswith('#close'):
+                break
+            else:
+                continue
+        else:
+            rows.append(line.split(separator))
+
+    log['rows'] = rows
+
+    return log
+
