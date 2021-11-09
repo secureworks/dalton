@@ -120,6 +120,3 @@ ENV/
 # don't inlude backups
 *.bak
 *.orig
-
-app/static/highlightjs/styles/*
-!eve-*.css
