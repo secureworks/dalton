@@ -5,7 +5,7 @@ ARG ZEEK_VERSION
 RUN apt-get update --fix-missing -y && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 	tcpdump cmake make gcc g++ flex bison libpcap-dev libssl-dev python3.8 python3.8-dev swig zlib1g-dev
 
-# download, build, and install Suricata from source
+# download, build, and install Zeek from source
 RUN mkdir -p /src/zeek-${ZEEK_VERSION}
 WORKDIR /src
 ADD https://download.zeek.org/zeek-${ZEEK_VERSION}.tar.gz zeek-${ZEEK_VERSION}.tar.gz
