@@ -968,11 +968,18 @@ def page_show_job(jid):
         error = r.get(f"{jid}-error")
         total_time = r.get(f"{jid}-time")
         alert_detailed = r.get(f"{jid}-alert_detailed")
+
+        try:
+            zeek_json = r.get(f"{jid}-zeek_json")
+        except Exception as e:
+            #logger.debug(f"Problem getting {jid}-zeek_json:\n{e}")
+            zeek_json = "False"
+
         try:
             # this gets passed as json with log description as key and log contents as value
             # attempt to load it as json before we pass it to job.html
             other_logs = json.loads(r.get(f"{jid}-other_logs"))
-            if tech.startswith('zeek'):
+            if tech.startswith('zeek') and zeek_json == "False":
                 for other_log in other_logs:
                     other_logs[other_log] = parseZeekASCIILog(other_logs[other_log])
         except Exception as e:
@@ -1009,11 +1016,6 @@ def page_show_job(jid):
             overview['status'] = 'Success'
         else:
             overview['status'] = 'Error'
-        try:
-            zeek_json = r.get(f"{jid}-zeek_json")
-        except Exception as e:
-            #logger.debug(f"Problem getting {jid}-zeek_json:\n{e}")
-            zeek_json = "False"
 
         return render_template('/dalton/job.html', overview=overview,page = '',
                                jobid = jid, ids=ids, perf=perf, alert=alert,
