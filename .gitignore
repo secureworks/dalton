@@ -4,6 +4,7 @@
 rulesets/*.rules
 rulesets/snort/
 rulesets/suricata/
+rulesets/zeek/
 
 # don't include configs
 app/static/engine-configs/snort/
