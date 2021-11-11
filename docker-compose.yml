@@ -1,4 +1,4 @@
-version: '2'
+version: '3'
 
 services:
   controller:
@@ -394,7 +394,6 @@ services:
     image: zeek-current:latest
     container_name: zeek-current
     volumes:
-      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts
+      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
     restart: always
-
 
