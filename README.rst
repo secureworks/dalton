@@ -1208,13 +1208,6 @@ operation: Build and Compile. The build mode provides a wizard-like interface fo
 creating certain types of pcaps. The compile mode provides a direct interface to
 the flowsynth compiler, allowing for the building of synth files directly in the UI.
 
-Zeek
-====
-
-Dalton now supports Zeek as a sensor as of version 3.2.0. There is limited support in the API and
-configurations/rulesets cannot be changed at runtime from the UI. However, Zeek scripts can be
-added in the rulesets directory and will be executed with every run.
-
 Build Mode
 ----------
 The Flowsynth Build mode allows for quick pcap generation using some sensible
@@ -1264,6 +1257,12 @@ build mode wizards. After the synth has been submitted, a pcap will be generated
 and a download link provided. The pcap can also be directly submitted from the web interface 
 to Dalton, to be used in a Suricata or Snort job.
 
+Zeek
+====
+
+Dalton now supports Zeek as a sensor as of version 3.2.0. There is limited support in the API and
+configurations/rulesets cannot be changed at runtime from the UI. However, Zeek scripts can be
+added in the rulesets directory and will be executed with every run.
 
 Frequently Asked Questions
 ==========================
