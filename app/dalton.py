@@ -153,7 +153,7 @@ STAT_CODE_INTERRUPTED = 3
 STAT_CODE_TIMEOUT = 4
 
 # engine technologies supported; used for validation (sometimes)
-supported_engines = ['suricata', 'snort']
+supported_engines = ['suricata', 'snort', 'zeek']
 
 logger.info("Dalton Started.")
 

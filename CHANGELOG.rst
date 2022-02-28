@@ -48,3 +48,8 @@ Contributors: Donald Campbell, Adam Mosesso
 * Server side enforcement ensuring "Dump buffers" will only be attempted for compatible versions.
 * Bumped the default agent versions in the ``docker-compose.yml`` file to be the latest.
 * Added ``INSTALL-AWS.rst`` file with instructions for quickly and easily spinning up Dalton in AWS.
+
+3.2.0 (2022-02-28)
+##################
+
+* Added support for Zeek as a sensor
