@@ -8,3 +8,4 @@ ruamel.yaml==0.16.12
 idstools==0.6.4
 flowsynth>=1.4.1
 werkzeug==0.16.1
+itsdangerous==2.0.1
