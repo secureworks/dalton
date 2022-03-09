@@ -264,7 +264,9 @@
 				<div class="tabbable tabs-left">
 					<ul class="nav nav-tabs">
 						<li class='active'><a href="#jobdetails" data-toggle='tab'>Job Settings</a></li>
+						{% if not sensor_tech.startswith('zeek') %}
 						<li><a href="#sensorconf" data-toggle='tab'>Config Files</a></li>
+                        {% endif %}
 					</ul>
 					<div class="tab-content">
 						<div class="tab-pane active" id="jobdetails">
@@ -328,6 +330,8 @@
                                         Use Suricata Socket Control Pcap Processing Mode
                                     </label>
                                 </div>
+
+						{% if not sensor_tech.startswith('zeek') %}
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Ruleset</div>
 							<label class="checkbox">
 								<input type="checkbox" name="optionProdRuleset" id="optionRuleset" value="prod" checked>
@@ -356,7 +360,9 @@
 							<span id="custom_ruleset">
 								<textarea rows='10' class='span'; style='margin-left:0;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"";);'></textarea>
 							</span>
+							{% endif %}
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Logs</div>
+							{% if not sensor_tech.startswith('zeek') %}
                             <div id="optionAlertDetailedDiv">
     							<label class="checkbox">
 	    							<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed" checked>
@@ -391,8 +397,15 @@
 								    Dump buffers (alerts only)
 							    </label>
                             </div>
+                            {% else %}
+							<label class="checkbox">
+								<input type="checkbox" name="optionZeekJSON" id="optionZeekJSON" value="optionZeekJSON">
+								JSON Format
+							</label>
+                            {% endif %}
 						</div>
 						<div class="tab-pane" id="sensorconf">
+							{% if not sensor_tech.startswith('zeek') %}
 							<label class="checkbox inline">
                                 <input type="checkbox" name="overrideExternalNet" id="overrideExternalNet" value="eoverride" checked>
 								Override EXTERNAL_NET (set to 'any')
@@ -405,6 +418,7 @@
                             <span id="custom_engineconf" class="span11">
                                 <textarea rows='25' cols='50' style='width: 100%;' name="custom_engineconf" id="custom_engineconf_t">{{ engine_conf }}</textarea>
                             </span>
+                            {% endif %}
 						</div>
 					</div>
 				</div>

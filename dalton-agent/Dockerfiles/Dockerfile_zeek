@@ -1,0 +1,23 @@
+FROM ubuntu:20.04
+
+ARG ZEEK_VERSION
+
+RUN apt-get update --fix-missing -y && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+	tcpdump cmake make gcc g++ flex bison libpcap-dev libssl-dev python3.8 python3.8-dev swig zlib1g-dev
+
+# download, build, and install Zeek from source
+RUN mkdir -p /src/zeek-${ZEEK_VERSION}
+WORKDIR /src
+ADD https://download.zeek.org/zeek-${ZEEK_VERSION}.tar.gz zeek-${ZEEK_VERSION}.tar.gz
+RUN tar -zxf zeek-${ZEEK_VERSION}.tar.gz -C zeek-${ZEEK_VERSION} --strip-components=1
+WORKDIR /src/zeek-${ZEEK_VERSION}
+RUN ./configure && make && make install
+
+env PATH /usr/local/zeek/bin/:$PATH
+
+RUN mkdir -p /opt/dalton-agent/
+WORKDIR /opt/dalton-agent
+COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
+COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
+
+CMD python3.8 /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1

@@ -1,4 +1,4 @@
-version: '2'
+version: '3'
 
 services:
   controller:
@@ -379,3 +379,21 @@ services:
 #    environment:
 #      - AGENT_DEBUG=${AGENT_DEBUG}
 #    restart: always
+
+###########################
+####### Zeek Agents #######
+###########################
+
+# Zeek current (latest) from source
+  agent-zeek-current:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_zeek
+      args:
+        - ZEEK_VERSION=4.0.2
+    image: zeek-current:latest
+    container_name: zeek-current
+    volumes:
+      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
+    restart: always
+

@@ -840,7 +840,7 @@ provided here but can be easily obtained by making the request in a web browser.
      an array of current active sensors, sorted descending based on ruleset
      filename (just like the list in the web interface).
 
-   | <engine> should be ``suricata`` or ``snort``.
+   | <engine> should be ``suricata``, ``snort``, or ``zeek``.
 
    | Example response:
 
@@ -1257,6 +1257,12 @@ build mode wizards. After the synth has been submitted, a pcap will be generated
 and a download link provided. The pcap can also be directly submitted from the web interface 
 to Dalton, to be used in a Suricata or Snort job.
 
+Zeek
+====
+
+Dalton now supports Zeek as a sensor as of version 3.2.0. There is limited support in the API and
+configurations/rulesets cannot be changed at runtime from the UI. However, Zeek scripts can be
+added in the rulesets directory and will be executed with every run.
 
 Frequently Asked Questions
 ==========================
@@ -1295,9 +1301,6 @@ Frequently Asked Questions
      versions (e.g. 2.4) have been written in the past but are not part of this 
      open source release.  However, if there is a demand for such support, then
      adding support for older Snort versions will be reconsidered.
-
-#. | **Are other sensor engines supported such as Bro/Zeek?**
-   | No; currently only Suricata and Snort are supported.
 
 #. | **So then is Snort 3 supported?**
    | Not at this time.  Snort 3 support is certainly possible and is being

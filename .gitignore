@@ -4,6 +4,7 @@
 rulesets/*.rules
 rulesets/snort/
 rulesets/suricata/
+rulesets/zeek/
 
 # don't include configs
 app/static/engine-configs/snort/
@@ -120,6 +121,3 @@ ENV/
 # don't inlude backups
 *.bak
 *.orig
-
-app/static/highlightjs/styles/*
-!eve-*.css

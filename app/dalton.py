@@ -153,7 +153,7 @@ STAT_CODE_INTERRUPTED = 3
 STAT_CODE_TIMEOUT = 4
 
 # engine technologies supported; used for validation (sometimes)
-supported_engines = ['suricata', 'snort']
+supported_engines = ['suricata', 'snort', 'zeek']
 
 logger.info("Dalton Started.")
 
@@ -307,6 +307,7 @@ def set_keys_timeout(jobid):
         r.expire("%s-other_logs" % jobid, EXPIRE_VALUE)
         r.expire("%s-eve" % jobid, EXPIRE_VALUE)
         r.expire("%s-teapotjob" % jobid, EXPIRE_VALUE)
+        r.expire("%s-zeek_json" % jobid, EXPIRE_VALUE)
     except:
         pass
 
@@ -316,7 +317,7 @@ def expire_all_keys(jid):
     #   efficient for large key sets so we are deleting each one individually
     global r
     logger.debug("Dalton calling expire_all_keys() on job %s" % jid)
-    keys_to_delete = ["ids", "perf", "alert", "alert_detailed", "other_logs", "eve", "error", "debug", "time", "statcode", "status", "start_time", "user", "tech", "submission_time", "teapotjob"]
+    keys_to_delete = ["ids", "perf", "alert", "alert_detailed", "other_logs", "eve", "error", "debug", "time", "statcode", "status", "start_time", "user", "tech", "submission_time", "teapotjob", "zeek_json"]
     try:
         for cur_key in keys_to_delete:
             r.delete("%s-%s" % (jid, cur_key))
@@ -716,6 +717,13 @@ def post_job_results(jobid):
     else:
         eve = ""
 
+    # Use JSON logs for Zeek
+    if "zeek_json" in result_obj:
+        logger.debug("Accessing Zeek JSON data from agent POST...")
+        zeek_json = result_obj['zeek_json']
+    else:
+        zeek_json = False
+
     logger.debug("Saving job data to redis...")
     r.set("%s-ids" % jobid, ids)
     r.set("%s-perf" % jobid, perf)
@@ -726,6 +734,7 @@ def post_job_results(jobid):
     r.set("%s-alert_detailed" % jobid, alert_detailed)
     r.set("%s-other_logs" % jobid, other_logs)
     r.set("%s-eve" % jobid, eve)
+    r.set("%s-zeek_json" % jobid, zeek_json)
     set_keys_timeout(jobid)
     logger.debug("Done saving job data to redis.")
 
@@ -878,7 +887,7 @@ def page_coverage_default(sensor_tech, error=None):
     elif sensor_tech == 'summary':
         return render_template('/dalton/error.html', jid='', msg=["Page expired.  Please resubmit your job or access it from the queue."])
 
-    if not os.path.isdir(conf_dir):
+    if not os.path.isdir(conf_dir) and not sensor_tech.startswith('zeek'):
         return render_template('/dalton/error.html', jid='', msg=[f"No engine configuration directory for '{sensor_tech}' found ({conf_dir})."])
 
     # pcap filename passed in from Flowsynth
@@ -959,10 +968,20 @@ def page_show_job(jid):
         error = r.get(f"{jid}-error")
         total_time = r.get(f"{jid}-time")
         alert_detailed = r.get(f"{jid}-alert_detailed")
+
+        try:
+            zeek_json = r.get(f"{jid}-zeek_json")
+        except Exception as e:
+            #logger.debug(f"Problem getting {jid}-zeek_json:\n{e}")
+            zeek_json = "False"
+
         try:
             # this gets passed as json with log description as key and log contents as value
             # attempt to load it as json before we pass it to job.html
             other_logs = json.loads(r.get(f"{jid}-other_logs"))
+            if tech.startswith('zeek') and zeek_json == "False":
+                for other_log in other_logs:
+                    other_logs[other_log] = parseZeekASCIILog(other_logs[other_log])
         except Exception as e:
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
@@ -1003,7 +1022,7 @@ def page_show_job(jid):
                                error=error, debug=debug, total_time=total_time,
                                tech=tech, custom_rules=custom_rules,
                                alert_detailed=alert_detailed, other_logs=other_logs,
-                               eve_json=eve, event_types=event_types)
+                               eve_json=eve, event_types=event_types, zeek_json=zeek_json)
 
 # sanitize passed in filename (string) and make it POSIX (fully portable)
 def clean_filename(filename):
@@ -1235,30 +1254,30 @@ def page_coverage_summary():
             logger.debug("%s" % traceback.format_exc())
             pass
 
+    #get the sensor technology and queue name
+    sensor_tech = request.form.get('sensor_tech')
+
+    #verify that we have a sensor that can handle the submitted sensor_tech
+    valid_sensor_tech = False
+    if r.exists('sensors'):
+        for sensor in r.smembers('sensors'):
+            if r.get("%s-tech" % sensor) == sensor_tech:
+                valid_sensor_tech = True
+                break
+    if not valid_sensor_tech:
+        logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, '%s'",  user, sensor_tech)
+        delete_temp_files(job_id)
+        return render_template('/dalton/error.html', jid='', msg=[f"There are no sensors that support sensor technology '{sensor_tech}'."])
+
     if len(form_pcap_files) == 0 and len(pcap_files) == 0:
         #throw an error, no pcaps submitted
         delete_temp_files(job_id)
         return render_template('/dalton/error.html', jid='', msg=["You must specify a PCAP file."])
-    elif (request.form.get('optionProdRuleset') == None and request.form.get('optionCustomRuleset') == None):
+    elif (request.form.get('optionProdRuleset') == None and request.form.get('optionCustomRuleset') == None) and not sensor_tech.startswith('zeek'):
         #throw an error, no rules defined
         delete_temp_files(job_id)
         return render_template('/dalton/error.html', jid='', msg=["You must specify at least one ruleset."])
     else:
-        #get the sensor technology and queue name
-        sensor_tech = request.form.get('sensor_tech')
-
-        #verify that we have a sensor that can handle the submitted sensor_tech
-        valid_sensor_tech = False
-        if r.exists('sensors'):
-            for sensor in r.smembers('sensors'):
-                if r.get("%s-tech" % sensor) == sensor_tech:
-                    valid_sensor_tech = True
-                    break
-        if not valid_sensor_tech:
-            logger.error("Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, '%s'",  user, sensor_tech)
-            delete_temp_files(job_id)
-            return render_template('/dalton/error.html', jid='', msg=[f"There are no sensors that support sensor technology '{sensor_tech}'."])
-
         # process files from web form
         for pcap_file in form_pcap_files:
             filename = os.path.basename(pcap_file.filename)
@@ -1382,6 +1401,11 @@ def page_coverage_summary():
         try:
             if request.form.get('optionOtherLogs'):
                 bGetOtherLogs = True
+            # Dump Buffer option valid for Suri >= version 2.1 and Snort >= 2.9.9.0
+            if sensor_tech_engine == "suricata" and LooseVersion(sensor_tech_version) < LooseVersion("2.1"):
+                bGetBufferDumps = False
+            if sensor_tech_engine == "snort" and LooseVersion(sensor_tech_version) < LooseVersion("2.9.9.0"):
+                bGetBufferDumps = False
         except:
             pass
 
@@ -1390,11 +1414,14 @@ def page_coverage_summary():
         try:
             if request.form.get('optionDumpBuffers'):
                 bGetBufferDumps = True
-            # Dump Buffer option valid for Suri >= version 2.1 and Snort >= 2.9.9.0
-            if sensor_tech_engine == "suricata" and LooseVersion(sensor_tech_version) < LooseVersion("2.1"):
-                bGetBufferDumps = False
-            if sensor_tech_engine == "snort" and LooseVersion(sensor_tech_version) < LooseVersion("2.9.9.0"):
-                bGetBufferDumps = False
+        except:
+            pass
+
+        # JSON output for Zeek logs
+        boptionZeekJSON = False
+        try:
+            if request.form.get('optionZeekJSON'):
+                boptionZeekJSON = True
         except:
             pass
 
@@ -1481,7 +1508,7 @@ def page_coverage_summary():
                   }
 
         conf_file = request.form.get('custom_engineconf')
-        if not conf_file:
+        if not conf_file and not sensor_tech.startswith('zeek'):
             delete_temp_files(job_id)
             return render_template('/dalton/error.html', jid='', msg=["No configuration file provided."])
 
@@ -1807,13 +1834,16 @@ def page_coverage_summary():
 
                 conf_file = new_conf
                 engine_conf_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_snort.conf")
+            elif sensor_tech.startswith('zeek'):
+                engine_conf_file = None
             else:
                 logger.warn("Unexpected sensor_tech value submitted: %s", sensor_tech)
-                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, "f{job_id}_engine.conf")
+                engine_conf_file = os.path.join(TEMP_STORAGE_PATH, f"{job_id}_engine.conf")
 
-            # write it out
-            with open(engine_conf_file, "w") as engine_conf_fh:
-                engine_conf_fh.write(conf_file)
+            if not sensor_tech.startswith('zeek'):
+                # write it out
+                with open(engine_conf_file, "w") as engine_conf_fh:
+                    engine_conf_fh.write(conf_file)
 
         # create jid (job identifier) value
         digest = hashlib.md5()
@@ -1906,6 +1936,8 @@ def page_coverage_summary():
                 else:
                     for pcap in pcap_files:
                         json_job['pcaps'].append(os.path.basename(pcap['filename']))
+                if engine_conf_file:
+                    json_job['engine-conf'] = os.path.basename(engine_conf_file)
                 json_job['user'] = user
                 json_job['enable-all-rules'] = bEnableAllRules
                 json_job['show-flowbit-alerts'] = bShowFlowbitAlerts
@@ -1921,7 +1953,7 @@ def page_coverage_summary():
                 json_job['get-buffer-dumps'] = bGetBufferDumps
                 json_job['sensor-tech'] = sensor_tech
                 json_job['prod-ruleset'] = prod_ruleset_name
-                json_job['engine-conf'] = os.path.basename(engine_conf_file)
+                json_job['zeek-json-logs'] = boptionZeekJSON
                 # add var and other fields too
                 str_job = json.dumps(json_job)
 
@@ -2093,7 +2125,8 @@ def controller_api_get_job_data(jid, requested_data):
     # add to as necessary
     valid_keys = ('alert', 'alert_detailed', 'ids', 'other_logs', 'eve',
                   'perf', 'tech', 'error', 'time', 'statcode', 'debug',
-                  'status', 'submission_time', 'start_time', 'user', 'all'
+                  'status', 'submission_time', 'start_time', 'user', 'all',
+                  'zeek_json'
                  )
     json_response = {'error':False, 'error_msg':None, 'data':None}
     # some input validation
@@ -2238,3 +2271,28 @@ def controller_api_get_max_pcap_files():
        submitter can ensure all the files will be processed.
     """
     return str(MAX_PCAP_FILES)
+
+def parseZeekASCIILog(logtext):
+    log = {}
+    rows = []
+    lines = logtext.splitlines()
+    for line in lines:
+        line = line.strip()
+        if line.startswith('#'):
+            if line.startswith('#separator'):
+                separator = line.split()[1].encode().decode('unicode-escape')
+            elif line.startswith('#fields'):
+                log['fields'] = line.split(separator)[1:]
+            elif line.startswith('#types'):
+                log['types'] = line.split(separator)[1:]
+            elif line.startswith('#close'):
+                break
+            else:
+                continue
+        else:
+            rows.append(line.split(separator))
+
+    log['rows'] = rows
+
+    return log
+

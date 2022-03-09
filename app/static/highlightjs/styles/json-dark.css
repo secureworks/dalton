@@ -1,6 +1,6 @@
 /*
 
-Light theme for EVE JSON
+Dark theme for JSON logs
 
 */
 
@@ -8,8 +8,8 @@ Light theme for EVE JSON
   display: block;
   overflow-x: auto;
   padding: 0.5em;
-  color: #000000;
-  background: #F5F5F5;
+  color: #EEEEEC;
+  background: #011627;
 }
 
 .hljs-subst,
@@ -41,14 +41,14 @@ Light theme for EVE JSON
 .hljs-selector-id,
 .hljs-selector-class {
 /*  boolean*/
-color: #E57609;
+  color: #DA7716;
 }
 
 .hljs-attribute,
 .hljs-number,
 .hljs-regexp,
 .hljs-link {
-  color: #3D7D01;
+  color: #5CB609;
 }
 
 .hljs-number,
@@ -58,7 +58,7 @@ color: #E57609;
 }
 
 .hljs-string {
-  color: #2121B6
+  color: #2D8FE9;
 }
 
 .hljs-symbol,
