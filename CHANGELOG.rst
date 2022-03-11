@@ -53,3 +53,8 @@ Contributors: Donald Campbell, Adam Mosesso
 ##################
 
 * Added support for Zeek as a sensor
+
+3.2.1 (2022-03-10)
+##################
+
+* Added explicit requirement for ``itsdangerous==2.0.1``
