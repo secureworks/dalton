@@ -1444,7 +1444,7 @@ def page_coverage_summary():
             pass
 
         # generate EVE log (only supported by Suricata)
-        bGetOEveLog = False
+        bGetEveLog = False
         try:
             if request.form.get('optionEveLog'):
                 bGetEveLog = True
