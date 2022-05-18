@@ -871,6 +871,63 @@ def validate_jobid(jid):
         return True
 
 
+@dalton_blueprint.route('/dalton/coverage/job/<jid>', methods=['GET'])
+def page_coverage_jid(jid, error=None):
+    global JOB_STORAGE_PATH
+    global TEMP_STORAGE_PATH
+    global RULESET_STORAGE_PATH
+
+    if not re.match(r"^[a-f0-9]{16}$", jid):
+        return render_template('/dalton/error.html', jid='', msg=["Not a valid job ID."])
+
+    jobzip_path = os.path.join(f"{JOB_STORAGE_PATH}", f"{jid}.zip")
+    if not os.path.isfile(jobzip_path):
+        return render_template('/dalton/error.html', jid=jid, msg=[f"Job with ID {jid} does not exist."])
+
+    custom_rules = None
+    with zipfile.ZipFile(jobzip_path) as zf:
+        manifest = json.loads(zf.read('manifest.json').decode())
+        sensor_tech = manifest['sensor-tech'].split('/')[0]
+        for f in zf.namelist():
+            if f.endswith(f".conf") or f.endswith(f".yaml"):
+                engine_conf = zf.read(f).decode()
+            elif f == "dalton-custom.rules" and manifest['custom-rules'] == True:
+                custom_rules = zf.read(f).decode()
+
+    rulesets = get_rulesets(sensor_tech)
+
+    # enumerate sensor versions based on available sensors and pass them to coverage.html
+    #   This way we can dynamically update the submission page as soon as new sensor versions check in
+    clear_old_agents()
+    sensors = []
+    if r.exists('sensors'):
+        for sensor in r.smembers('sensors'):
+            try:
+                tech = r.get("%s-tech" % sensor)
+                if tech.startswith(sensor_tech):
+                    if tech not in sensors:
+                        sensors.append(tech)
+            except Exception as e:
+                return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
+        try:
+            # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
+            #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
+            sensors.sort(reverse=False)
+            # sort by version number; ignore "rust_" prefix
+            sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('/', 2)[1], prefixes=["rust_"])), reverse=True)
+        except Exception as e:
+            try:
+                sensors.sort(key=LooseVersion, reverse=True)
+            except Exception as ee:
+                sensors.sort(reverse=True)
+        logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
+
+    job_ruleset = manifest.get('prod-ruleset')
+    if job_ruleset:
+        rulesets.insert(0, [f"{jid} ruleset", jobzip_path])
+
+    return render_template('/dalton/coverage.html', sensor_tech=sensor_tech, rulesets=rulesets, error=error, engine_conf=engine_conf, sensors=sensors, fspcap=None, max_pcaps=MAX_PCAP_FILES, manifest=manifest, custom_rules=custom_rules)
+
 @dalton_blueprint.route('/dalton/coverage/<sensor_tech>/', methods=['GET'])
 #@login_required()
 def page_coverage_default(sensor_tech, error=None):
@@ -1953,6 +2010,8 @@ def page_coverage_summary():
                 json_job['get-buffer-dumps'] = bGetBufferDumps
                 json_job['sensor-tech'] = sensor_tech
                 json_job['prod-ruleset'] = prod_ruleset_name
+                json_job['override-external-net'] = bOverrideExternalNet
+                json_job['suricata-eve'] = bGetEveLog
                 json_job['zeek-json-logs'] = boptionZeekJSON
                 # add var and other fields too
                 str_job = json.dumps(json_job)

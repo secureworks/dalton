@@ -274,6 +274,10 @@
                             <p>Please specify a packet capture (libpcap). Depending on the engine, pcapng format may be supported as well.</p>
                             {% if fspcap %}
                                 <input type="text" name="fspcap" id="fspcap" readonly="readonly" value={{fspcap}}><p/>
+                            {% elif manifest %}
+                                {% for pcap in manifest['pcaps'] %}
+                                    <input type="text" name="jobpcap{{loop.index}}" id="jobpcap{{loop.index}}" readonly="readonly" value={{pcap}}><p/>
+                                {% endfor %}
                             {% endif %}
                             {% for n in range(max_pcaps|int) %}
                                 {% if n != 0 %}
@@ -295,7 +299,7 @@
                             <p>
                             <div>
                                 <label class="checkbox" id="labelSplitcap">
-                                    <input type="checkbox" name="optionSplitcap" id="optionSplitcap" value="splitcap">
+                                    <input type="checkbox" name="optionSplitcap" id="optionSplitcap" value="splitcap" {% if manifest and manifest['split-pcaps'] %}checked{% endif %}>
                                     Create separate jobs for each pcap
                                 </label>
                             </div>
@@ -304,7 +308,11 @@
                                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
                                     {% for sensor in sensors %}
                                         <!-- TODO: make this a grid insead of a list -->
-                                        <input type="radio" name="sensor_tech" id="{{sensor}}" value="{{sensor}}"{% if loop.first %} checked{% endif %}><label for="{{sensor}}" class="radio inline">
+                                        {% if manifest and manifest['sensor-tech'] == sensor %}
+                                            <input type="radio" name="sensor_tech" id="{{sensor}}" value="{{sensor}}" checked><label for="{{sensor}}" class="radio inline">
+                                        {% else %}
+                                            <input type="radio" name="sensor_tech" id="{{sensor}}" value="{{sensor}}"{% if loop.first %} checked{% endif %}><label for="{{sensor}}" class="radio inline">
+                                        {% endif %}
                                             {% set tlist = sensor.split('/') %}
                                             {% if tlist|length > 1 %}
                                                 {% if tlist[1].startswith("rust_") %}
@@ -326,7 +334,7 @@
                                 <p>
                                 <div id="divUseSC">
                                     <label class="checkbox" id="labelUseSC">
-                                        <input type="checkbox" name="optionUseSC" id="optionUseSC" value="use_sock_control" checked>
+                                        <input type="checkbox" name="optionUseSC" id="optionUseSC" value="use_sock_control" {% if not manifest or (manifest and manifest['use-suricatasc']) %}checked{% endif %}>
                                         Use Suricata Socket Control Pcap Processing Mode
                                     </label>
                                 </div>
@@ -334,7 +342,7 @@
 						{% if not sensor_tech.startswith('zeek') %}
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Ruleset</div>
 							<label class="checkbox">
-								<input type="checkbox" name="optionProdRuleset" id="optionRuleset" value="prod" checked>
+								<input type="checkbox" name="optionProdRuleset" id="optionRuleset" value="prod" {% if not manifest or (manifest and manifest['prod-ruleset']) %}checked{% endif %}>
 								Use a defined ruleset
 							</label>
 							<span id="prod_ruleset">
@@ -345,61 +353,61 @@
 								</select>
 							</span>
 							<label class="checkbox" id="labelEnableAllRules">
-								<input type="checkbox" name="optionEnableAllRules" id="optionEnableAllRules" value="enableAll">
+								<input type="checkbox" name="optionEnableAllRules" id="optionEnableAllRules" value="enableAll" {% if manifest and manifest['enable-all-rules'] %}checked{% endif %}>
 								Enable disabled rules
 							</label>
 							<label class="checkbox" id="labelShowFlowbitAlerts">
-								<input type="checkbox" name="optionShowFlowbitAlerts" id="optionShowFlowbitAlerts" value="showFlowbitAlerts">
+								<input type="checkbox" name="optionShowFlowbitAlerts" id="optionShowFlowbitAlerts" value="showFlowbitAlerts" {% if manifest and manifest['show-flowbit-alerts'] %}checked{% endif %}>
 								Show all flowbit alerts
 							</label>
 							<br>
 							<label class="checkbox">
-								<input type="checkbox" name="optionCustomRuleset" id="optionRulesetCustom" value="custom">
+    						    <input type="checkbox" name="optionCustomRuleset" id="optionRulesetCustom" value="custom"{% if manifest and manifest['custom-rules'] %} checked{% endif %}>
 								Use custom rules
 							</label>
 							<span id="custom_ruleset">
-								<textarea rows='10' class='span'; style='margin-left:0;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"";);'></textarea>
+								<textarea rows='10' class='span'; style='margin-left:0;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"";);'>{% if manifest and manifest['custom-rules'] and custom_rules %}{{custom_rules}}{% endif %}</textarea>
 							</span>
 							{% endif %}
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Logs</div>
 							{% if not sensor_tech.startswith('zeek') %}
                             <div id="optionAlertDetailedDiv">
     							<label class="checkbox">
-	    							<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed" checked>
+	    							<input type="checkbox" name="optionAlertDetailed" id="optionAlertDetailed" value="optionAlertDetailed" {% if not manifest or (manifest and manifest['alert-detailed']) %}checked{% endif %}>
 		    					    Pcap records from alerts (unified2)
                                 </label>
                             </div>
                             {% if sensor_tech.startswith('suri') %}
                                 <div id="optionEveLogDiv">
                                     <label class="checkbox">
-                                        <input type="checkbox" name="optionEveLog" id="optionEveLog" value="optionEveLog" checked>
+                                        <input type="checkbox" name="optionEveLog" id="optionEveLog" value="optionEveLog" {% if not manifest or (manifest and manifest['suricata-eve']) %}checked{% endif %}>
                                         EVE log
                                     </label>
                                 </div>
                                 <label class="checkbox">
-                                    <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs" checked>
+                                    <input type="checkbox" name="optionOtherLogs" id="optionOtherLogs" value="optionOtherLogs" {% if not manifest or (manifest and manifest['get-other-logs']) %}checked{% endif %}>
                                     Other logs (Alert Debug, HTTP, TLS, DNS, etc.)
                                 </label>
                             {% endif %}
 							<label class="checkbox">
-								<input type="checkbox" name="optionPerf" id="optionPerf" value="perf">
+								<input type="checkbox" name="optionPerf" id="optionPerf" value="perf" {% if manifest and manifest['track-performance'] %}checked{% endif %}>
 								Rule profiling
 							</label>
                             {% if sensor_tech.startswith('suri') %}
                                 <label class="checkbox">
-                                    <input type="checkbox" name="optionFastPattern" id="optionFastPattern" value="optionFastPattern">
+                                    <input type="checkbox" name="optionFastPattern" id="optionFastPattern" value="optionFastPattern" {% if manifest and manifest['get-fast-pattern'] %}checked{% endif %}>
                                     Fast pattern info
                                 </label>
                             {% endif %}
                             <div id="optionDumpBuffersDiv">
 							    <label class="checkbox">
-								    <input type="checkbox" name="optionDumpBuffers" id="optionDumpBuffers" value="optionDumpBuffers">
+								    <input type="checkbox" name="optionDumpBuffers" id="optionDumpBuffers" value="optionDumpBuffers" {% if manifest and manifest['get-buffer-dumps'] %}checked{% endif %}>
 								    Dump buffers (alerts only)
 							    </label>
                             </div>
                             {% else %}
 							<label class="checkbox">
-								<input type="checkbox" name="optionZeekJSON" id="optionZeekJSON" value="optionZeekJSON">
+								<input type="checkbox" name="optionZeekJSON" id="optionZeekJSON" value="optionZeekJSON" {% if manifest and manifest['zeek-json-logs'] %}checked{% endif %}>
 								JSON Format
 							</label>
                             {% endif %}
@@ -407,7 +415,7 @@
 						<div class="tab-pane" id="sensorconf">
 							{% if not sensor_tech.startswith('zeek') %}
 							<label class="checkbox inline">
-                                <input type="checkbox" name="overrideExternalNet" id="overrideExternalNet" value="eoverride" checked>
+                                <input type="checkbox" name="overrideExternalNet" id="overrideExternalNet" value="eoverride" {% if not manifest or (manifest and manifest['override-external-net']) %}checked{% endif %}>
 								Override EXTERNAL_NET (set to 'any')
 							</label>
                             <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Configuration File</div>
