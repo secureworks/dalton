@@ -1292,6 +1292,17 @@ def page_coverage_summary():
     # note that these are file handle objects? have to get filename using .filename
     # make this a list so I can pass by reference
     dupcount = [0]
+    job_zip = request.form.get("job-zip")
+    if (job_zip != None and re.match(r"^[a-f0-9]{16}\.zip$", job_zip)):
+        filename = clean_filename(os.path.basename(job_zip))
+        filepath = os.path.join(JOB_STORAGE_PATH, filename)
+        if not os.path.isfile(filepath):
+            return render_template('/dalton/error.html', jid='', msg=[f"Zip file for {filename} does not exist"])
+        err_msg = extract_pcaps(filepath, pcap_files, job_id, dupcount)
+        if err_msg:
+            delete_temp_files(job_id)
+            return render_template('/dalton/error.html', jid='', msg=[err_msg])
+
     for i in range(MAX_PCAP_FILES):
         try:
             coverage_pcaps = request.files.getlist("coverage-pcap%d" % i)

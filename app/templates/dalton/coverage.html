@@ -275,9 +275,7 @@
                             {% if fspcap %}
                                 <input type="text" name="fspcap" id="fspcap" readonly="readonly" value={{fspcap}}><p/>
                             {% elif manifest %}
-                                {% for pcap in manifest['pcaps'] %}
-                                    <input type="text" name="jobpcap{{loop.index}}" id="jobpcap{{loop.index}}" readonly="readonly" value={{pcap}}><p/>
-                                {% endfor %}
+                                <input type="text" name="job-zip" id="job-zip" readonly="readonly" value={{manifest['id'] + '.zip'}}><p/>
                             {% endif %}
                             {% for n in range(max_pcaps|int) %}
                                 {% if n != 0 %}
