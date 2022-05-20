@@ -68,6 +68,7 @@ try:
     JOB_STORAGE_PATH = dalton_config.get('dalton', 'job_path')
     CONF_STORAGE_PATH = dalton_config.get('dalton', 'engine_conf_path')
     REDIS_EXPIRE = (dalton_config.getint('dalton', 'redis_expire') * 60)
+    SHARE_EXPIRE = (dalton_config.getint('dalton', 'share_expire') * 60)
     TEAPOT_REDIS_EXPIRE = (dalton_config.getint('dalton', 'teapot_redis_expire') * 60)
     JOB_RUN_TIMEOUT = dalton_config.getint('dalton', 'job_run_timeout')
     AGENT_PURGE_TIME = dalton_config.getint('dalton', 'agent_purge_time')
@@ -893,6 +894,14 @@ def page_coverage_jid(jid, error=None):
                 engine_conf = zf.read(f).decode()
             elif f == "dalton-custom.rules" and manifest['custom-rules'] == True:
                 custom_rules = zf.read(f).decode()
+    
+    # extend job life by moving file mod date into the future, thereby delaying the usual expiry process
+    # subtracting REDIS_EXPIRE so SHARE_EXPIRE matches expectations
+    # example: SHARE_EXPIRE = 30 days, REDIS_EXPIRE = 5 days. 
+    # The queue delete logic deletes after now + REDIS_EXPIRE. If we don't subtract it now jobs will last 35 days
+    now = time.time()
+    newtime = now + (SHARE_EXPIRE - REDIS_EXPIRE)
+    os.utime(jobzip_path, (newtime,newtime))
 
     rulesets = get_rulesets(sensor_tech)
 
