@@ -90,8 +90,54 @@
 				$('#custom_ruleset').show();
 			} else {
 				$('#custom_ruleset').hide();
-			}
+			}        
 		});
+
+        $("#overlay").change(function() {
+            console.log("Overlay changed");
+            readFile(this);
+            document.getElementById("overlay").style.display = "none";
+          });
+           
+          var draganddropCounter = 0;
+          $(document).on('dragenter', function(e) {
+            if(draganddropCounter === 0){ 
+                console.log(e.type);
+                document.getElementById("overlay").style.display = "block";
+            }
+            draganddropCounter++;
+            e.preventDefault();
+            e.stopPropagation();
+            
+          });
+           
+          $(document).on('dragleave', function(e) {
+            draganddropCounter--;
+            e.preventDefault();
+            e.stopPropagation();
+            if(draganddropCounter === 0){
+               console.log("Drag and drop counter === 0")
+               document.getElementById("overlay").style.display = "none";
+            }
+          }); 
+
+          $(document).on('dragover', false).on('drop', function(e) {
+            console.log("Document dropped");
+            draganddropCounter--;
+            e.preventDefault();
+            e.stopPropagation();
+            draganddropCounter = 0
+            document.getElementById("overlay").style.display = "none";
+            for(i=0;i<{{max_pcaps}}; i++){ if($('#coverage-pcap'+i).val()){
+                //alert("Pcap"+i+" has value");
+            }else{
+              console.log("Name:"+e.originalEvent.dataTransfer.files[0].name+"\nSetting input "+i+" to file.");
+              $('#coverage-pcap'+i).prop("files",e.originalEvent.dataTransfer.files);
+              $('#addpcap').click();
+              break;
+            }  
+          };
+          }); 
 
 		$('#showHideOptionCustomEngineConf').click( function() {
             $(this).find('i').toggleClass('icon-chevron-right').toggleClass('icon-chevron-down');
@@ -228,6 +274,7 @@
         updateHeading();
         show_hide_log_options($('input[name="sensor_tech"]:checked').val());
         show_hide_suricatasc_options($('input[name="sensor_tech"]:checked').val());
+        console.log("Page loaded");
     });
 {% endblock %}
 
@@ -237,6 +284,7 @@
 			<b>An error occured:&nbsp;</b>{{error}}
 		</div>
 	{% endif %}
+
 	<div class="row-fluid">
 		<div class="span11">
 			<form id='submitjob' action="/dalton/coverage/summary" method="post" enctype="multipart/form-data">
@@ -270,6 +318,8 @@
 					</ul>
 					<div class="tab-content">
 						<div class="tab-pane active" id="jobdetails">
+                            <div class="pcaps_box" id="pcaps">
+                            <div class="dropzone-wrapper" id="pcaps_overlay"></div>
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;font-size:21px;line-height:40px;color:#333;border:0;">Packet Captures</div>
                             <p>Please specify a packet capture (libpcap). Depending on the engine, pcapng format may be supported as well.</p>
                             {% if fspcap %}
@@ -301,7 +351,7 @@
                                     Create separate jobs for each pcap
                                 </label>
                             </div>
-
+                        </div>
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Sensor Version</div>
                                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
                                     {% for sensor in sensors %}
