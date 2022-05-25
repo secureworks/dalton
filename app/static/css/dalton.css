@@ -28,7 +28,8 @@ h1, h2, h3, h4, h5, h6 {
         position: absolute;
         top: 50%;
         left: 50%;
-        font-size: 50px;
+        font-size: 4vw;
+        inline-size: max-content;
         color: white;
         transform: translate(-50%,-50%);
         -ms-transform: translate(-50%,-50%);
