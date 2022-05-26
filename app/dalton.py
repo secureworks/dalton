@@ -68,6 +68,7 @@ try:
     JOB_STORAGE_PATH = dalton_config.get('dalton', 'job_path')
     CONF_STORAGE_PATH = dalton_config.get('dalton', 'engine_conf_path')
     REDIS_EXPIRE = (dalton_config.getint('dalton', 'redis_expire') * 60)
+    SHARE_EXPIRE = (dalton_config.getint('dalton', 'share_expire') * 60)
     TEAPOT_REDIS_EXPIRE = (dalton_config.getint('dalton', 'teapot_redis_expire') * 60)
     JOB_RUN_TIMEOUT = dalton_config.getint('dalton', 'job_run_timeout')
     AGENT_PURGE_TIME = dalton_config.getint('dalton', 'agent_purge_time')
@@ -871,6 +872,74 @@ def validate_jobid(jid):
         return True
 
 
+@dalton_blueprint.route('/dalton/coverage/job/<jid>', methods=['GET'])
+def page_coverage_jid(jid, error=None):
+    global JOB_STORAGE_PATH
+    global TEMP_STORAGE_PATH
+    global RULESET_STORAGE_PATH
+
+    if not re.match(r"^[a-f0-9]{16}$", jid):
+        return render_template('/dalton/error.html', jid='', msg=["Not a valid job ID."])
+
+    jobzip_path = os.path.join(f"{JOB_STORAGE_PATH}", f"{jid}.zip")
+    if not os.path.isfile(jobzip_path):
+        return render_template('/dalton/error.html', jid=jid, msg=[f"Job with ID {jid} does not exist."])
+
+    custom_rules = None
+    with zipfile.ZipFile(jobzip_path) as zf:
+        manifest = json.loads(zf.read('manifest.json').decode())
+        sensor_tech = manifest['sensor-tech'].split('/')[0]
+        for f in zf.namelist():
+            if f.endswith(f".conf") or f.endswith(f".yaml"):
+                engine_conf = zf.read(f).decode()
+            elif f == "dalton-custom.rules" and manifest['custom-rules'] == True:
+                custom_rules = zf.read(f).decode()
+    
+    # extend job life by moving file mod date into the future, thereby delaying the usual expiry process
+    # subtracting REDIS_EXPIRE so SHARE_EXPIRE matches expectations
+    # example: SHARE_EXPIRE = 30 days, REDIS_EXPIRE = 5 days. 
+    # The queue delete logic deletes after now + REDIS_EXPIRE. If we don't subtract it now jobs will last 35 days
+    now = time.time()
+    newtime = now + (SHARE_EXPIRE - REDIS_EXPIRE)
+    os.utime(jobzip_path, (newtime,newtime))
+
+    rulesets = get_rulesets(sensor_tech)
+
+    if sensor_tech.lower().startswith('zeek'):
+        engine_conf = None
+
+    # enumerate sensor versions based on available sensors and pass them to coverage.html
+    #   This way we can dynamically update the submission page as soon as new sensor versions check in
+    clear_old_agents()
+    sensors = []
+    if r.exists('sensors'):
+        for sensor in r.smembers('sensors'):
+            try:
+                tech = r.get("%s-tech" % sensor)
+                if tech.startswith(sensor_tech):
+                    if tech not in sensors:
+                        sensors.append(tech)
+            except Exception as e:
+                return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
+        try:
+            # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
+            #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
+            sensors.sort(reverse=False)
+            # sort by version number; ignore "rust_" prefix
+            sensors.sort(key=lambda v:LooseVersion(prefix_strip(v.split('/', 2)[1], prefixes=["rust_"])), reverse=True)
+        except Exception as e:
+            try:
+                sensors.sort(key=LooseVersion, reverse=True)
+            except Exception as ee:
+                sensors.sort(reverse=True)
+        logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
+
+    job_ruleset = manifest.get('prod-ruleset')
+    if job_ruleset:
+        rulesets.insert(0, [f"{jid} ruleset", jobzip_path])
+
+    return render_template('/dalton/coverage.html', sensor_tech=sensor_tech, rulesets=rulesets, error=error, engine_conf=engine_conf, sensors=sensors, fspcap=None, max_pcaps=MAX_PCAP_FILES, manifest=manifest, custom_rules=custom_rules)
+
 @dalton_blueprint.route('/dalton/coverage/<sensor_tech>/', methods=['GET'])
 #@login_required()
 def page_coverage_default(sensor_tech, error=None):
@@ -1235,6 +1304,17 @@ def page_coverage_summary():
     # note that these are file handle objects? have to get filename using .filename
     # make this a list so I can pass by reference
     dupcount = [0]
+    job_zip = request.form.get("job-zip")
+    if (job_zip != None and re.match(r"^[a-f0-9]{16}\.zip$", job_zip)):
+        filename = clean_filename(os.path.basename(job_zip))
+        filepath = os.path.join(JOB_STORAGE_PATH, filename)
+        if not os.path.isfile(filepath):
+            return render_template('/dalton/error.html', jid='', msg=[f"Zip file for {filename} does not exist"])
+        err_msg = extract_pcaps(filepath, pcap_files, job_id, dupcount)
+        if err_msg:
+            delete_temp_files(job_id)
+            return render_template('/dalton/error.html', jid='', msg=[err_msg])
+
     for i in range(MAX_PCAP_FILES):
         try:
             coverage_pcaps = request.files.getlist("coverage-pcap%d" % i)
@@ -1387,7 +1467,7 @@ def page_coverage_summary():
             pass
 
         # generate EVE log (only supported by Suricata)
-        bGetOEveLog = False
+        bGetEveLog = False
         try:
             if request.form.get('optionEveLog'):
                 bGetEveLog = True
@@ -1546,7 +1626,14 @@ def page_coverage_summary():
                 if request.form.get('optionProdRuleset'):
                     # some code re-use here
                     prod_ruleset_name = os.path.basename(request.form.get('prod_ruleset'))
-                    if not prod_ruleset_name.endswith(".rules"):
+                    if prod_ruleset_name.startswith(JOB_STORAGE_PATH) and prod_ruleset_name.endswith('.zip'):
+                        jobzip_path = os.path.join(JOB_STORAGE_PATH, os.path.basename(prod_ruleset_name))
+                        with zipfile.ZipFile(jobzip_path) as zf:
+                            for f in zf.namelist():
+                                if f.endswith(".rules") and f != "dalton-custom.rules":
+                                    prod_ruleset_name = f
+                                    break
+                    elif not prod_ruleset_name.endswith(".rules"):
                         prod_ruleset_name = "%s.rules" % prod_ruleset_name
                     config['rule-files'].append("%s" % prod_ruleset_name)
                 if bCustomRules:
@@ -1883,13 +1970,25 @@ def page_coverage_summary():
                     if not ruleset_path:
                         delete_temp_files(job_id)
                         return render_template('/dalton/error.html', jid=jid, msg=["No defined ruleset provided."])
+                    if ruleset_path.startswith(JOB_STORAGE_PATH) and ruleset_path.endswith('.zip'):
+                        jobzip_path = os.path.join(JOB_STORAGE_PATH, os.path.basename(ruleset_path))
+                        if not os.path.exists(jobzip_path):
+                            delete_temp_files(job_id)
+                            return render_template('/dalton/error.html', jid=jid, msg=["Ruleset does not exist on Dalton Controller: %s; ruleset-path: %s" % (prod_ruleset_name, ruleset_path)])
+                        with zipfile.ZipFile(jobzip_path) as jobzf:
+                            for f in jobzf.namelist():
+                                if f.endswith(".rules") and f != "dalton-custom.rules":
+                                    ruleset_path = os.path.join(TEMP_STORAGE_PATH, job_id, f)
+                                    open(ruleset_path, 'w').write(jobzf.read(f).decode())
+                                    prod_ruleset_name = os.path.basename(ruleset_path)
+                                    break
                     if not prod_ruleset_name: # if Suri job, this is already set above
                         prod_ruleset_name = os.path.basename(ruleset_path)
                         if not prod_ruleset_name.endswith(".rules"):
                             prod_ruleset_name = "%s.rules" % prod_ruleset_name
                     logger.debug("ruleset_path = %s" % ruleset_path)
                     logger.debug("Dalton in page_coverage_summary():   prod_ruleset_name: %s" % (prod_ruleset_name))
-                    if not ruleset_path.startswith(RULESET_STORAGE_PATH) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
+                    if (not ruleset_path.startswith(RULESET_STORAGE_PATH) and not ruleset_path.startswith(TEMP_STORAGE_PATH)) or ".." in ruleset_path or not re.search(r'^[a-z0-9\/\_\-\.]+$', ruleset_path, re.IGNORECASE):
                         delete_temp_files(job_id)
                         return render_template('/dalton/error.html', jid=jid, msg=["Invalid ruleset submitted: '%s'." % prod_ruleset_name, "Path/name invalid."])
                     elif not os.path.exists(ruleset_path):
@@ -1953,6 +2052,8 @@ def page_coverage_summary():
                 json_job['get-buffer-dumps'] = bGetBufferDumps
                 json_job['sensor-tech'] = sensor_tech
                 json_job['prod-ruleset'] = prod_ruleset_name
+                json_job['override-external-net'] = bOverrideExternalNet
+                json_job['suricata-eve'] = bGetEveLog
                 json_job['zeek-json-logs'] = boptionZeekJSON
                 # add var and other fields too
                 str_job = json.dumps(json_job)

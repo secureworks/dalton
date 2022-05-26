@@ -552,10 +552,13 @@ A job zip file, which includes the packet capture file(s) submitted
 along with rules and variables associated with the job, is stored on
 disk, by default in the ``/opt/dalton/jobs`` directory; this location is
 configurable via the ``job_path`` parameter in the ``dalton.conf`` file.
-These files are cleaned up by Dalton based on the ``redis_expire`` and 
-``teapot_redis_expire``.  Dalton only cleans up job zip files from disk when 
-the ``Queue`` page is loaded.  To force the clean up job to run on demand, 
-send a HTTP GET request to::
+These files are cleaned up by Dalton based on the ``redis_expire`` and
+``teapot_redis_expire``. Visiting a job's share link increases the expire
+time for the job zip file. How long the expire time is extended can be
+configured in the ``dalton.conf`` file as well with the ``share_expire``
+configuration option. Dalton only cleans up job zip files from disk when the
+``Queue`` page is loaded. To force the clean up job to run on demand, send
+a HTTP GET request to::
 
   /dalton/controller_api/delete-old-job-files
 

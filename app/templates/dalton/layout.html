@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Dalton</title>
 
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
@@ -21,9 +20,13 @@
       }
     </style>
     <link href="{{ url_for('static', filename='bootstrap/css/bootstrap-responsive.css') }}" rel="stylesheet">
+
   </head>
 
   <body>
+    <div id="overlay" onclick="off()">
+      <div id="overlay-text">Drop PCAP to queue for upload</div>
+      </div>
   <div class="navbar navbar-fixed-top">
     <div class="navbar-inner">
       <div class="container span12">
