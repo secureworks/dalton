@@ -23,7 +23,7 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 # download, build, and install Suricata from source
 RUN mkdir -p /src/suricata-${SURI_VERSION}
 WORKDIR /src
-ADD http://downloads.suricata-ids.org/suricata-${SURI_VERSION}.tar.gz suricata-${SURI_VERSION}.tar.gz
+ADD https://www.openinfosecfoundation.org/download/suricata-${SURI_VERSION}.tar.gz suricata-${SURI_VERSION}.tar.gz
 RUN tar -zxf suricata-${SURI_VERSION}.tar.gz -C suricata-${SURI_VERSION} --strip-components=1
 WORKDIR /src/suricata-${SURI_VERSION}
 # Note: Some Suricata versions between 2.0 and 5.0 won't compile on newer linux kernels (like
