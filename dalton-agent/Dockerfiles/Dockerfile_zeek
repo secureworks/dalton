@@ -11,7 +11,7 @@ WORKDIR /src
 ADD https://download.zeek.org/zeek-${ZEEK_VERSION}.tar.gz zeek-${ZEEK_VERSION}.tar.gz
 RUN tar -zxf zeek-${ZEEK_VERSION}.tar.gz -C zeek-${ZEEK_VERSION} --strip-components=1
 WORKDIR /src/zeek-${ZEEK_VERSION}
-RUN ./configure && make && make install
+RUN ./configure && make -j $(nproc) && make install
 
 env PATH /usr/local/zeek/bin/:$PATH
 
