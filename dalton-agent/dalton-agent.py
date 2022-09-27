@@ -1206,7 +1206,10 @@ def run_zeek(json_logs):
     zeek_command = "cd %s && %s -C -r %s" % (IDS_LOG_DIRECTORY, IDS_BINARY, PCAP_FILES[0])
     if json_logs:
         zeek_command += " -e 'redef LogAscii::use_json=T;redef LogAscii::json_timestamps=JSON::TS_ISO8601;'"
-    zeek_command += " /opt/dalton-agent/zeek_scripts/*"
+
+    if len([f for f in os.listdir('/opt/dalton-agent/zeek_scripts/') if not f.startswith('.')]) > 0:
+        zeek_command += " /opt/dalton-agent/zeek_scripts/*"
+
     print_msg("Starting Zeek and Running Pcap(s)...")
     print_debug("Running Zeek with the following command command:\n%s" % zeek_command)
     zeek_output_fh = open(JOB_IDS_LOG, "w")
