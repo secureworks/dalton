@@ -888,6 +888,45 @@ provided here but can be easily obtained by making the request in a web browser.
      If the <jobid> is invalid or an error occurs, a HTML error page
      is returned.
 
+
+Submit Job API
+--------------
+
+There is an option to programmatically submit jobs using HTTP POST requests. 
+The endpoint to submit a job is ``/dalton/coverage/summary``. 
+
+Additional parameters that are mandatory and will need to be included in the json payload of the POST request are listed below:
+
+.. code:: javascript
+    data = {
+        "sensor_tech": <string that has the sensor technology>,
+        "optionProdRuleset": "prod",
+        "prod_ruleset": <rules path>,
+        "custom_engineconf": <string with the complete confguration yaml file>,
+        "teapotJob": 1
+    }
+
+The above example indicates the minimum data payload to submit a job. 
+You need to make sure that you have the proper sensor tech name. 
+You may use the API call: ``GET /dalton/controller_api/v2/<jobid>/tech/raw`` to retrieve the specific sensor tech.
+The rules path is ``/opt/dalton/rulesets/<sensor_name>/<rule_file_name>`` where sensor can be: suricata, zeek, snort, and the file name is the name of the file that has all the rules of this sensor.
+
+It is also necessary to submit a file using the following format:
+
+.. code:: javascript
+    files = {"coverage-pcap*": (<pcap_filename>, <pcap_bytes>)}
+
+You can upload up to 10 files with one job, so substitute * with a number from 0-9.
+You will need to read the filebytes in the pcap_bytes var and optially you can include the ``pcap_filename``.
+Submit the job as a shortlived ``teapotJob`` if you plan to make multiple calls in a short amount of time for better performance.
+
+Other useful arguments to submit a job are: 
+
+- ``custom_rules`` in which you may include the custom rules you may want to test with your job,
+- ``optionAlertDetailed``, ``optionEveLog``, ``optionOtherLogs``: this can be set to ``True`` if you want to generate additional logs with your job.
+
+An example script can be found in ``examples/submit_job.py``.
+
 Teapot Jobs
 ===========
 
