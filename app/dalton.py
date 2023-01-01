@@ -2160,7 +2160,7 @@ def page_queue_default():
             #  the most recent num_jobs_to_show jobs
             # do some cleanup on the list to remove jobs where the data has expired (been deleted).
             # Using 'jid-submission_time' and jid=status as tests -- if these don't exist the other keys associated
-            # with that jid should be exipred or will expire shortly.  That key gets set to expire
+            # with that jid should be expired or will expire shortly.  That key gets set to expire
             # after a job is requested/sent to a sensor so we won't clear out queued jobs.
             if not r.exists("%s-submission_time" % jid) or not r.exists("%s-status" % jid):
                 # job has expired
