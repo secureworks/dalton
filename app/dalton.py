@@ -576,7 +576,7 @@ def sensor_request_job():
     r.set(f"{SENSOR_HASH}-tech", sensor_tech)
     r.set(f"{SENSOR_HASH}-agent_version", AGENT_VERSION)
 
-    #grab a job! If it dosen't exist, return sleep.
+    #grab a job! If it doesn't exist, return sleep.
     response = r.lpop(sensor_tech)
     if (response == None):
         return "sleep"
