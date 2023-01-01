@@ -26,7 +26,7 @@ RUN apt-get install -y less nano
 # download, build, and install Snort from source
 RUN mkdir -p /src/snort-${SNORT_VERSION} && mkdir -p /etc/snort
 WORKDIR /src
-# DAQ.  Apparenlty DAQ will sometime fail building with multiple make jobs.
+# DAQ.  Apparently DAQ will sometime fail building with multiple make jobs.
 ADD https://www.snort.org/downloads/archive/snort/daq-${DAQ_VERSION}.tar.gz daq-${DAQ_VERSION}.tar.gz
 RUN tar -zxf daq-${DAQ_VERSION}.tar.gz && cd daq-${DAQ_VERSION} && ./configure && make && make install
 # Snort
