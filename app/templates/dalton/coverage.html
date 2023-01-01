@@ -355,7 +355,7 @@
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Sensor Version</div>
                                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
                                     {% for sensor in sensors %}
-                                        <!-- TODO: make this a grid insead of a list -->
+                                        <!-- TODO: make this a grid instead of a list -->
                                         {% if manifest and manifest['sensor-tech'] == sensor %}
                                             <input type="radio" name="sensor_tech" id="{{sensor}}" value="{{sensor}}" checked><label for="{{sensor}}" class="radio inline">
                                         {% else %}
