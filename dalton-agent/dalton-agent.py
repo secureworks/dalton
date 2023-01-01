@@ -211,7 +211,7 @@ def get_engine_version(path):
     return (engine, version)
 
 def hash_file(filenames):
-    """Returns md5sum of pased in file. If a list of files is passed,
+    """Returns md5sum of passed in file. If a list of files is passed,
        they are concatenated together and hashed.
        Remove "default-rule-path" from Suricata config since this
        changes every job.
