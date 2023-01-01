@@ -895,7 +895,7 @@ def check_pcaps():
                 warning_msg += "Warning: \'%s\' was captured using a snaplen of %d bytes.  This may mean you have truncated packets." % (os.path.basename(pcap), snaplen)
                 if snaplen == 1500:
                     warning_msg += "\n\nSome sandboxes (Bluecoat/Norman) will put a hardcoded snaplen of 1500 bytes\n"
-                    warning_msg += "on pcaps even when the packets are larger than 1500 bytes.  This can result in the sensor throwning away these\n"
+                    warning_msg += "on pcaps even when the packets are larger than 1500 bytes.  This can result in the sensor throwing away these\n"
                     warning_msg += "packets and not inspecting them.  If this is the case, try saving the file in Wireshark in pcapng format, opening up\n"
                     warning_msg += "that pcapng file in Wireshark, and saving it as a libpcap file. This should set the snaplen to 65535."
                 warning_msg += "\n\nThis is just a warning message about the pcap. The job ran successfully and the generated alerts as well as other\n"
