@@ -392,7 +392,7 @@ number of user-configurable options:
         "Alert Details" tab on the job results page. Information returned
         includes hex/ASCII output from packets that generated alerts as
         well as "Extra" data from the unified2 file such as "Original
-        Client IP" from packets with "X-Forwared-For" or "True-Client-IP"
+        Client IP" from packets with "X-Forwarded-For" or "True-Client-IP"
         HTTP headers (if enable\_xff is configured on the sensor).
         Note that Suricata version 6 and later does not support unified2
         output so this option is unavailable for jobs to such agents.
