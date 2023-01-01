@@ -98,7 +98,7 @@ if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
 
 #connect to the datastore
 try:
-    # redis values are retured as byte objects by default. Automatically
+    # redis values are returned as byte objects by default. Automatically
     # decode them to utf-8.
     r = redis.Redis(REDIS_HOST, charset="utf-8", decode_responses=True)
 except Exception as e:
