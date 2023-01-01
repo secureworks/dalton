@@ -993,7 +993,7 @@ def run_suricata_sc():
 
     # pcap files submitted (non blocking, they get queued); wait until done
     # note that "pcap-file-number" command returns the number in the queue, and
-    # does not inlude the current pcap being processed, so wait until that
+    # does not include the current pcap being processed, so wait until that
     # ("pcap-current") is None.
     # TODO: check for timeout/infinite loop?
     files_remaining = 1
