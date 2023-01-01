@@ -1455,7 +1455,7 @@ def page_coverage_summary():
             pass
 
         # used to tell the agent to return pcap data from alerts.
-        #   This is only supported (for now) for agents that generage/process unified2 alerts
+        #   This is only supported (for now) for agents that generate/process unified2 alerts
         #   and return pcap details from them.
         bGetAlertDetailed = False
         try:
