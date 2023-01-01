@@ -1,7 +1,7 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
     {% if eve_json != "" %}
-        // default syntax highlighting limit (bytes); if lengh greater than this, don't highlight by default.
+        // default syntax highlighting limit (bytes); if length greater than this, don't highlight by default.
         var highlightThreshold = 1048576
 
         var eveJSON = JSON.parse('[' + {{eve_json|tojson}}.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
