@@ -1097,7 +1097,7 @@ def page_show_job(jid):
 def clean_filename(filename):
     return re.sub(r"[^a-zA-Z0-9\_\-\.]", "_", filename)
 
-# handle duplicate filenames (e.g. same pcap sumbitted more than once)
+# handle duplicate filenames (e.g. same pcap submitted more than once)
 #  by renaming pcaps with same name
 def handle_dup_names(filename, pcap_files, job_id, dupcount):
     for pcap in pcap_files:
@@ -1365,7 +1365,7 @@ def page_coverage_summary():
             filename = clean_filename(filename)
             if os.path.splitext(filename)[1] != '.pcap':
                     filename = f"{filename}.pcap"
-            # handle duplicate filenames (e.g. same pcap sumbitted more than once)
+            # handle duplicate filenames (e.g. same pcap submitted more than once)
             filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
             pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
             pcap_files.append({'filename': filename, 'pcappath': pcappath})
@@ -1387,7 +1387,7 @@ def page_coverage_summary():
                 return render_template('/dalton/error.html', jid=job_id, msg=["No mergecap binary found on Dalton Controller.", "Unable to process multiple pcaps for this Suricata job."])
             combined_file = "%s/combined-%s.pcap" % (os.path.join(TEMP_STORAGE_PATH, job_id), job_id)
             mergecap_command = f"{MERGECAP_BINARY} -w {combined_file} -a -F pcap {' '.join([p['pcappath'] for p in pcap_files])}"
-            logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s", ', '.join([p['filename'] for p in pcap_files]))
+            logger.debug("Multiple pcap files submitted to Suricata, combining the following into one file:  %s", ', '.join([p['filename'] for p in pcap_files]))
             try:
                 # validation on pcap filenames done above; otherwise OS command injection here
                 mergecap_output = subprocess.Popen(mergecap_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
