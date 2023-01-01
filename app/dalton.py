@@ -1535,7 +1535,7 @@ def page_coverage_summary():
                 if (len(line) > 0) and not re.search(r'^[\x00-\x7F]+$', line):
                     fh.close()
                     delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid='', msg=["Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules.", "Please encode necesary non-ASCII characters appropriately.  Rule:", f"{line}"])
+                    return render_template('/dalton/error.html', jid='', msg=["Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules.", "Please encode necessary non-ASCII characters appropriately.  Rule:", f"{line}"])
                 # some rule validation for Snort and Suricata
                 if sensor_tech.startswith('snort') or sensor_tech.startswith('suri'):
                     # rule must start with alert|log|pass|activate|dynamic|drop|reject|sdrop
