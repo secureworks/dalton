@@ -1443,7 +1443,7 @@ def page_coverage_summary():
             pass
 
         # A 'teapot' job is one that shouldn't be stored for a long period of time; it can be used by
-        #   functionality that programatically analyzes a rule and/or other situations
+        #   functionality that programmatically analyzes a rule and/or other situations
         #   where the submission data shouldn't be stored for long periods of time (e.g. over an hour).
         #   'teapot' is not an acronym. It's for job runs that are short and stout.
         bteapotJob = False
