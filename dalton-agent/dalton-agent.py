@@ -1096,7 +1096,7 @@ def process_other_logs(other_logs):
                 all_other_logs[log_name] = log_fh.read()
                 log_fh.close()
                 if all_other_logs[log_name] == "":
-                    print_debug("log \"%s\" is empty, not inclding" % log_name)
+                    print_debug("log \"%s\" is empty, not including" % log_name)
                     del all_other_logs[log_name]
             else:
                 print_debug("Requested log file \'%s\' not present, skipping." % other_logs[log_name])
