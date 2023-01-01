@@ -920,7 +920,7 @@ def page_coverage_jid(jid, error=None):
                     if tech not in sensors:
                         sensors.append(tech)
             except Exception as e:
-                return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
+                return render_template('/dalton/error.html', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
         try:
             # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
             #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
@@ -984,7 +984,7 @@ def page_coverage_default(sensor_tech, error=None):
                     if tech not in sensors:
                         sensors.append(tech)
             except Exception as e:
-                return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
+                return render_template('/dalton/error.html', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
         try:
             # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
             #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
