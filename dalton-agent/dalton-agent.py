@@ -1659,7 +1659,7 @@ while True:
     except DaltonError as e:
         logger.debug("DaltonError caught (in while True loop):\n%s" % e)
     except Exception as e:
-        logger.debug("General Dalton Agent exeption caught. Error:\n%s\n%s" % (e, traceback.format_exc()))
+        logger.debug("General Dalton Agent exception caught. Error:\n%s\n%s" % (e, traceback.format_exc()))
         if JOB_ID:
             # unexpected error happened on agent when trying to process a job but there may not be job data so compile an empty response with the exception error message and try to send it
             logger.warn("Possible communication error processing jobid %s.  Attempting to send error message to controller." % JOB_ID)
