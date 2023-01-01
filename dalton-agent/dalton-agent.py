@@ -186,7 +186,7 @@ def get_engine_version(path):
         elif "zeek" in output.decode('utf-8'):
             engine = "zeek"
         else:
-            # use filenname of binary
+            # use filename of binary
             engine = os.path.basename(path).lower()
             logger.warn("Could not determine engine name, using '%s' from IDS_BINARY path" % engine)
 
