@@ -1021,7 +1021,7 @@ Example Suricata 4.0.2 specification:
         restart: always
 
 Rust support was added in Suricata 4.0 but is optional.  Starting with Suricata 5.0.0,
-Rust is manditory.  To turn on Rust support for a Suricata 4.x Agent, set the
+Rust is mandatory.  To turn on Rust support for a Suricata 4.x Agent, set the
 ``ENABLE_RUST`` arg in the docker-compose file to ``--enable-rust`` for that
 particular Agent specification (see below example).  Suricata 4.x Agents that have
 Rust support will show up in the Web UI alongside the string, "with Rust support".
