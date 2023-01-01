@@ -439,7 +439,7 @@ def get_engine_conf_file(sensor):
         custom_config = None
         try:
             # if custom config used
-            # 'sensor' varible format example: suricata/5.0.0/mycustomfilename
+            # 'sensor' variable format example: suricata/5.0.0/mycustomfilename
             (engine, version, custom_config) = sensor.split('/', 2)
             epath = os.path.join(CONF_STORAGE_PATH, clean_path(engine))
             if os.path.isfile(os.path.join(epath, "%s" % custom_config)):
