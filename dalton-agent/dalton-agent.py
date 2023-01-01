@@ -539,7 +539,7 @@ class SocketController:
                     self.log_offset = suri_output_fh.tell()
                     break
                 if "<Error>" in line:
-                    # submit_job() erorrs out before JOB_IDS_LOG is copied so
+                    # submit_job() errors out before JOB_IDS_LOG is copied so
                     # copy over output log to JOB_IDS_LOG here so it gets returned
                     shutil.copyfile(suricata_logging_outputs_file, JOB_IDS_LOG)
                     self.suricata_is_running = False
