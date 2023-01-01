@@ -64,7 +64,7 @@ suricata_sc_pid_file = "/usr/local/var/run/suricata.pid"
 
 
 #*********************************
-#*** Parse Comand Line Options ***
+#*** Parse Command Line Options ***
 #*********************************
 parser = OptionParser()
 parser.add_option("-c", "--config",
