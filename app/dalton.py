@@ -348,7 +348,7 @@ def check_for_timeout(jobid):
 
 @dalton_blueprint.route('/dalton/controller_api/delete-old-job-files', methods=['GET'])
 def delete_old_job_files():
-    """Deletes job files on disk if modificaiton time exceeds expire time(s)"""
+    """Deletes job files on disk if modification time exceeds expire time(s)"""
     global REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, JOB_STORAGE_PATH, logger
     total_deleted = 0
 
