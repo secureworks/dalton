@@ -1078,7 +1078,7 @@ def process_eve_log():
 
 def process_other_logs(other_logs):
     """
-    Takes a dictionary of Display Name, filename pairs for logs in the IDS_LOG_DIRECTORY and poulates
+    Takes a dictionary of Display Name, filename pairs for logs in the IDS_LOG_DIRECTORY and populates
     the JOB_OTHER_LOGS with a dictionary containing the Display Name and file contents.
     """
     print_debug("process_other_logs() called")
