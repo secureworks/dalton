@@ -1159,7 +1159,7 @@ and place a file with the same name on the Controller in the
 ``engine-configs/suricata/`` directory (for Suricata) or
 ``engine-configs/snort/``  directory (for Snort).  If the ``SENSOR_CONFIG`` value
 does not exactly match a config file on the Controller, the Controller
-will look for filesnames with the SENSOR_CONFIG value and extensions ".yaml", ".yml",
+will look for filenames with the SENSOR_CONFIG value and extensions ".yaml", ".yml",
 and ".conf".
 
 For new Suricata releases, the ``.yaml`` file from source should just 
