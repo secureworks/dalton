@@ -338,7 +338,7 @@ number of user-configurable options:
      zip and tar files can contain multiple files, for those formats only
      members that have the ".pcap", ".pcapng", or ".cap" extensions will
      be included; the other files will be ignored. Password protected zip
-     files will be attempted to be decrypted with the passsword 'infected'.
+     files will be attempted to be decrypted with the password 'infected'.
 
    | If multiple pcaps are submitted for a Suricata job, they will be 
      combined into a single pcap on job submission since (older versions of) Suricata can
