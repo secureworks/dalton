@@ -1416,7 +1416,7 @@ def page_coverage_summary():
         if request.form.get('optionProdRuleset') and request.form.get('optionEnableAllRules'):
             bEnableAllRules = True
 
-        # get showFlobitAlerts option
+        # get showFlowbitAlerts option
         bShowFlowbitAlerts = False
         if request.form.get('optionProdRuleset') and request.form.get('optionShowFlowbitAlerts'):
             bShowFlowbitAlerts = True
