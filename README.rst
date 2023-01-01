@@ -570,12 +570,12 @@ page or directly downloaded using the following URL::
 Sensors
 =======
 
-Agents (a.k.a. "Sensors") check in to the Dalton server frequently
+Agents (a.k.a. "Sensors") check into the Dalton server frequently
 (about every second but configurable in the ``dalton-agent.conf`` file). The 
 last time an agent checked in can be viewed on the ``Sensors`` page. Agents
 that have not checked in recently will be pruned based on the 
 ``agent_purge_time`` value in the ``dalton.conf`` config file. When an
-expired or new agent checks in to the Dalton Controller it will be
+expired or new agent checks into the Dalton Controller it will be
 automatically (re)added and made available for job submissions.
 
 Dalton API
@@ -1115,7 +1115,7 @@ Adding Sensor Configs
 =====================
 
 Sensor configuration files (e.g. ``suricata.yaml`` or ``snort.conf``) are 
-stored on the Dalton Controller.  When a sensor checks in to the Controller, 
+stored on the Dalton Controller.  When a sensor checks into the Controller, 
 it is registered in Redis and when that sensor is selected for a Dalton job, 
 the corresponding config file is loaded, populated under the ``Config Files`` vertical tab 
 in the Web UI, and submitted with the Dalton job.
@@ -1294,7 +1294,7 @@ Frequently Asked Questions
    | In this context those terms, for the most part, mean the same thing.
      Technically, you can think of "engine" as the IDS engine, in this
      case Suricata or Snort; "sensor" as the system running the engine; and
-     "agent" as a specific system running the Dalton Agent code and checking in to
+     "agent" as a specific system running the Dalton Agent code and checking into
      the Dalton Controller.  "Sensor" and "Agent" are very often used
      interchangeably.
 

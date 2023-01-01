@@ -482,7 +482,7 @@ def get_engine_conf_file(sensor):
             # Unix newline is \n but for display on web page, \r\n is desired in some
             # browsers/OSes.  Note: currently not converted back on job submit.
             with open(conf_file, 'r') as fh:
-                # want to parse each line so put it in to a list
+                # want to parse each line so put it into a list
                 contents = fh.readlines()
             logger.debug("Loading config file %s", conf_file)
 
