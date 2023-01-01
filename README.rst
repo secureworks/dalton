@@ -437,7 +437,7 @@ number of user-configurable options:
            line represents the HTTP request and response all in one.
       -  | **DNS Log**
          | A log of DNS requests and responses as provided by Suricata.
-           This won't be availble if Suricata is compiled with Rust support
+           This won't be available if Suricata is compiled with Rust support
            or if the version of Suricata is 5.0 or later.
       -  | **TLS Log**
          | A log of SSL/TLS traffic as provided by Suricata.
