@@ -290,7 +290,7 @@
 			<form id='submitjob' action="/dalton/coverage/summary" method="post" enctype="multipart/form-data">
 				<h2>
 				Submit A New Job for <b id="versionHeading">
-                <!-- set by Javascript updateHeading(); this doesn't really matter -->
+                <!-- set by JavaScript updateHeading(); this doesn't really matter -->
                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
                     {% set sensor = sensors[0].split('/') %}
                     {% if sensor|length > 1 %}
