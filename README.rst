@@ -889,8 +889,14 @@ provided here but can be easily obtained by making the request in a web browser.
      is returned.
 
 
-Submit Job API
---------------
+Dalton API Client
+-----------------
+
+An API Client has been added in ``api/dalton.py`` that performs API calls with Python requests. 
+The client is limited to GET and POST requests.
+
+Submit Job using the API
+------------------------
 
 There is an option to programmatically submit jobs using HTTP POST requests. 
 The endpoint to submit a job is ``/dalton/coverage/summary``. 
@@ -925,7 +931,7 @@ Other useful arguments to submit a job are:
 - ``custom_rules`` in which you may include the custom rules you may want to test with your job,
 - ``optionAlertDetailed``, ``optionEveLog``, ``optionOtherLogs``: this can be set to ``True`` if you want to generate additional logs with your job.
 
-An example script can be found in ``examples/submit_job.py``.
+An example script can be found in ``api/examples/submit_job.py``.
 
 Teapot Jobs
 ===========
