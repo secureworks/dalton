@@ -18,10 +18,7 @@ configuration = conf.read()
 cust = open(f"{CURRENT_PATH}/api/examples/mocks/custom_rules.rules", "r")
 custom_rules = cust.read()
 
-# not sure if I should use this
-# response = requests.get(f"{DALTON_URL}/dalton/controller_api/get-current-sensors-json-full")
-# sample response text: '{"e1661859b3cb4449bf7be8000d9d016f": {"uid": "8a204e8152b4", "ip": "172.19.0.2", "time": "Feb 28 21:39:38 (0 minutes ago)", "tech": "suricata/6.0.8/suricata-cyberadapt.yaml", "agent_version": "3.1.1"}}'
-
+# get rulesets and sensor techs to use in job submission parameters
 dalton_rulesets = dalton_client.get_prod_rulesets(SENSOR_NAME)
 dalton_sensor_techs = dalton_client.get_sensor_tech(SENSOR_NAME)
 
