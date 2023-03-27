@@ -4,7 +4,7 @@ Flask-Assets==0.12
 Flask-Script==2.0.6
 Flask-Caching==1.8.0
 Flask-Compress==1.4.0
-redis==2.10.6
+redis==4.5.3
 ruamel.yaml==0.16.12
 idstools==0.6.4
 flowsynth>=1.4.1
