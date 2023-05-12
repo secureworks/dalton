@@ -19,7 +19,7 @@ Dalton Agent - runs on IDS engine; receives jobs, runs them, and reports results
 """
 #
 # Note: originally written to run on Python 2.4 and up without the need for
-# non-standard libararies so that is why some things are written the way
+# non-standard libraries so that is why some things are written the way
 # they are. This is especially noticeable (painful?) with the use of urllib2
 # instead of urllib3 or Requests.
 #
@@ -64,7 +64,7 @@ suricata_sc_pid_file = "/usr/local/var/run/suricata.pid"
 
 
 #*********************************
-#*** Parse Comand Line Options ***
+#*** Parse Command Line Options ***
 #*********************************
 parser = OptionParser()
 parser.add_option("-c", "--config",
@@ -186,7 +186,7 @@ def get_engine_version(path):
         elif "zeek" in output.decode('utf-8'):
             engine = "zeek"
         else:
-            # use filenname of binary
+            # use filename of binary
             engine = os.path.basename(path).lower()
             logger.warn("Could not determine engine name, using '%s' from IDS_BINARY path" % engine)
 
@@ -211,7 +211,7 @@ def get_engine_version(path):
     return (engine, version)
 
 def hash_file(filenames):
-    """Returns md5sum of pased in file. If a list of files is passed,
+    """Returns md5sum of passed in file. If a list of files is passed,
        they are concatenated together and hashed.
        Remove "default-rule-path" from Suricata config since this
        changes every job.
@@ -539,7 +539,7 @@ class SocketController:
                     self.log_offset = suri_output_fh.tell()
                     break
                 if "<Error>" in line:
-                    # submit_job() erorrs out before JOB_IDS_LOG is copied so
+                    # submit_job() errors out before JOB_IDS_LOG is copied so
                     # copy over output log to JOB_IDS_LOG here so it gets returned
                     shutil.copyfile(suricata_logging_outputs_file, JOB_IDS_LOG)
                     self.suricata_is_running = False
@@ -895,7 +895,7 @@ def check_pcaps():
                 warning_msg += "Warning: \'%s\' was captured using a snaplen of %d bytes.  This may mean you have truncated packets." % (os.path.basename(pcap), snaplen)
                 if snaplen == 1500:
                     warning_msg += "\n\nSome sandboxes (Bluecoat/Norman) will put a hardcoded snaplen of 1500 bytes\n"
-                    warning_msg += "on pcaps even when the packets are larger than 1500 bytes.  This can result in the sensor throwning away these\n"
+                    warning_msg += "on pcaps even when the packets are larger than 1500 bytes.  This can result in the sensor throwing away these\n"
                     warning_msg += "packets and not inspecting them.  If this is the case, try saving the file in Wireshark in pcapng format, opening up\n"
                     warning_msg += "that pcapng file in Wireshark, and saving it as a libpcap file. This should set the snaplen to 65535."
                 warning_msg += "\n\nThis is just a warning message about the pcap. The job ran successfully and the generated alerts as well as other\n"
@@ -993,7 +993,7 @@ def run_suricata_sc():
 
     # pcap files submitted (non blocking, they get queued); wait until done
     # note that "pcap-file-number" command returns the number in the queue, and
-    # does not inlude the current pcap being processed, so wait until that
+    # does not include the current pcap being processed, so wait until that
     # ("pcap-current") is None.
     # TODO: check for timeout/infinite loop?
     files_remaining = 1
@@ -1078,8 +1078,8 @@ def process_eve_log():
 
 def process_other_logs(other_logs):
     """
-    Takes a dictionary of Display Name, filename pairs for logs in the IDS_LOG_DIRECTORY and poulates
-    the JOB_OTHER_LOGS with a dictonary containing the Display Name and file contents.
+    Takes a dictionary of Display Name, filename pairs for logs in the IDS_LOG_DIRECTORY and populates
+    the JOB_OTHER_LOGS with a dictionary containing the Display Name and file contents.
     """
     print_debug("process_other_logs() called")
     print_msg("Processing other logs")
@@ -1096,7 +1096,7 @@ def process_other_logs(other_logs):
                 all_other_logs[log_name] = log_fh.read()
                 log_fh.close()
                 if all_other_logs[log_name] == "":
-                    print_debug("log \"%s\" is empty, not inclding" % log_name)
+                    print_debug("log \"%s\" is empty, not including" % log_name)
                     del all_other_logs[log_name]
             else:
                 print_debug("Requested log file \'%s\' not present, skipping." % other_logs[log_name])
@@ -1659,7 +1659,7 @@ while True:
     except DaltonError as e:
         logger.debug("DaltonError caught (in while True loop):\n%s" % e)
     except Exception as e:
-        logger.debug("General Dalton Agent exeption caught. Error:\n%s\n%s" % (e, traceback.format_exc()))
+        logger.debug("General Dalton Agent exception caught. Error:\n%s\n%s" % (e, traceback.format_exc()))
         if JOB_ID:
             # unexpected error happened on agent when trying to process a job but there may not be job data so compile an empty response with the exception error message and try to send it
             logger.warn("Possible communication error processing jobid %s.  Attempting to send error message to controller." % JOB_ID)

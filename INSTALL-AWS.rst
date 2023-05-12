@@ -33,7 +33,7 @@ Notes
 
 Depending on how many Dalton Agents are running, rulesets, etc.:
 
-- More than 8GB of storage is likey needed; configure for at least 12GB but more is recommended.
+- More than 8GB of storage is likely needed; configure for at least 12GB but more is recommended.
 - 1GB memory will work (most of the time) but more is recommended; try at least twice that or more.
 
 The following were done using the Amazon Linux 2 AMI on a

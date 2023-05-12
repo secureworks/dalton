@@ -98,7 +98,7 @@ if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
 
 #connect to the datastore
 try:
-    # redis values are retured as byte objects by default. Automatically
+    # redis values are returned as byte objects by default. Automatically
     # decode them to utf-8.
     r = redis.Redis(REDIS_HOST, charset="utf-8", decode_responses=True)
 except Exception as e:
@@ -348,7 +348,7 @@ def check_for_timeout(jobid):
 
 @dalton_blueprint.route('/dalton/controller_api/delete-old-job-files', methods=['GET'])
 def delete_old_job_files():
-    """Deletes job files on disk if modificaiton time exceeds expire time(s)"""
+    """Deletes job files on disk if modification time exceeds expire time(s)"""
     global REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, JOB_STORAGE_PATH, logger
     total_deleted = 0
 
@@ -439,7 +439,7 @@ def get_engine_conf_file(sensor):
         custom_config = None
         try:
             # if custom config used
-            # 'sensor' varible format example: suricata/5.0.0/mycustomfilename
+            # 'sensor' variable format example: suricata/5.0.0/mycustomfilename
             (engine, version, custom_config) = sensor.split('/', 2)
             epath = os.path.join(CONF_STORAGE_PATH, clean_path(engine))
             if os.path.isfile(os.path.join(epath, "%s" % custom_config)):
@@ -482,7 +482,7 @@ def get_engine_conf_file(sensor):
             # Unix newline is \n but for display on web page, \r\n is desired in some
             # browsers/OSes.  Note: currently not converted back on job submit.
             with open(conf_file, 'r') as fh:
-                # want to parse each line so put it in to a list
+                # want to parse each line so put it into a list
                 contents = fh.readlines()
             logger.debug("Loading config file %s", conf_file)
 
@@ -576,7 +576,7 @@ def sensor_request_job():
     r.set(f"{SENSOR_HASH}-tech", sensor_tech)
     r.set(f"{SENSOR_HASH}-agent_version", AGENT_VERSION)
 
-    #grab a job! If it dosen't exist, return sleep.
+    #grab a job! If it doesn't exist, return sleep.
     response = r.lpop(sensor_tech)
     if (response == None):
         return "sleep"
@@ -920,7 +920,7 @@ def page_coverage_jid(jid, error=None):
                     if tech not in sensors:
                         sensors.append(tech)
             except Exception as e:
-                return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
+                return render_template('/dalton/error.html', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
         try:
             # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
             #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
@@ -984,7 +984,7 @@ def page_coverage_default(sensor_tech, error=None):
                     if tech not in sensors:
                         sensors.append(tech)
             except Exception as e:
-                return render_template('/dalton/error.hml', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
+                return render_template('/dalton/error.html', jid=None, msg="Error getting sensor list for %s.  Error:\n%s" % (tech, e))
         try:
             # May 2019 - DRW - I'd prefer that non-rust sensors of the same version get listed before
             #  rust enabled sensors so adding this extra sort. Can/should probably be removed in year or two.
@@ -1097,7 +1097,7 @@ def page_show_job(jid):
 def clean_filename(filename):
     return re.sub(r"[^a-zA-Z0-9\_\-\.]", "_", filename)
 
-# handle duplicate filenames (e.g. same pcap sumbitted more than once)
+# handle duplicate filenames (e.g. same pcap submitted more than once)
 #  by renaming pcaps with same name
 def handle_dup_names(filename, pcap_files, job_id, dupcount):
     for pcap in pcap_files:
@@ -1365,7 +1365,7 @@ def page_coverage_summary():
             filename = clean_filename(filename)
             if os.path.splitext(filename)[1] != '.pcap':
                     filename = f"{filename}.pcap"
-            # handle duplicate filenames (e.g. same pcap sumbitted more than once)
+            # handle duplicate filenames (e.g. same pcap submitted more than once)
             filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
             pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
             pcap_files.append({'filename': filename, 'pcappath': pcappath})
@@ -1387,7 +1387,7 @@ def page_coverage_summary():
                 return render_template('/dalton/error.html', jid=job_id, msg=["No mergecap binary found on Dalton Controller.", "Unable to process multiple pcaps for this Suricata job."])
             combined_file = "%s/combined-%s.pcap" % (os.path.join(TEMP_STORAGE_PATH, job_id), job_id)
             mergecap_command = f"{MERGECAP_BINARY} -w {combined_file} -a -F pcap {' '.join([p['pcappath'] for p in pcap_files])}"
-            logger.debug("Multiple pcap files sumitted to Suricata, combining the following into one file:  %s", ', '.join([p['filename'] for p in pcap_files]))
+            logger.debug("Multiple pcap files submitted to Suricata, combining the following into one file:  %s", ', '.join([p['filename'] for p in pcap_files]))
             try:
                 # validation on pcap filenames done above; otherwise OS command injection here
                 mergecap_output = subprocess.Popen(mergecap_command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE).stdout.read()
@@ -1416,7 +1416,7 @@ def page_coverage_summary():
         if request.form.get('optionProdRuleset') and request.form.get('optionEnableAllRules'):
             bEnableAllRules = True
 
-        # get showFlobitAlerts option
+        # get showFlowbitAlerts option
         bShowFlowbitAlerts = False
         if request.form.get('optionProdRuleset') and request.form.get('optionShowFlowbitAlerts'):
             bShowFlowbitAlerts = True
@@ -1443,7 +1443,7 @@ def page_coverage_summary():
             pass
 
         # A 'teapot' job is one that shouldn't be stored for a long period of time; it can be used by
-        #   functionality that programatically analyzes a rule and/or other situations
+        #   functionality that programmatically analyzes a rule and/or other situations
         #   where the submission data shouldn't be stored for long periods of time (e.g. over an hour).
         #   'teapot' is not an acronym. It's for job runs that are short and stout.
         bteapotJob = False
@@ -1455,7 +1455,7 @@ def page_coverage_summary():
             pass
 
         # used to tell the agent to return pcap data from alerts.
-        #   This is only supported (for now) for agents that generage/process unified2 alerts
+        #   This is only supported (for now) for agents that generate/process unified2 alerts
         #   and return pcap details from them.
         bGetAlertDetailed = False
         try:
@@ -1535,7 +1535,7 @@ def page_coverage_summary():
                 if (len(line) > 0) and not re.search(r'^[\x00-\x7F]+$', line):
                     fh.close()
                     delete_temp_files(job_id)
-                    return render_template('/dalton/error.html', jid='', msg=["Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules.", "Please encode necesary non-ASCII characters appropriately.  Rule:", f"{line}"])
+                    return render_template('/dalton/error.html', jid='', msg=["Invalid rule. Only ASCII characters are allowed in the literal representation of custom rules.", "Please encode necessary non-ASCII characters appropriately.  Rule:", f"{line}"])
                 # some rule validation for Snort and Suricata
                 if sensor_tech.startswith('snort') or sensor_tech.startswith('suri'):
                     # rule must start with alert|log|pass|activate|dynamic|drop|reject|sdrop
@@ -2160,7 +2160,7 @@ def page_queue_default():
             #  the most recent num_jobs_to_show jobs
             # do some cleanup on the list to remove jobs where the data has expired (been deleted).
             # Using 'jid-submission_time' and jid=status as tests -- if these don't exist the other keys associated
-            # with that jid should be exipred or will expire shortly.  That key gets set to expire
+            # with that jid should be expired or will expire shortly.  That key gets set to expire
             # after a job is requested/sent to a sensor so we won't clear out queued jobs.
             if not r.exists("%s-submission_time" % jid) or not r.exists("%s-status" % jid):
                 # job has expired

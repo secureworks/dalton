@@ -1,8 +1,8 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
     {% if eve_json != "" %}
-        // default syntax hilighting limit (bytes); if lengh greater than this, don't hilight by default.
-        var hilightThreshold = 1048576
+        // default syntax highlighting limit (bytes); if length greater than this, don't highlight by default.
+        var highlightThreshold = 1048576
 
         var eveJSON = JSON.parse('[' + {{eve_json|tojson}}.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
         var eventTypeFilters = [];
@@ -13,7 +13,7 @@
 
     $(document).ready(function() {
         {% if eve_json != "" %}
-            if ({{eve_json|length}} > hilightThreshold) {
+            if ({{eve_json|length}} > highlightThreshold) {
                 console.log("EVE log is " + {{eve_json|length}} + " bytes (" + eveJSON.length + " lines). Turning off syntax highlighting by default.");
                 document.getElementById("colorize").checked = false;
             } else {

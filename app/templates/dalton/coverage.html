@@ -190,7 +190,7 @@
                         || vals2.includes(NaN)
                         || vals1.length == 0
                         || vals2.length == 0) {
-                      throw "provided version is not a nubmer.";
+                      throw "provided version is not a number.";
                     }
                     while (vals1.length > vals2.length) {
                       vals2.push(0);
@@ -281,7 +281,7 @@
 {% block body %}
 	{% if error != None %}
 		<div class="alert alert-error">
-			<b>An error occured:&nbsp;</b>{{error}}
+			<b>An error occurred:&nbsp;</b>{{error}}
 		</div>
 	{% endif %}
 
@@ -290,7 +290,7 @@
 			<form id='submitjob' action="/dalton/coverage/summary" method="post" enctype="multipart/form-data">
 				<h2>
 				Submit A New Job for <b id="versionHeading">
-                <!-- set by Javascript updateHeading(); this doesn't really matter -->
+                <!-- set by JavaScript updateHeading(); this doesn't really matter -->
                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
                     {% set sensor = sensors[0].split('/') %}
                     {% if sensor|length > 1 %}
@@ -355,7 +355,7 @@
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Sensor Version</div>
                                 {% if sensors != None and sensors != '' and sensors|length > 0 %}
                                     {% for sensor in sensors %}
-                                        <!-- TODO: make this a grid insead of a list -->
+                                        <!-- TODO: make this a grid instead of a list -->
                                         {% if manifest and manifest['sensor-tech'] == sensor %}
                                             <input type="radio" name="sensor_tech" id="{{sensor}}" value="{{sensor}}" checked><label for="{{sensor}}" class="radio inline">
                                         {% else %}

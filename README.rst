@@ -338,14 +338,14 @@ number of user-configurable options:
      zip and tar files can contain multiple files, for those formats only
      members that have the ".pcap", ".pcapng", or ".cap" extensions will
      be included; the other files will be ignored. Password protected zip
-     files will be attempted to be decrypted with the passsword 'infected'.
+     files will be attempted to be decrypted with the password 'infected'.
 
    | If multiple pcaps are submitted for a Suricata job, they will be 
      combined into a single pcap on job submission since (older versions of) Suricata can
      only read a single pcap in read pcap mode.
 
    -  | **Create separate jobs for each pcap**
-      | If selected, each pcap file sumitted (or found in an archive) will be
+      | If selected, each pcap file submitted (or found in an archive) will be
         submitted as its own job.  When all the jobs are submitted, Dalton will
         redirect the user to the Queue page.  If this is a `Teapot job <#teapot-jobs>`__,
         then a comma separated list of JIDs is returned.
@@ -392,7 +392,7 @@ number of user-configurable options:
         "Alert Details" tab on the job results page. Information returned
         includes hex/ASCII output from packets that generated alerts as
         well as "Extra" data from the unified2 file such as "Original
-        Client IP" from packets with "X-Forwared-For" or "True-Client-IP"
+        Client IP" from packets with "X-Forwarded-For" or "True-Client-IP"
         HTTP headers (if enable\_xff is configured on the sensor).
         Note that Suricata version 6 and later does not support unified2
         output so this option is unavailable for jobs to such agents.
@@ -437,7 +437,7 @@ number of user-configurable options:
            line represents the HTTP request and response all in one.
       -  | **DNS Log**
          | A log of DNS requests and responses as provided by Suricata.
-           This won't be availble if Suricata is compiled with Rust support
+           This won't be available if Suricata is compiled with Rust support
            or if the version of Suricata is 5.0 or later.
       -  | **TLS Log**
          | A log of SSL/TLS traffic as provided by Suricata.
@@ -570,12 +570,12 @@ page or directly downloaded using the following URL::
 Sensors
 =======
 
-Agents (a.k.a. "Sensors") check in to the Dalton server frequently
+Agents (a.k.a. "Sensors") check into the Dalton server frequently
 (about every second but configurable in the ``dalton-agent.conf`` file). The 
 last time an agent checked in can be viewed on the ``Sensors`` page. Agents
 that have not checked in recently will be pruned based on the 
 ``agent_purge_time`` value in the ``dalton.conf`` config file. When an
-expired or new agent checks in to the Dalton Controller it will be
+expired or new agent checks into the Dalton Controller it will be
 automatically (re)added and made available for job submissions.
 
 Dalton API
@@ -1066,7 +1066,7 @@ Example Suricata 4.0.2 specification:
         restart: always
 
 Rust support was added in Suricata 4.0 but is optional.  Starting with Suricata 5.0.0,
-Rust is manditory.  To turn on Rust support for a Suricata 4.x Agent, set the
+Rust is mandatory.  To turn on Rust support for a Suricata 4.x Agent, set the
 ``ENABLE_RUST`` arg in the docker-compose file to ``--enable-rust`` for that
 particular Agent specification (see below example).  Suricata 4.x Agents that have
 Rust support will show up in the Web UI alongside the string, "with Rust support".
@@ -1160,7 +1160,7 @@ Adding Sensor Configs
 =====================
 
 Sensor configuration files (e.g. ``suricata.yaml`` or ``snort.conf``) are 
-stored on the Dalton Controller.  When a sensor checks in to the Controller, 
+stored on the Dalton Controller.  When a sensor checks into the Controller, 
 it is registered in Redis and when that sensor is selected for a Dalton job, 
 the corresponding config file is loaded, populated under the ``Config Files`` vertical tab 
 in the Web UI, and submitted with the Dalton job.
@@ -1204,7 +1204,7 @@ and place a file with the same name on the Controller in the
 ``engine-configs/suricata/`` directory (for Suricata) or
 ``engine-configs/snort/``  directory (for Snort).  If the ``SENSOR_CONFIG`` value
 does not exactly match a config file on the Controller, the Controller
-will look for filesnames with the SENSOR_CONFIG value and extensions ".yaml", ".yml",
+will look for filenames with the SENSOR_CONFIG value and extensions ".yaml", ".yml",
 and ".conf".
 
 For new Suricata releases, the ``.yaml`` file from source should just 
@@ -1339,7 +1339,7 @@ Frequently Asked Questions
    | In this context those terms, for the most part, mean the same thing.
      Technically, you can think of "engine" as the IDS engine, in this
      case Suricata or Snort; "sensor" as the system running the engine; and
-     "agent" as a specific system running the Dalton Agent code and checking in to
+     "agent" as a specific system running the Dalton Agent code and checking into
      the Dalton Controller.  "Sensor" and "Agent" are very often used
      interchangeably.
 
