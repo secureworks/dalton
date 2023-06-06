@@ -538,7 +538,7 @@ class SocketController:
                 if "engine started" in line.lower():
                     self.log_offset = suri_output_fh.tell()
                     break
-                if "<Error>" in line:
+                if "<Error>" in line or "Error: " in line:
                     # submit_job() errors out before JOB_IDS_LOG is copied so
                     # copy over output log to JOB_IDS_LOG here so it gets returned
                     shutil.copyfile(suricata_logging_outputs_file, JOB_IDS_LOG)
@@ -1114,7 +1114,7 @@ def check_for_errors(tech):
         ids_log_fh = open(JOB_IDS_LOG, "r")
         for line in ids_log_fh:
             if tech.startswith('suri'):
-                if ("<Error>" in line or line.startswith("ERROR") or line.startswith("Failed to parse configuration file")):
+                if ("<Error>" in line or "Error: " in line or line.startswith("ERROR") or line.startswith("Error: ") or line.startswith("Failed to parse configuration file")):
                     error_lines.append(line)
                     if "bad dump file format" in line or "unknown file format" in line:
                         error_lines.append("Bad pcap file(s) submitted to Suricata. Pcap files should be in libpcap format (pcapng is not supported in older Suricata versions).\n")
