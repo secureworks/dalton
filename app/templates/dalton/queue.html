@@ -24,6 +24,7 @@
                 <tr>
                     <th>Job ID</th>
                   <!--  <th>User</th> -->
+                    <th>Alert Count</th>
                     <th>Queue</th>
         		    <th>Submission Time</th>
                     <th>Status</th>
@@ -33,12 +34,19 @@
 				<td><a href="/dalton/job/{{job.jid}}">{{ job.jid }}</td>
               <!--  <td>{{ job.user }}</td> -->
 				<td>
-                {% set tlist = job.tech.split('-') %}
+                    {% if job.alert_count is number %}
+                        {{ job.alert_count|int }}
+                    {% else %}
+                        {{ job.alert_count }}
+                    {% endif %}
+                </td>
+				<td>
+                {% set tlist = job.tech.split('/') %}
                 {% if tlist|length > 1 %}
                     {% if tlist[1].startswith("rust_") %}
-                        {{tlist[0]|title}} {{tlist[1][5:]}}{% if tlist|length > 2 %}-{{tlist[2:]|join('-')}}{% endif %} (with Rust support)
+                        {{tlist[0]|title}} {{tlist[1][5:]}} ({% if tlist|length > 2 %}{{tlist[2]}} - {% endif %}with Rust support)
                     {% else %}
-                        {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+                        {{tlist[0]|title}} {{tlist[1]}}{% if tlist|length > 2 %} ({{tlist[2]}}){% endif %}
                     {% endif %}
                 {% else %}
                     {{job.tech|title}}

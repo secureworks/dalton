@@ -16,12 +16,12 @@
 			<tr>
 				<td>{{ data.uid }}</td>
 				<td>
-                {% set tlist = data.tech.split('-') %}
+                {% set tlist = data.tech.split('/') %}
                 {% if tlist|length > 1 %}
                     {% if tlist[1].startswith("rust_") %}
-                        {{tlist[0]|title}} {{tlist[1][5:]}}{% if tlist|length > 2 %}-{{tlist[2:]|join('-')}}{% endif %} (with Rust support)
+                        {{tlist[0]|title}} {{tlist[1][5:]}} ({% if tlist|length > 2 %}{{tlist[2]}} - {% endif %}with Rust support)
                     {% else %}
-                        {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+                        {{tlist[0]|title}} {{tlist[1]}}{% if tlist|length > 2 %} ({{tlist[2]}}){% endif %}
                     {% endif %}
                 {% else %}
                     {{data.tech|title}}

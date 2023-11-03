@@ -1,43 +1,51 @@
 {% extends "dalton/layout.html" %}
 {% block body %}
-    <script type='text/javascript'>
+<script type='text/javascript'>
 	var countdown = 1;
-        $(document).ready(function() {
-            $.ajaxSetup({ cache: false }); // This part addresses an IE bug.  without it, IE will only load the first number and will never refresh
-            setInterval(function() {
-		$.get('/dalton/controller_api/job_status/{{job_id}}', function(data){
-			if (data.indexOf("Click here") != -1) {
-				// job done
-				if (data.indexOf("ERROR") != -1) {
-					// error occurred, show countdown
-					$('#job-status').html(data);
-					$('#alt-message').html('(redirecting in ' + countdown + ' seconds)');
-					countdown--;
-					if (countdown <= 0) {
-						window.location = window.location.href;
-					}
-				} else {
-					<!-- job done, no error, redirect immediately to results page -->
-					$('#job-status').html("Redirecting...");
-					window.location = window.location.href;
-				}
-			} else {
-				$('#job-status').html(data);
-			}
-		});
-            }, 1000); <!-- time to refresh the div.  it is in milliseconds. -->
-        });
-    </script>
+    var doneDone = false;
+    $(document).ready(function() {
+        $.ajaxSetup({ cache: false });
+
+        (function update() {
+            $.get('/dalton/controller_api/job_status/{{job_id}}', function(data){
+               if (data.indexOf("Click here") != -1) {
+                    {# job done #}
+                    if (data.indexOf("ERROR") != -1) {
+                        $('#job-status').html(data);
+                        $('#alt-message').html('(redirecting in ' + countdown + ' seconds)');
+                        countdown--;
+                        if (countdown <= 0) {
+                            doneDone = true;
+                            window.location = window.location.href;
+                        }
+                    } else {
+                        <!-- job done, no error, redirect immediately to results page -->
+                        doneDone = true;
+                        $('#job-status').html("Redirecting...");
+                        window.location = window.location.href;
+                    }
+                    return;
+                } else {
+                    $('#job-status').html(data);
+                }
+            }).then(function() {
+                if (!Boolean(doneDone)) {
+                   setTimeout(update, 400);
+                }
+            });
+        })();
+    });
+</script>
     <div class="row">
         <div class="span9">
             <h2>
 		Status for job {{job_id}}
-        {% set tlist = tech.split('-') %}
+        {% set tlist = tech.split('/') %}
         {% if tlist|length > 1 %}
             {% if tlist[1].startswith("rust_") %}
-                {{tlist[0]|title}} {{tlist[1][5:]}}{% if tlist|length > 2 %}-{{tlist[2:]|join('-')}}{% endif %} (with Rust support)
+                {{tlist[0]|title}} {{tlist[1][5:]}} ({% if tlist|length > 2 %}{{tlist[2]}} - {% endif %}with Rust support)
             {% else %}
-                {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+                {{tlist[0]|title}} {{tlist[1]}}{% if tlist|length > 2 %} ({{tlist[2]}}){% endif %}
             {% endif %}
         {% else %}
             ({{tech|title}})

@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <title>Dalton</title>
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
 
     <link href="{{ url_for('static', filename='bootstrap/css/bootstrap.css') }}" rel="stylesheet" type="text/css">
     <link href="{{ url_for('static', filename='css/dalton.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='highlightjs/styles/json-light.css') }}" rel="stylesheet" type="text/css" id="json-css">
+    <script src="{{ url_for('static', filename='highlightjs/highlight.pack.js') }}"></script>
     <script src="{{ url_for('static', filename='bootstrap/js/jquery.js') }}"></script>
     <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.js') }}"></script>
     <style>
@@ -15,9 +20,13 @@
       }
     </style>
     <link href="{{ url_for('static', filename='bootstrap/css/bootstrap-responsive.css') }}" rel="stylesheet">
+
   </head>
 
   <body>
+    <div id="overlay" onclick="off()">
+      <div id="overlay-text">Drop PCAP to queue for upload</div>
+      </div>
   <div class="navbar navbar-fixed-top">
     <div class="navbar-inner">
       <div class="container span12">
@@ -45,6 +54,7 @@
                   <ul class="dropdown-menu">
                     <li><a href="/dalton/coverage/suricata/">Suricata Test</a></li>
                     <li><a href="/dalton/coverage/snort/">Snort Test</a></li>
+                    <li><a href="/dalton/coverage/zeek/">Zeek Test</a></li>
                   </ul>
                 </li>
                 {% if (request.url_rule|string).endswith("/queue") %}

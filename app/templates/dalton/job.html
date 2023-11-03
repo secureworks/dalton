@@ -1,15 +1,146 @@
 {% extends "dalton/layout.html" %}
+{% block js %}
+    {% if eve_json != "" %}
+        // default syntax highlighting limit (bytes); if length greater than this, don't highlight by default.
+        var highlightThreshold = 1048576
+
+        var eveJSON = JSON.parse('[' + {{eve_json|tojson}}.replace(/\r?\n/g, ',').replace(/,+$/,'') + ']');
+        var eventTypeFilters = [];
+        {% for event_type in event_types %}
+            eventTypeFilters.push("eve-{{event_type}}");
+        {% endfor %}
+    {% endif %}
+
+    $(document).ready(function() {
+        {% if eve_json != "" %}
+            if ({{eve_json|length}} > highlightThreshold) {
+                console.log("EVE log is " + {{eve_json|length}} + " bytes (" + eveJSON.length + " lines). Turning off syntax highlighting by default.");
+                document.getElementById("colorize").checked = false;
+            } else {
+                console.debug("EVE log is " + {{eve_json|length}} + " bytes (" + eveJSON.length + " lines).");
+            }
+
+            function renderEvePane() {
+                // identify what filters are checked
+                eventFilterEnable = []
+                for(i=0; i < eventTypeFilters.length; i++) {
+                    if ($('#' + eventTypeFilters[i]).prop('checked')) {
+                        eventFilterEnable.push(eventTypeFilters[i].replace(/^eve-/, ''));
+                    }
+                }
+                // build new array of JSON objects with EVE lines
+                newEveArray = [];
+                if (eventFilterEnable.length == eventTypeFilters.length) {
+                    newEveArray = eveJSON;
+                } else {
+                    for(i=0; i < eveJSON.length; i++) {
+                        if (eventFilterEnable.includes(eveJSON[i].event_type)) {
+                            newEveArray.push(eveJSON[i]);
+                        }
+                    }
+                }
+                // pretty print (or not), and update DOM
+                if ($('#formatEVE').prop('checked')) {
+                    document.getElementById("eve-json").textContent = JSON.stringify(newEveArray, null, 2);
+                } else {
+                    newEve = "["
+                    for(i=0; i < newEveArray.length; i++) {
+                        // stringify doesn't preserve escaping of forward slashes (e.g. "\/" in original is just "/")
+                        newEve += JSON.stringify(newEveArray[i]) + "\n";
+                    }
+                    if (newEve.length == 1) {
+                        newEve = "";
+                    } else {
+                        newEve = newEve.slice(0,-1) + ']';
+                    }
+                    document.getElementById("eve-json").textContent = newEve;
+                }
+                colorizeJSON();
+            }
+
+            function addEveFilterListener(myfilter) {
+                $('#' + myfilter).click( function() {
+                    renderEvePane();
+                });
+            }
+
+            $('#formatEVE').click( function() {
+                renderEvePane();
+            });
+
+            eventTypeFilters.forEach(addEveFilterListener);
+
+            renderEvePane();
+        {% endif %}
+
+        {% if eve_json != "" or zeek_json == "True" %}
+            $('#darkMode').click( function() {
+                if ($('#darkMode').prop('checked')) {
+                    document.getElementById("json-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/json-dark.css') }}");
+                } else {
+                    document.getElementById("json-css").setAttribute('href', "{{ url_for('static', filename='highlightjs/styles/json-light.css') }}");
+                }
+            });
+
+            function colorizeJSON() {
+                // apply syntax highlighting
+                jsonLogs = document.getElementsByClassName('hljs');
+                if ($('#colorize').prop('checked')) {
+                    for(i=0; i < jsonLogs.length; i++) {
+                        hljs.highlightBlock(jsonLogs[i]);
+                    }
+                }
+                else {
+                    for(i=0; i < jsonLogs.length; i++) {
+                        jsonLogs[i].innerHTML = jsonLogs[i].textContent;
+                    }
+                }
+            }
+
+            $('#colorize').click( function() {
+                colorizeJSON();
+            });
+        {% endif %}
+
+        {% if zeek_json == "True" %}
+            $('#formatZeekJSON').click( function() {
+                jsonLogs = document.getElementsByClassName('hljs');
+                if ($('#formatZeekJSON').prop('checked')) {
+                    for(i=0; i < jsonLogs.length; i++) {
+                        var jsonArray = [];
+                        var jsonRows = jsonLogs[i].textContent.split(/\r?\n/);
+                        jsonRows.pop();
+                        for(j=0; j < jsonRows.length; j++) {
+                            jsonArray.push(JSON.parse(jsonRows[j]));
+                        }
+                        jsonLogs[i].textContent = JSON.stringify(jsonArray, null, 2);
+                    }
+                }
+                else {
+                    for(i=0; i < jsonLogs.length; i++) {
+                        var jsonObj = JSON.parse(jsonLogs[i].textContent);
+                        jsonLogs[i].textContent = "";
+                        for(j=0; j < jsonObj.length; j++) {
+                            jsonLogs[i].textContent += JSON.stringify(jsonObj[j]) + '\n';
+                        }
+                    }
+                }
+                colorizeJSON();
+            });
+        {% endif %}
+    });
+{% endblock %}
 {% block body %}
     <div class="row">
         <div class="span11">
             <h2>
 		Report for {{jobid}}
-        {% set tlist = tech.split('-') %}
+        {% set tlist = tech.split('/') %}
         {% if tlist|length > 1 %}
             {% if tlist[1].startswith("rust_") %}
-                {{tlist[0]|title}} {{tlist[1][5:]}}{% if tlist|length > 2 %}-{{tlist[2:]|join('-')}}{% endif %} (with Rust support)
+                {{tlist[0]|title}} {{tlist[1][5:]}} ({% if tlist|length > 2 %}{{tlist[2]}} - {% endif %}with Rust support)
             {% else %}
-                {{tlist[0]|title}} {{tlist[1:]|join('-')}}
+                {{tlist[0]|title}} {{tlist[1]}}{% if tlist|length > 2 %} ({{tlist[2]}}){% endif %}
             {% endif %}
         {% else %}
             {{tech|title}}
@@ -22,9 +153,9 @@
 	        	{% endif %}
 	        	&nbsp;&nbsp;&nbsp;
 	        	{% if overview.alert_count > 0 %}
-	        		Alerts: <span class='badge badge-success'>{{overview.alert_count}}</span>
+	        		Alerts: <span class='badge badge-success'>{{overview.alert_count | int}}</span>
 	        	{% else %}
-	        		Alerts: <span class='badge badge-info'>{{overview.alert_count}}</span>
+	        		Alerts: <span class='badge badge-info'>{{overview.alert_count | int}}</span>
 	        	{% endif %}
 			&nbsp;&nbsp;&nbsp;
 			Processing Time:
@@ -35,18 +166,48 @@
 			{% endif %}
 			<br/><br/>
 			    <a href="/dalton/sensor_api/get_job/{{jobid}}">Download Job Zipfile</a> (includes pcap(s), rules, and config)
+			    <br/>
+			    <a href="/dalton/coverage/job/{{jobid}}">Share link</a> to recreate job
 			    <br/><br/>
+            {% if zeek_json == "True" %}
+            <form class="form-inline">
+                <label class="checkbox inline" style="float:left;">
+                    <input type="checkbox" name="formatZeekJSON" id="formatZeekJSON" value="custom"><span class="label label-success">Format</span>
+                </label>
+                <label class="checkbox inline" style="float:right;">
+                    <input type="checkbox" name="darkMode" id="darkMode" value="custom"><span class="label label-inverse">Dark Mode</span>
+                </label>
+                <br/>
+                <label class="checkbox inline" style="float:left;clear:both;">
+                    <input type="checkbox" name="colorize" id="colorize" value="custom"><span class="label label-success">Syntax Highlighting</span>
+                </label>
+            </form>
+            <br/>
+			{% endif %}
 	        <div class="tabbable">
 	            <ul class="nav nav-tabs">
-        			{% if error == "" %}
-		    		    <li class='active'><a href="#alerts" data-toggle='tab'><i class="icon-warning-sign"></i>&nbsp;Alerts</a></li>
-			        {% else %}
-				        <li><a href="#alerts" data-toggle='tab'><i class="icon-warning-sign"></i>&nbsp;Alerts</a></li>
+				    {% if not tech.startswith('zeek') %}
+            			{% if error == "" %}
+    		    		    <li class='active'><a href="#alerts" data-toggle='tab'><i class="icon-warning-sign"></i>&nbsp;Alerts</a></li>
+	    		        {% else %}
+		    		        <li><a href="#alerts" data-toggle='tab'><i class="icon-warning-sign"></i>&nbsp;Alerts</a></li>
+			            {% endif %}
 			        {% endif %}
+
                     {% if alert_detailed != "" %}
                         <li><a href="#alert-detailed" data-toggle='tab'><i class="icon-zoom-in"></i>&nbsp;Alert Details</a></li>
                     {% endif %}
-                    <li><a href="#ids" data-toggle='tab'><i class="icon-eye-open"></i>&nbsp;IDS Engine</a></li>
+
+                    {% if eve_json != "" %}
+                        <li><a href="#eve-json-tab" data-toggle='tab'><i class="icon-leaf"></i>&nbsp;EVE JSON</a></li>
+                    {% endif %}
+
+                    {% if tech.startswith('zeek') and error == "" %}
+                        <li class='active'><a href="#ids" data-toggle='tab'><i class="icon-eye-open"></i>&nbsp;IDS Engine</a></li>
+	    		    {% else %}
+                        <li><a href="#ids" data-toggle='tab'><i class="icon-eye-open"></i>&nbsp;IDS Engine</a></li>
+				    {% endif %}
+
 				    {% if perf != "" %}
 				  	    <li><a href="#perf" data-toggle='tab'><i class="icon-heart"></i>&nbsp;Performance</a></li>
 				    {% endif %}
@@ -55,8 +216,6 @@
                         {% for log_description in other_logs %}
                             {% if "Perf" in log_description %}
                                 <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-heart"></i>&nbsp;{{log_description}}</a></li>
-			    {% elif "EVE" in log_description %}
-                                <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-leaf"></i>&nbsp;{{log_description}}</a></li>
                             {% else %}
                                 <li><a href="#{{log_description|replace(" ", "_")}}" data-toggle='tab'><i class="icon-file"></i>&nbsp;{{log_description}}</a></li>
                             {% endif %}
@@ -71,30 +230,87 @@
 				    {% endif %}
 				</ul>
 			    <div class="tab-content">
-				    {% if error == "" %}
-					    <div class="tab-pane active" id="alerts"><pre>{{alert}}</pre></div>
-				    {% else %}
-					    <div class="tab-pane" id="alerts"><pre>{{alert}}</pre></div>
+				    {% if not tech.startswith('zeek') %}
+				        {% if error == "" %}
+					        <div class="tab-pane active" id="alerts"><pre>{{alert}}</pre></div>
+				        {% else %}
+					        <div class="tab-pane" id="alerts"><pre>{{alert}}</pre></div>
+				        {% endif %}
 				    {% endif %}
 
                     {% if alert_detailed != "" %}
                         <div class="tab-pane" id="alert-detailed"><pre>{{alert_detailed}}</pre></div>
                     {% endif %}
 
-			    	<div class="tab-pane" id="ids"><pre>{{ids}}</pre></div>
+                    {% if eve_json != "" %}
+                        <div class="tab-pane" id="eve-json-tab">
+                          <div class="span12" style="text-align:center;background-color:#ffffff;">
+                            <form class="form-inline">
+                                <label class="checkbox inline" style="float:left;">
+                                    <input type="checkbox" name="formatEVE" id="formatEVE" value="custom"><span class="label label-success">Format</span>
+                                </label>
+                                &nbsp;&nbsp;&nbsp;<label class="inline" style=:"text-align:center;"><a href="/dalton/controller_api/v2/{{jobid}}/eve/raw">Download Raw EVE Log</a></label>
+                                <label class="checkbox inline" style="float:right;">
+                                    <input type="checkbox" name="darkMode" id="darkMode" value="custom"><span class="label label-inverse">Dark Mode</span>
+                                </label>
+                                <br>
+                                <label class="checkbox inline" style="float:left;clear:both;">
+                                    <input type="checkbox" name="colorize" id="colorize" value="custom" checked><span class="label label-success">Syntax Highlighting</span>
+                                </label>
+                            </form>
+                            {% if event_types|length > 0 %}
+                            <form class="form inline" style="text-align:center;">
+                                {% for event_type in event_types %}
+                                <label class="checkbox inline">
+                                    <input type="checkbox" name="eve-{{event_type}}" id="eve-{{event_type}}" value="custom" checked><span class="label label-info">{{event_type}}</span>
+                                </label>
+                                {% endfor %}
+                                &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                            </form>
+                            {% endif %}
+                          </div>
+                            <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" name="eve-json" id="eve-json" class="hljs"></pre>
+                        </div>
+                    {% endif %}
+
+				    {% if tech.startswith('zeek') and error == "" %}
+			    	    <div class="tab-pane active" id="ids"><pre>{{ids}}</pre></div>
+			        {% else %}
+			    	    <div class="tab-pane" id="ids"><pre>{{ids}}</pre></div>
+			        {% endif %}
+
 			        {% if perf != "" %}
 			        	<div class="tab-pane" id="perf"><pre style="font-size:12px">{{perf}}</pre></div>
 			        {% endif %}
 
                     {% if other_logs != "" %}
                         {% for log_description in other_logs %}
+                            <div class="tab-pane" id="{{log_description|replace(" ", "_")}}">
                             {% if "Perf" in log_description or "Stats" in log_description %}
-                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
-                            {% elif "EVE" in log_description  %}
-                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre style="font-size:12px">{{other_logs[log_description]}}</pre></div>
+                                <pre style="font-size:12px">{{other_logs[log_description]}}</pre>
+                            {% elif zeek_json == "True" %}
+                                <pre style="font-size:12px;padding: 0.5em;overflow-x: auto;display: block;" class="hljs">{{other_logs[log_description]}}</pre>
+				            {% elif tech.startswith('zeek') %}
+                                <table class="table table-striped table-hover table-condensed" style="white-space:nowrap;">
+                                <thead><tr>
+                                {% for header in other_logs[log_description]["fields"] %}
+                                    <th>{{header}}</th>
+                                {% endfor %}
+                                </tr></thead>
+                                <tbody>
+                                {% for row in other_logs[log_description]["rows"] %}
+                                    <tr>
+                                    {% for value in row %}
+                                        <td>{{value}}</td>
+                                    {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                                </table>
                             {% else %}
-                                <div class="tab-pane" id="{{log_description|replace(" ", "_")}}"><pre>{{other_logs[log_description]}}</pre></div>
+                                <pre>{{other_logs[log_description]}}</pre>
                             {% endif %}
+                            </div>
                         {% endfor %}
                     {% endif %}
 

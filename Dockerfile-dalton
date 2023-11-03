@@ -1,4 +1,4 @@
-FROM python:2.7.16
+FROM python:3.9.0
 MAINTAINER David Wharton
 
 # wireshark needed for mergecap; statically compiled
@@ -10,8 +10,6 @@ RUN apt-get update && \
 # for development; not needed by the app
 #RUN apt-get install -y less nano net-tools
 
-RUN mkdir -p /opt/dalton
-
 WORKDIR /opt/dalton
 
 COPY requirements.txt /opt/dalton/requirements.txt
@@ -22,11 +20,5 @@ COPY run.py /opt/dalton/run.py
 COPY dalton.conf /opt/dalton/dalton.conf
 COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
-
-#install flowsynth
-ADD https://raw.githubusercontent.com/secureworks/flowsynth/afc92674a8e8b78332d68565b2e5458e2048f17e/requirements.txt /opt/flowsynth/requirements.txt
-ADD https://raw.githubusercontent.com/secureworks/flowsynth/afc92674a8e8b78332d68565b2e5458e2048f17e/src/flowsynth.py /opt/flowsynth/src/flowsynth.py
-RUN pip install -r /opt/flowsynth/requirements.txt
-RUN chmod +x /opt/flowsynth/src/flowsynth.py
 
 CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf

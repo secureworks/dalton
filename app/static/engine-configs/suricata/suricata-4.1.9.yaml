@@ -221,14 +221,14 @@ outputs:
             #md5: [body, subject]
 
         #- dnp3
-        #- nfs
-        #- smb
-        #- tftp
-        #- ikev2
-        #- krb5
+        - nfs
+        - smb
+        - tftp
+        - ikev2
+        - krb5
         - dhcp:
             # DHCP logging requires Rust.
-            enabled: no
+            enabled: yes
             # When extended mode is on, all DHCP messages are logged
             # with full detail. When extended mode is off (the
             # default), just enough information to map a MAC address
@@ -771,7 +771,7 @@ pcap-file:
 app-layer:
   protocols:
     krb5:
-      enabled: no
+      enabled: yes
     ikev2:
       enabled: yes
     tls:
@@ -848,9 +848,9 @@ app-layer:
     # Note: NFS parser depends on Rust support: pass --enable-rust
     # to configure.
     nfs:
-      enabled: no
+      enabled: yes
     tftp:
-      enabled: no
+      enabled: yes
     dns:
       # memcaps. Globally and per flow/state.
       #global-memcap: 16mb
@@ -1027,10 +1027,10 @@ app-layer:
 
     # Note: parser depends on Rust support
     ntp:
-      enabled: no
+      enabled: yes
 
     dhcp:
-      enabled: no
+      enabled: yes
 
 # Limit for the maximum number of asn1 frames to decode (default 256)
 asn1-max-frames: 256
@@ -1408,6 +1408,10 @@ decoder:
   vxlan:
     enabled: false
     ports: $VXLAN_PORTS # syntax: '8472, 4789'
+  # ERSPAN Type I decode support
+  erspan:
+    typeI:
+      enabled: false
 
 
 ##
@@ -1862,9 +1866,9 @@ mpipe:
 ## file configuration".
 ##
 
-default-rule-path: /usr/local/var/lib/suricata/rules
-rule-files:
- - suricata.rules
+#default-rule-path: /usr/local/etc/suricata/rules
+#rule-files:
+# - suricata.rules
 
 ##
 ## Advanced rule file configuration.
@@ -1874,9 +1878,9 @@ rule-files:
 ## installed with Suricata.
 ##
 
-#default-rule-path: /usr/local/var/lib/suricata/rules
+default-rule-path: /usr/local/etc/suricata/rules
 
-#rule-files:
+rule-files:
 # - botcc.rules
 # # - botcc.portgrouped.rules
 # - ciarmy.rules
