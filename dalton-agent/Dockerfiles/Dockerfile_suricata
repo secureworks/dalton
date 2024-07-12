@@ -14,7 +14,7 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential autoconf automake libtool libpcap-dev libnet1-dev \
     libyaml-0-2 libyaml-dev zlib1g zlib1g-dev libcap-ng-dev libcap-ng0 \
     make libmagic-dev libjansson-dev libjansson4 pkg-config rustc cargo \
-    liblua5.1-dev libevent-dev
+    liblua5.1-dev libevent-dev libpcre2-dev
 
 
 # for debugging agent
