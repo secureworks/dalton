@@ -1,18 +1,17 @@
-import random
-import subprocess
-import shlex
 import hashlib
-import os
-import logging
 import json
-import sys
+import logging
+import os
 import random
-import tempfile
 import re
+import shlex
+import subprocess
+import tempfile
 from logging.handlers import RotatingFileHandler
-from . import certsynth
 
-from flask import Blueprint, render_template, request, Response, redirect
+from flask import Blueprint, Response, redirect, render_template, request
+
+from . import certsynth
 from .dalton import FS_BIN_PATH as BIN_PATH
 from .dalton import FS_PCAP_PATH as PCAP_PATH
 
@@ -254,7 +253,7 @@ def compile_fs():
     proc = subprocess.Popen(shlex.split(command), stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     output = proc.communicate()[0]
 
-	#parse flowsynth json
+    # parse flowsynth json
     try:
         synthstatus = json.loads(output)
     except ValueError:
@@ -268,9 +267,16 @@ def compile_fs():
     #render the results page
     return render_template('/pcapwg/packet.html', buildstatus = synthstatus, filename=fname)
 
-@flowsynth_blueprint.route('/compile')
+@flowsynth_blueprint.route('/compile', methods=['GET'])
 def compile_page():
     return render_template('/pcapwg/compile.html', page='compile')
+
+
+@flowsynth_blueprint.route('/compile', methods=['POST'])
+def compile_page_post():
+    synth = request.form.get('synth')
+    return render_template('/pcapwg/compile.html', page='compile', flowsynth_code=synth)
+
 
 @flowsynth_blueprint.route('/about')
 def about_page():
