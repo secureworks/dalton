@@ -9,3 +9,28 @@ body {
 h1, h2, h3, h4, h5, h6 {
         font-family:"Times New Roman"
 }
+
+#overlay {
+        position: fixed;
+        display: none;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.5);
+        z-index: 2;
+        cursor: pointer;
+}
+
+#overlay-text{
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        font-size: 4vw;
+        inline-size: max-content;
+        color: white;
+        transform: translate(-50%,-50%);
+        -ms-transform: translate(-50%,-50%);
+}

@@ -5,9 +5,11 @@ log_format my_format '$http_host '
                   '$request_time '
                   '$upstream_response_time';
 
-# by default each agent polls every second for jobs; don't log all this
 map $request_uri $logrequest {
-    ~^/dalton/sensor_api/request_job/.*SENSOR_UID= 0;
+    # by default each agent polls every second for jobs; don't log all this
+    ~^/dalton/sensor_api/request_job.*SENSOR_UID= 0;
+    # ignore ajax calls waiting for job to be done
+    ~^/dalton/controller_api/job_status/ 0;
     # add other paths here if desired
     default 1;
 }

@@ -10,11 +10,11 @@ import random
 import tempfile
 import re
 from logging.handlers import RotatingFileHandler
-import certsynth
+from . import certsynth
 
 from flask import Blueprint, render_template, request, Response, redirect
-from dalton import FS_BIN_PATH as BIN_PATH
-from dalton import FS_PCAP_PATH as PCAP_PATH
+from .dalton import FS_BIN_PATH as BIN_PATH
+from .dalton import FS_PCAP_PATH as PCAP_PATH
 
 # setup the flowsynth blueprint
 flowsynth_blueprint = Blueprint('flowsynth_blueprint', __name__, template_folder='templates/')
@@ -117,20 +117,24 @@ def payload_cert(formobj):
         logger.error("No cert submitted")
         return None
 
-    file_content = request.files['cert_file'].read()
-    if formobj.get('cert_file_type') == 'pem':
-        if certsynth.pem_cert_validate(file_content.strip()):
-            return certsynth.cert_to_synth(file_content.strip(), 'PEM')
+    try:
+        file_content = request.files['cert_file'].read()
+        if formobj.get('cert_file_type') == 'pem':
+            file_content = file_content.decode('utf-8')
+            if certsynth.pem_cert_validate(file_content.strip()):
+                return certsynth.cert_to_synth(file_content.strip(), 'PEM')
+            else:
+                logger.error("Unable to validate submitted pem file.")
+                return None
+        elif formobj.get('cert_file_type') == 'der':
+            return certsynth.cert_to_synth(file_content, 'DER')
         else:
-            logger.error("Unable to validate submitted pem file.")
+            # this shouldn't happen if people are behaving
+            logger.error(f"Invalid certificate format given: '{cert_file_type}'")
             return None
-    elif formobj.get('cert_file_type') == 'der':
-        return certsynth.cert_to_synth(file_content, 'DER')
-    else:
-        # this shouldn't happen if people are behaving
-        logger.error("Unable to validate submitted der file.")
+    except Exception as e:
+        logger.error(f"Error processing submitted certificate file: {e}")
         return None
-
 
 def fs_replace_badchars(payload):
     """replace characters that conflict with the flowsynth syntax"""
@@ -143,7 +147,9 @@ def fs_replace_badchars(payload):
 
 def unicode_safe(string):
     """return an ascii repr of the string"""
-    return string.encode('ascii', 'ignore')
+    # Jun 21, 2019 - DRW - I'm not sure the reason for this
+    # or if it is still necessary in Python3....
+    return string.encode('ascii', 'ignore').decode('ascii')
 
 
 @flowsynth_blueprint.route('/index.html', methods=['GET', 'POST'])
@@ -226,12 +232,12 @@ def compile_fs():
 
     if (os.path.isdir(PCAP_PATH) == False):
         os.mkdir(PCAP_PATH)
-        os.chmod(PCAP_PATH, 0777)
+        os.chmod(PCAP_PATH, 0o777)
 
     #write flowsynth data to file
     fs_code = str(request.form.get('code'))
     hashobj = hashlib.md5()
-    hashobj.update("%s%s" % (fs_code, random.randint(1,10000)))
+    hashobj.update(f"{fs_code}{random.randint(1,10000)}".encode('utf-8'))
     fname = hashobj.hexdigest()[0:15]
     output_url = "get_pcap/%s" % (fname)
     inpath = tempfile.mkstemp()[1]
@@ -243,8 +249,8 @@ def compile_fs():
     fptr.close()
 
     #run the flowsynth command
-    command = "%s/src/flowsynth.py %s -f pcap -w %s --display json --no-filecontent" % (BIN_PATH, inpath, outpath)
-    print command
+    command = "%s %s -f pcap -w %s --display json --no-filecontent" % (BIN_PATH, inpath, outpath)
+    print(command)
     proc = subprocess.Popen(shlex.split(command), stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     output = proc.communicate()[0]
 
@@ -281,5 +287,5 @@ def retrieve_pcap(pcapid):
     if not os.path.isfile(path):
         logger.error("In get_pcap request: file not found: '%s'" % os.path.basename(path))
         return render_template('/pcapwg/error.html', error_text = "File not found: '%s'" % os.path.basename(path))
-    filedata = open(path,'r').read()
+    filedata = open(path,'rb').read()
     return Response(filedata,mimetype="application/vnd.tcpdump.pcap", headers={"Content-Disposition":"attachment;filename=%s.pcap" % pcapid})

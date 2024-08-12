@@ -33,7 +33,7 @@ To configure what rulesets are available, see
 To configure what sensors are available, see 
 `Adding Sensors <#adding-sensors>`__.
 
-If you are building behind a proxy, see
+If Dalton is being built behind a proxy, see
 `Building Behind A Proxy <#building-behind-a-proxy>`__
 
 Contents
@@ -49,6 +49,7 @@ Contents
 -  `Using Dalton <#using-dalton>`__
 
    -  `Launching A New Job <#launching-a-new-job>`__
+   -  `Suricata Socket Control Mode <#suricata-socket-control-mode>`__
    -  `Job Settings <#job-settings>`__
    -  `Config Files <#config-files>`__
    -  `Job Results <#job-results>`__
@@ -232,6 +233,24 @@ likely fail and result in an empty file.  In this case rulesets
 will need to be added (and the empty files removed);
 see `Adding Rulesets <#adding-rulesets>`__.
 
+Enabling SSL/TLS on the Controller
+----------------------------------
+The Dalton Controller web interface supports SSL/TLS.  To enable,
+set the ``DALTON_EXTERNAL_PORT_SSL`` variable in the ``.env`` file
+to the desired SSL/TLS listen port; by default it is 443.  Then,
+modify the "nginx" section of the ``docker-compose.yml`` and uncomment
+(or add if it is missing) the line:
+
+.. code:: bash
+
+             - DALTON_EXTERNAL_PORT_SSL=${DALTON_EXTERNAL_PORT_SSL}
+
+The Dalton Controller comes with a default certificate and key but
+these should be replaced.  The certificate and key files should be
+placed in the ``nginx-conf/tls/`` directory and named ``dalton.crt``
+and ``dalton.key``, respectively.
+
+
 Using Dalton
 ============
 
@@ -244,8 +263,7 @@ sensor technology. The user will be prompted to select the sensor to be
 used, supply a packet capture and ruleset (pre-defined and/or custom),
 and given the ability to configure other options using the vertical
 tab(s) on the submission page. On the 'Config Files' tab a user can
-modify the sensor configuration file. The variables (e.g. $HTTP\_PORTS)
-are split out from the rest of the config in the UI.
+modify the sensor configuration file.
 
 Please be aware that in most rulesets, almost all rules looking at TCP
 traffic are set to inspect established sessions. This means that if a
@@ -257,6 +275,53 @@ testing such a packet is desired, it will need to be incorporated into a
 new pcap that includes a 3-way handshake and the server and client IPs
 set correctly. This can be done fairly easily using Flowsynth; the
 `Flowsynth Web UI <#flowsynth-webui>`__ makes this easy.
+
+Suricata Socket Control Mode
+----------------------------
+
+Dalton Agents running Suricata 3.0 and later are capable of using the
+`Suricata Socket Control <https://suricata.readthedocs.io/en/latest/manpages/suricatasc.html>`__
+mode to process pcaps instead of starting up a new Suricata process for each job
+and using pcap replay mode.  Leveraging the socket control feature of Suricata
+offers significant job performance gains (reduced job runtime) when the
+ruleset and config do not change between jobs on an agent, since the overhead
+of starting up Suricata and processing the ruleset is eliminated.
+
+To enable Suricata Socket Control select ``Use Suricata Socket Control Pcap Processing Mode``
+on the job submission page, located in the ``Sensor Version`` section of the ``Job Settings``
+vertical tab.
+
+If the Dalton agent is unable to use Suricata Socket Control for a job, it will
+use the classic read pcap mode.
+
+If ``Rule profiling`` is enabled, then Suricata Socket Control
+mode will be disabled for that job since the rule profiling and
+keyword profiling logs do not get populated (or usually do not have
+enough time to be populated) for socket control pcap runs.
+
+The Suricata Socket Control mode leverages the ``suricatasc`` Python
+module included with the Suricata source.  If the agent was built
+as a Docker container using the Dockerfile(s) provided, then the
+``suricatasc`` Python file(s) should already be there and the
+agent aware of them.  If not, or if the module is not in PYTHONPATH,
+then the ``SURICATA_SC_PYTHON_MODULE`` config item in the
+``dalton-agent.conf`` file can be set to point to correct location.
+
+While Socket Control is supported by Suricata in versions 1.4 and later,
+the ``suricatasc`` module was not Python 3 compatible until Suricata
+3.0 so that is the earliest version Dalton supports.
+
+-  | **Problems with Suricata Socket Control Mode**
+   | There are some known issues with Suricata Socket Control, not related to Dalton.
+     If problems are encountered
+     with it, try running the job with this option disabled.
+
+   -  | **Sample Issues**
+      | `Docker Suricata Socket Control crashing using command 'reopen-log-files <https://redmine.openinfosecfoundation.org/issues/3436>`__
+
+      | `Suricata 4.1 Seg Fault: Socket Control pcap-file and corrupt pcap <https://redmine.openinfosecfoundation.org/issues/3448>`__
+
+      | `Alert metadata not present in EVE output when using Socket Control Pcap Processing Mode <https://redmine.openinfosecfoundation.org/issues/3467>`__
 
 Job Settings
 ------------
@@ -273,15 +338,24 @@ number of user-configurable options:
      zip and tar files can contain multiple files, for those formats only
      members that have the ".pcap", ".pcapng", or ".cap" extensions will
      be included; the other files will be ignored. Password protected zip
-     files will be attempted to be decrypted with the passsword 'infected'.
+     files will be attempted to be decrypted with the password 'infected'.
 
    | If multiple pcaps are submitted for a Suricata job, they will be 
      combined into a single pcap on job submission since (older versions of) Suricata can
      only read a single pcap in read pcap mode.
 
+   -  | **Create separate jobs for each pcap**
+      | If selected, each pcap file submitted (or found in an archive) will be
+        submitted as its own job.  When all the jobs are submitted, Dalton will
+        redirect the user to the Queue page.  If this is a `Teapot job <#teapot-jobs>`__,
+        then a comma separated list of JIDs is returned.
+
 -  | **Sensor Version**
    | The specific sensor version to use to run the specified pcap(s)
      and rule(s).
+
+   -  | **Use Suricata Socket Control Pcap Processing Mode**
+      | See `Suricata Socket Control Mode <#suricata-socket-control-mode>`__ section.
 
 -  **Ruleset**
 
@@ -312,14 +386,27 @@ number of user-configurable options:
 
 -  **Logs**
 
-   -  | **Pcap records from alerts**
+   -  | **Pcap records from alerts (unified2)**
       | This tells the agent to process unified2 alert data and if alerts
         are generated by the job, this information will show up under the 
         "Alert Details" tab on the job results page. Information returned
         includes hex/ASCII output from packets that generated alerts as
         well as "Extra" data from the unified2 file such as "Original
-        Client IP" from packets with "X-Forwared-For" or "True-Client-IP"
+        Client IP" from packets with "X-Forwarded-For" or "True-Client-IP"
         HTTP headers (if enable\_xff is configured on the sensor).
+        Note that Suricata version 6 and later does not support unified2
+        output so this option is unavailable for jobs to such agents.
+   -  | **EVE Log**
+      | *Suricata only*, version 2 and later.  Turn on (or off, if not checked)
+        EVE logging and return the results.
+        The specific EVE log types, settings, etc. are determined by
+        (and can be set in) the config file.
+        Since Suricata version < 3.1
+        doesn't support multiple TLS loggers, TLS logging in the EVE log
+        is disabled for jobs submitted to such agents.
+        The maximum supported
+        size for the EVE log is 512MB; see note about 512MB limit for
+        'Other logs'.
    -  | **Other logs (Alert Debug, HTTP, TLS, DNS, etc.)**
       | *Suricata only*.  This will return other logs generated by the
         engine that can be useful for analysis and debugging.
@@ -350,17 +437,23 @@ number of user-configurable options:
            line represents the HTTP request and response all in one.
       -  | **DNS Log**
          | A log of DNS requests and responses as provided by Suricata.
-           This won't be availble if Suricata is compiled with Rust support.
+           This won't be available if Suricata is compiled with Rust support
+           or if the version of Suricata is 5.0 or later.
       -  | **TLS Log**
          | A log of SSL/TLS traffic as provided by Suricata.
-      -  | **EVE Log**
-         | If EVE logging is enabled in the config, the EVE log will be
-           returned.  This can be useful for programmatic results analysis
-           when structured results are needed. Since Suricata version < 3.1
-           doesn't support multiple TLS loggers, the TLS log in the EVE log
-           is turned off.  See also above note about 512MB limit for
-           'Other logs'.
-
+   -  | **Dump buffers (alerts only)**
+      | This will display the contents of buffers used by the detection
+        engines, which can be useful for troubleshooting signature creation with traffic
+        that may not be parsing as expected. Since such output can be voluminous,
+        only buffer content associated with alerts are returned.  To see buffer content from
+        more traffic, use rule(s) that match on more traffic (or even
+        a generic rule that matches on all traffic).
+        Snort will output buffer contents into a "Buffer Dump" log output.
+        Suricata works differently and will place contents into "HTTP Buffers",
+        "TLS Buffers" and/or "DNS Buffers". These are Lua script outputs
+        intended to be visually similar than the Snort buffer dump output.
+        However on Suricata the protocol must be specified for the buffer dump
+        to work. Examples: ``alert http``, ``alert tls``, ``alert dns``.
    -  | **Rule profiling**
         Return per-rule performance statistics. This is data from the
         engine's rule performance profiling output. This data will show up
@@ -384,25 +477,15 @@ Config Files
 On the job submission page, the "Config Files" vertical tab provides the
 ability to edit the configuration file(s) for the sensor:
 
--  | **Variables**
-   |  The variables that can be used by the rules.
-      If the ``Override EXTERNAL_NET (set to 'any')`` option is selected
-      (on by default), then the ``EXTERNAL_NET`` IP variable will be set to
-      ``any`` when the job is submitted.
-
 -  | **Configuration File**
-   | The engine configuration file, minus rule the variables, that the
+   | The engine configuration file, including variables, that the
      Dalton agent uses for the job.
 
-The variables and rest of the configuration file are separated
-dynamically when the pages loads, or when a new sensor version is
-selected. But on the disk the config is just one file in the
-"engine-configs/" directory (e.g.
-'engine-configs/suricata/suricata-4.0.0.yaml'). See also `Updating
-Sensor Configs <#updating-sensor-configs>`__. 
-When a job is submitted to the Controller, the ``Variables`` and
-``Configuration File`` values will be combined in to a single file for a
-Suricata Dalton agent job.
+If the ``Override EXTERNAL_NET (set to 'any')`` option is selected
+(on by default), then the ``EXTERNAL_NET`` IP variable will be set to
+``any`` when the job is submitted.
+
+See also `Updating Sensor Configs <#updating-sensor-configs>`__. 
 
 Job Results
 ===========
@@ -415,11 +498,21 @@ presents the results from the job run in a tabulated interface:
 -  | **Alert Details**
    | If ``Include Detailed Alerts`` is selected for a job, detailed output
      from processing unified2 alert files will be shown here.
+-  | **EVE JSON** (Suricata only)
+   | The EVE log, with syntax highlighting, if EVE logging is enabled.
+     The ``Format`` checkbox
+     "pretty-prints" the EVE data; the ``Dark Mode`` checkbox applies
+     a dark mode theme/coloring to the EVE data.  The UI also dynamically
+     presents checkboxes based on the event types present in the EVE log.
+     These can be used to filter the displayed EVE data.
+     If the EVE data is more than 2000000 bytes, then by default the
+     ``Dark Mode`` option is
+     disabled and syntax coloring is turned off, for performance reasons.
 -  | **IDS Engine**
    | This the raw output from the IDS engine. For Snort jobs, the engine
      statistics will be in this tab, at the bottom.
 -  | **Performance**
-   | If ``Enable rule profiling`` is enabled, those results will be
+   | If ``Rule profiling`` is enabled, those results will be
      included here.
 -  | **Debug**
    | This is the Debug output from the agent.
@@ -459,10 +552,13 @@ A job zip file, which includes the packet capture file(s) submitted
 along with rules and variables associated with the job, is stored on
 disk, by default in the ``/opt/dalton/jobs`` directory; this location is
 configurable via the ``job_path`` parameter in the ``dalton.conf`` file.
-These files are cleaned up by Dalton based on the ``redis_expire`` and 
-``teapot_redis_expire``.  Dalton only cleans up job zip files from disk when 
-the ``Queue`` page is loaded.  To force the clean up job to run on demand, 
-send a HTTP GET request to::
+These files are cleaned up by Dalton based on the ``redis_expire`` and
+``teapot_redis_expire``. Visiting a job's share link increases the expire
+time for the job zip file. How long the expire time is extended can be
+configured in the ``dalton.conf`` file as well with the ``share_expire``
+configuration option. Dalton only cleans up job zip files from disk when the
+``Queue`` page is loaded. To force the clean up job to run on demand, send
+a HTTP GET request to::
 
   /dalton/controller_api/delete-old-job-files
 
@@ -474,12 +570,12 @@ page or directly downloaded using the following URL::
 Sensors
 =======
 
-Agents (a.k.a. "Sensors") check in to the Dalton server frequently
+Agents (a.k.a. "Sensors") check into the Dalton server frequently
 (about every second but configurable in the ``dalton-agent.conf`` file). The 
 last time an agent checked in can be viewed on the ``Sensors`` page. Agents
 that have not checked in recently will be pruned based on the 
 ``agent_purge_time`` value in the ``dalton.conf`` config file. When an
-expired or new agent checks in to the Dalton Controller it will be
+expired or new agent checks into the Dalton Controller it will be
 automatically (re)added and made available for job submissions.
 
 Dalton API
@@ -489,20 +585,67 @@ Job API
 -------
 
 The Dalton controller provides a RESTful API to retrieve data about
-submitted jobs.  API responses use JSON although the data returned in the values is, 
+submitted jobs.  API responses use JSON or the raw ("RAW") data, and
+the data returned in the values is, 
 in most cases, just the raw text that is displayed in the Dalton web interface.
-The API can be utilized via HTTP GET requests in this format::
+
+**JSON API**
+
+The JSON API can be utilized via HTTP GET requests in this format::
 
   GET /dalton/controller_api/v2/<jobid>/<key>
 
-Where ``<jobid>`` is the Job ID and::
+For requests, ``<jobid>`` is the Job ID and::
 
-    <key> : [alert|alert_detailed|all|debug|error|ids|other_logs|perf|start_time|statcode|status|submission_time|tech|time|user]
+    <key> : [alert|alert_debug|alert_detailed|all|debug|dns_log|
+             error|engine_stats|eve|fast_pattern|http_log|ids|
+             keyword_perf|other_logs|packet_stats|perf|start_time|
+             statcode|status|submission_time|tech|time|tls_log|user]
+
+A JSON API request returns JSON with three root elements:
+
+-  | **data**
+   | The requested data.  If the key is invalid for the
+     job, then an error is returned, along with an error message stating
+     as such. If there is no data for the requested Job ID and key, then
+     this ``data`` parameter value is an empty string and ``error`` is set
+     to false..
+
+-  | **error**
+   | [true\|false] depending if the API request generated an error. This is
+     not returned as a quoted string.  \ **This** **indicates an error with
+     the API request, not an error running the job**.  Errors running the job
+     can be found by querying for the 'error' key (see above).
+
+-  | **error_msg**
+   | null if error is false, otherwise this is a quoted string with the error
+     message.
+
+**RAW API**
+
+The RAW API can be utilized via the same HTTP GET requests appended with "/raw"::
+
+  GET /dalton/controller_api/v2/<jobid>/<key>/raw
+
+The ``<jobid>`` and ``<key>`` are the same as the JSON API but a
+RAW API request returns the raw data from the Redis database, in the response body.
+This is basically what is returned from the JSON API but not encapsulated or encoded as JSON.  For
+RAW API responses, the Content-Type header is set to "text/plain" with the exception of
+the "eve" and "all" logs which
+use "application/json".  A RAW request for the "all" key returns a string representation
+of a Python dictionary with all the key-value pairs.
+The RAW responses also include "attachment" and "filename"
+in the Content-Disposition header that prompt browsers to download/save the file.
 
 **Valid Keys**
 
 -  **alert** - Alert data from the job. This is the same as what is
    displayed in the "Alerts" tab in the job results page.
+
+-  **alert\_debug** - A full alert log containing much information for
+   signature writers or for investigating suspected false positives (Suricata only).
+   This is the same as what is displayed in the "Alert Debug" tab in the job
+   results page.
 
 -  **alert\_detailed** - Detailed alert data from the job. This is the
    same as what is displayed in the "Alert Details" tab in the job
@@ -513,17 +656,45 @@ Where ``<jobid>`` is the Job ID and::
 -  **debug** - Debug data from the job.  This is the same as what is
    displayed in the "Debug" tab in the job results page.
 
+-  **dns\_log** - A line based log of DNS requests and responses (Suricata only).
+   This is the same as what is displayed in the "DNS Log" tab in the job
+   results page.
+
+-  **engine\_stats** - Contains data from various counters of the Suricata
+   engine (Suricata only).  This is the same as what is displayed in
+   the "Engine Stats" tab in the job results page.
+
 -  **error** - Error data from the job.  This is the same as what is
    displayed in the "Error" tab in the job results page.
+
+-  **eve** - EVE JSON output from the job (Suricata only).  This is the same as what is
+   displayed in the "EVE JSON" tab in the job results page.
+
+-  **fast\_pattern** - Fast pattern details for the submitted rules (Suricata only).
+   This is the same as what is displayed in the "Fast Pattern" tab in the job
+   results page.
+
+-  **http\_log** - A line based log of HTTP requests (Suricata only).  This is the
+   same as what is displayed in the "HTTP Log" tab in the job results page.
 
 -  **ids** - IDS Engine output from the job.  This is the same as what
    is displayed in the "IDS Engine" tab in the job results page.  
    For Snort Agents, engine statistics output at the end of the job 
    run are populated here.
 
--  **other\_logs** - Other logs from the job (Suricata only). 
+-  **keyword\_perf** - Contains data of per keyword profiling (Suricata only).
+   This is the same as what is displayed in the "Keyword Perf" tab in the job
+   results page.
+
+-  **other\_logs** - *deprecated* - Other logs from the job (Suricata only).
    This is returned as key/value pairs with the key being the
-   name of the log and the value being the contents of the log.
+   name of the log and the value being the contents of the log. This key
+   is deprecated and is not included in the ``all`` key response. The contents
+   of ``other_logs``, e.g. "http_log", "tls_log", etc., can and should be
+   accessed directly.
+
+-  **packet\_stats** - Statistics from the pcap(s) (Suricata only).  This is the
+   same as what is displayed in the "Engine Stats" tab in the job results page.
 
 -  **perf** - Performance data from the job (if the job generated
    performance data).   This is the same as what is displayed in the
@@ -565,81 +736,70 @@ Where ``<jobid>`` is the Job ID and::
    job was submitted to the Dalton Controller.
 
 -  **tech** - The sensor technology (i.e. engine and version) the job was submitted
-   for.  For example, 'suricata-4.0.0' is Suricata v4.0.0.  Suricata Agents
-   start with "suricata-" and Snort Agents start with "snort-".
+   for, in the format ``<engine>/<version>``.
+   For example, ``suricata/4.0.0`` is Suricata v4.0.0.
+   If a custom config is used, it will be added on the end, also separated by a
+   forward slash.  For example, ``suricata/4.0.7/mycustomconfigname``.  A Suricata 4
+   sensor compiled with Rust support will have "rust\_" prepended to the version,
+   for example, ``suricata/rust_4.1.5``.
 
 -  **time** - The time in seconds the job took to run, as reported by
    the Dalton Agent (this includes job download time by the agent). 
    This is returned as a string and is the same as the "Processing Time"
    displayed in the job results page.
+
+-  **tls\_log** - A line based log of TLS handshake parameters (Suricata only).
+   This is the same as what is displayed in the "TLS Log" tab in the job
+   results page.
+
 -  **user** - The user who submitted the job. This will always be "undefined" 
    since authentication is not implemented in this release.
 
-An API request returns JSON with three root elements:
-
--  | **name**
-   | The requested data.   **All data is returned as a quoted string if it is
-     not null**.  If the 'all' key is requested, this contains key/value
-     pairs of all valid keys (so the JSON will need to be double-read to get
-     to the data).  If the 'other\_logs' keyword is requested, this is
-     key/value pairs the JSON will need to be double-read to get to the
-     data or triple-read it if it is part of an 'all' request. This is null
-     if there is no data for the requested key.
-
--  | **error**
-   | [true\|false] depending if the API request generated an error. This is
-     not returned as a quoted string.  \ **This** **indicates an error with
-     the API request, not an error running the job**.  Errors running the job
-     can be found by querying for the 'error' key (see above).
-
--  | **error_msg**
-   | null if error is false, otherwise this is a quoted string with the error
-     message.
- 
-
 **Examples:**
 
-Request::
+JSON API Request::
 
     GET /dalton/controller_api/v2/d1b3b838d41442f6/alert
 
-Response:
+JSON API Response:
 
 .. code::
 
     {
-    "data": "06/26/2017-12:08:13.255103  [**] [1:2023754:6] ET CURRENT_EVENTS 
-            Malicious JS.Nemucod to PS Dropping PE Nov 14 M2 [**] [Classification: 
+    "data": "06/26/2017-12:08:13.255103  [**] [1:180043530:4] Nemucod Downloader
+            Trojan Request Outbound [**] [Classification: 
             A Network Trojan was detected] [Priority: 1] {TCP} 192.168.1.201:65430 
-            -> 47.91.93.208:80\n\n06/26/2017-12:08:13.255103  [**] [1:2023882:2] 
-            ET INFO HTTP Request to a *.top domain [**] [Classification: Potentially 
+            -> 47.91.93.208:80\n\n06/26/2017-12:08:13.255103  [**] [1:180056733:3] 
+            Suspicious HTTP Request to a *.top TLD - Outbound [**] [Classification: Potentially 
             Bad Traffic] [Priority: 2] {TCP} 192.168.1.201:65430 -> 47.91.93.208:80\n
-            \n06/26/2017-12:08:13.646674  [**] [1:2023754:6] ET CURRENT_EVENTS 
-            Malicious JS.Nemucod to PS Dropping PE Nov 14 M2 [**] [Classification: 
+            \n06/26/2017-12:08:13.646674  [**] [1:180043530:4] Nemucod Downloader
+            Trojan Request Outbound [**] [**] [Classification: 
             A Network Trojan was detected] [Priority: 1] {TCP} 192.168.1.201:65430 
-            -> 47.91.93.208:80\n\n06/26/2017-12:08:14.053075  [**] [1:2023754:6] ET 
-            CURRENT_EVENTS Malicious JS.Nemucod to PS Dropping PE Nov 14 M2 [**] 
-            [Classification: A Network Trojan was detected] [Priority: 1] {TCP} 
-            192.168.1.201:65430 -> 47.91.93.208:80\n\n06/26/2017-12:08:12.097144  
-            [**] [1:2023883:1] ET DNS Query to a *.top domain - Likely Hostile 
-            [**] [Classification: Potentially Bad Traffic] [Priority: 2] {UDP} 
-            192.168.1.201:54947 -> 192.168.1.1:53\n\n",
+            -> 47.91.93.208:80\n\n",
     "error_msg": null,
     "error": false
     }
 
-Request:
-
-::
+JSON API Request::
 
     GET /dalton/controller_api/v2/ae42737ab4f52862/ninjalevel
 
-Response:
+JSON API Response:
 
 .. code:: javascript
 
-    {"data": null, "error_msg": "value 'ninjalevel' invalid", "error": true}
- 
+    {"data": null, "error_msg": "No data found for 'ninjalevel' for Job ID ae42737ab4f52862", "error": true}
+
+RAW API Request::
+
+    GET /dalton/controller_api/v2/ae42737ab4f52862/alert/raw
+
+RAW API Response:
+
+.. code::
+
+    12/16/2019-20:03:24.094114  [**] [1:806421601:0] MyMalware C2 Request Outbound [**]
+    [Classification: (null)] [Priority: 3] {TCP} 192.168.102.203:45661 -> 172.16.31.41:80
 
 Controller API
 --------------
@@ -649,14 +809,16 @@ the ability to pull information from, and perform limited actions on, the Contro
 The following routes can be accessed via HTTP GET requests.  Full examples are not
 provided here but can be easily obtained by making the request in a web browser.
 
--  | **/dalton/controller_api/request_engine_conf/<sensor>**
-   | Returns JSON of the requested configuration file split out into ``variables``
-     and ``conf``.
+-  | **/dalton/controller_api/request_engine_conf?sensor=<sensor>**
+   | Returns the requested configuration file as text.  The <sensor> value
+     is going to be the engine, version, and, if applicable, the custom config
+     filename, separated by forward slashes.  For example:
+     ``suricata/5.0.0`` or ``suricata/5.0.0/mycustomconfig.yaml``.
+     Suricata version 4.x compiled with Rust support will have
+     the prefix "rust\_" before the version, e.g. ``suricata/rust_4.1.5``.
 
    | If no exact match is found for a config file on disk, the closest file
      that matches is returned.
-
-   | <sensor> is the sensor technology, e.g. ``suricata-4.0.``
 
 -  | **/dalton/controller_api/delete-old-job-files**
    | Deletes old job files from disk. Returns the number of
@@ -681,18 +843,18 @@ provided here but can be easily obtained by making the request in a web browser.
      an array of current active sensors, sorted descending based on ruleset
      filename (just like the list in the web interface).
 
-   | <engine> should be ``suricata`` or ``snort``.
+   | <engine> should be ``suricata``, ``snort``, or ``zeek``.
 
    | Example response:
 
 .. code:: javascript
 
-    {"sensor_tech": ["suricata-4.0.1", "suricata-3.2.4", "suricata-2.0.9"]}
+    {"sensor_tech": ["suricata/4.0.1", "suricata/3.2.4", "suricata/2.0.9"]}
 
 -  | **/dalton/controller_api/get-current-sensors-json-full**
    | Response is a JSON payload with details about
      all the current active sensors (agents). Info includes agent IP,
-     last check-in time, tech (e.g. ``suricata-4.0.1``), etc.
+     last check-in time, tech (e.g. ``suricata/4.0.1``), etc.
 
 -  | **/dalton/controller_api/get-prod-rulesets/<engine>**
    | Returns a list of current available production rulesets on the
@@ -725,6 +887,51 @@ provided here but can be easily obtained by making the request in a web browser.
      config file, and manifest used by the job referenced by <jobid>.
      If the <jobid> is invalid or an error occurs, a HTML error page
      is returned.
+
+
+Dalton API Client
+-----------------
+
+An API Client has been added in ``api/dalton.py`` that performs API calls with Python requests. 
+The client is limited to GET and POST requests.
+
+Submit Job using the API
+------------------------
+
+There is an option to programmatically submit jobs using HTTP POST requests. 
+The endpoint to submit a job is ``/dalton/coverage/summary``. 
+
+Additional parameters that are mandatory and will need to be included in the json payload of the POST request are listed below:
+
+.. code:: javascript
+    data = {
+        "sensor_tech": <string that has the sensor technology>,
+        "optionProdRuleset": "prod",
+        "prod_ruleset": <rules path>,
+        "custom_engineconf": <string with the complete confguration yaml file>,
+        "teapotJob": 1
+    }
+
+The above example indicates the minimum data payload to submit a job. 
+You need to make sure that you have the proper sensor tech name. 
+You may use the API call: ``GET /dalton/controller_api/v2/<jobid>/tech/raw`` to retrieve the specific sensor tech.
+The rules path is ``/opt/dalton/rulesets/<sensor_name>/<rule_file_name>`` where sensor can be: suricata, zeek, snort, and the file name is the name of the file that has all the rules of this sensor.
+
+It is also necessary to submit a file using the following format:
+
+.. code:: javascript
+    files = {"coverage-pcap*": (<pcap_filename>, <pcap_bytes>)}
+
+You can upload up to 10 files with one job, so substitute * with a number from 0-9.
+You will need to read the filebytes in the pcap_bytes var and optially you can include the ``pcap_filename``.
+Submit the job as a shortlived ``teapotJob`` if you plan to make multiple calls in a short amount of time for better performance.
+
+Other useful arguments to submit a job are: 
+
+- ``custom_rules`` in which you may include the custom rules you may want to test with your job,
+- ``optionAlertDetailed``, ``optionEveLog``, ``optionOtherLogs``: this can be set to ``True`` if you want to generate additional logs with your job.
+
+An example script can be found in ``api/examples/submit_job.py``.
 
 Teapot Jobs
 ===========
@@ -794,13 +1001,17 @@ Adding Sensors
 
 Adding sensors to Dalton is a fairly simple process.  If there isn't already 
 a corresponding or compatible configuration file for the new sensor, that 
-will also need to be added; see `Adding Sensor Configs <#adding-sensor-configs>`__.
+will also need to be added; see `Adding Sensor Configs <#adding-sensor-configs>`__
+for more information and to use custom config files for specific sensors.
 
-It is possible and often desirable to have multiple sensors of the same type 
-(e.g. Suricata 4.0.1), all running jobs.  In that case, just set the ``SENSOR_TECHNOLOGY`` 
-value the same (e.g. 'suricata-4.0.1') and they will all request jobs that 
-have been submitted to that queue.  A single job is given to only one sensor 
-so whichever Agent requests the next job in the queue first get it.
+Unless a custom configuration is used, (see `Adding Sensor Configs <#adding-sensor-configs>`__),
+sensors (Agents) request jobs based on
+their particular engine (Suricata or Snort) and version (e.g. 5.0.0, 2.9.9.0).
+Submitted jobs are queued based on the (corresponding) "Sensor Version" specified in the user
+interface.  All applicable sensors pull jobs from the Controller from their respective queue, meaning
+that there can be multiple Agents of the same type (engine and version) and
+they will all pull from the appropriate shared queue on the Controller and
+receive/run jobs on a first-come-first-served basis.
 
 Docker Sensors
 --------------
@@ -854,10 +1065,11 @@ Example Suricata 4.0.2 specification:
           - AGENT_DEBUG=${AGENT_DEBUG}
         restart: always
 
-Rust support was added in Suricata 4.0 but is optional.  Starting with Suricata 5.0,
-Rust is manditory.  Suricata 4.0 and later agents wishing to use Rust, and all
-Suricata 5.0 and later agents, should specify the appropriate Dockerfile --
-``Dockerfiles/Dockerfile_suricata_rust``.
+Rust support was added in Suricata 4.0 but is optional.  Starting with Suricata 5.0.0,
+Rust is mandatory.  To turn on Rust support for a Suricata 4.x Agent, set the
+``ENABLE_RUST`` arg in the docker-compose file to ``--enable-rust`` for that
+particular Agent specification (see below example).  Suricata 4.x Agents that have
+Rust support will show up in the Web UI alongside the string, "with Rust support".
 
 Example Suricata 4.1.4 specification with Rust support:
 
@@ -866,19 +1078,20 @@ Example Suricata 4.1.4 specification with Rust support:
       agent-suricata-4.1.4-rust:
         build:
           context: ./dalton-agent
-          dockerfile: Dockerfiles/Dockerfile_suricata_rust
+          dockerfile: Dockerfiles/Dockerfile_suricata
           args:
             - SURI_VERSION=4.1.4
             - http_proxy=${http_proxy}
             - https_proxy=${https_proxy}
             - no_proxy=${no_proxy}
+            - ENABLE_RUST=--enable-rust
         image: suricata-4.1.4-rust:latest
         container_name: suricata-4.1.4-rust
         environment:
           - AGENT_DEBUG=${AGENT_DEBUG}
         restart: always
 
-Suricata can also have ``SURI_VERSION=current`` in which case the latest 
+Suricata can also have ``SURI_VERSION=current`` in which case the latest
 Suricata version will be used to build the Agent.  Having a 'current' Suricata 
 version specification in the ``docker-compose.yml`` file is especially convenient 
 since when a new version comes out, all that has to be done is run the
@@ -907,13 +1120,10 @@ if changed, ``DAQ_VERSION``.  Example Snort specification:
             - AGENT_DEBUG=${AGENT_DEBUG}
           restart: always
 
-Suricata 4.0 and earlier agents *without* Rust support should build off the Suricata Dockerfile,
-``Dockerfiles/Dockerfile_suricata``; Suricata 4.0 and later agents *with* Rust
-support should build off the Suricata Dockerfile, ``Dockerfiles/Dockerfile_suricata_rust``.
-Suricata 5.0 and later agents must always use ``Dockerfiles/Dockerfile_suricata_rust``
-since Rust is no longer optional.
+Suricata Agents should build off the Suricata Dockerfile,
+``Dockerfiles/Dockerfile_suricata_rust``.
 
-Snort agents should build off the
+Snort Agents should build off the
 Snort Dockerfile at ``Dockerfiles/Dockerfile_snort``.
 
 Non-Docker Sensors
@@ -926,23 +1136,12 @@ A Suricata or Snort machine can be turned into a Dalton Agent fairly easily.
 Requirements:
 
 -  Engine (Suricata or Snort)
--  Python
+-  Python 3.6 or later
 -  ``dalton-agent.py``
 -  ``dalton-agent.conf``
 
 The ``dalton-agent.conf`` file must be modified to point to the Docker 
-Controller (see ``DALTON_API`` option).  Additionally, if the 
-``SENSOR_TECHNOLOGY`` value is not set to 'auto' (or automatic version 
-determination fails), the the ``SENSOR_TECHNOLOGY`` value should be 
-set and must follow a certain
-pattern; it should start with the engine name ('suricata' or 'snort'), 
-followed by a dash followed by the version number. For example:  'suricata-4.0.1'.  
-This format helps tell the Dalton Controller what technology is being used as 
-well as maps back to the config files on the Controller.  Technically the version 
-number part of the ``SENSOR_TECHNOLOGY`` string can be arbitrary but in that 
-case a configuration file with the corresponding name should be present on the 
-Dalton Controller so it knows which configuration file to load and use for jobs 
-related to that sensor.
+Controller (see ``DALTON_API`` option).
 
 For more details on the Dalton Agent configuration options, see the inline 
 comments in the ``dalton-agent.conf`` file.
@@ -961,7 +1160,7 @@ Adding Sensor Configs
 =====================
 
 Sensor configuration files (e.g. ``suricata.yaml`` or ``snort.conf``) are 
-stored on the Dalton Controller.  When a sensor checks in to the Controller, 
+stored on the Dalton Controller.  When a sensor checks into the Controller, 
 it is registered in Redis and when that sensor is selected for a Dalton job, 
 the corresponding config file is loaded, populated under the ``Config Files`` vertical tab 
 in the Web UI, and submitted with the Dalton job.
@@ -982,7 +1181,7 @@ the ``static`` directory to serve the config files and changing it will
 mostly like break something.
 
 Sensor configuration files 
-are not automatically added when Agents are build or the Controller is run; 
+are not automatically added when Agents are built or the Controller is run; 
 they must be manually added. 
 However, the Dalton Controller already comes with the default (from source) config files 
 for Suricata versions 0.8.1 and later, and for Snort 2.9.0 and later. 
@@ -990,22 +1189,23 @@ Duplicate config files are not included.  For example, since all the Suricata
 1.4.x versions have the same (default) .yaml file, only "suricata-1.4.yaml" 
 is included.
 
-The Controller picks the config file to load/use based off the sensor technology 
-(Suricata or Snort) and Agent supplied version number, both of which are part 
-of the ``SENSOR_TECHNOLOGY`` string submitted by the Agent which should start 
-with "snort-" or "suricata-", depending on the engine type.  The "version 
-number" is just the part of the string after "suricata-" or "snort-".
+The Controller attempts to find a config file to load/use based off
+the sensor engine (Suricata or Snort) and version number (e.g. 5.0.0, 2.9.9.0).
 
-So if a sensor identifies itself as "suricata-5.9.1" then the Controller will 
-look for a file with the name "suricata-5.9.1.yaml" in the 
+For example, if an Agent is running Suricata version 5.0.0, then the Controller will 
+look for a file with the name "suricata-5.0.0.yaml" in the 
 ``engine-configs/suricata/`` directory.  If it can't find an 
 exact match, it will attempt to find the closest match it can based off the
-version number.  The version number is just used to help map an Agent 
-to a config.  So, for example, if an Agent identified itself as 
-"suricata-mycustomwhatever" and there was a corresponding 
-"suricata-mycustomwhatever.yaml" file in ``engine-configs/suricata``, 
-it would work fine.
+version number.
 
+If a custom config is desired to be used by a particular sensor, set
+the ``SENSOR_CONFIG`` variable in the Agent's ``dalton-agent.conf`` file
+and place a file with the same name on the Controller in the
+``engine-configs/suricata/`` directory (for Suricata) or
+``engine-configs/snort/``  directory (for Snort).  If the ``SENSOR_CONFIG`` value
+does not exactly match a config file on the Controller, the Controller
+will look for filenames with the SENSOR_CONFIG value and extensions ".yaml", ".yml",
+and ".conf".
 
 For new Suricata releases, the ``.yaml`` file from source should just 
 be added to the ``engine-configs/suricata`` directory and named 
@@ -1105,6 +1305,12 @@ build mode wizards. After the synth has been submitted, a pcap will be generated
 and a download link provided. The pcap can also be directly submitted from the web interface 
 to Dalton, to be used in a Suricata or Snort job.
 
+Zeek
+====
+
+Dalton now supports Zeek as a sensor as of version 3.2.0. There is limited support in the API and
+configurations/rulesets cannot be changed at runtime from the UI. However, Zeek scripts can be
+added in the rulesets directory and will be executed with every run.
 
 Frequently Asked Questions
 ==========================
@@ -1119,10 +1325,8 @@ Frequently Asked Questions
      must be rebuilt for the change to take effect (just run ``start_dalton.sh``).
 
 #. | **Is SSL/TLS supported?**
-   | The default configuration does not leverage SSL nor is there a simple
-     "on/off" switch for SSL/TLS.  However, if you know what you are doing, it
-     isn't difficult to configure nginx for it and point the Dalton Agents to
-     it.  This has been done in some environments.
+   | SSL/TLS can be configured for the Web UI.
+     See `Enabling SSL/TLS on the Controller <#Enabling-SSL-TLS-on-the-Controller>`__.
    
 #. | **Will this work on Windows?**
    | The native Dalton code won't work as expected on Windows without non-trivial 
@@ -1135,7 +1339,7 @@ Frequently Asked Questions
    | In this context those terms, for the most part, mean the same thing.
      Technically, you can think of "engine" as the IDS engine, in this
      case Suricata or Snort; "sensor" as the system running the engine; and
-     "agent" as a specific system running the Dalton Agent code and checking in to
+     "agent" as a specific system running the Dalton Agent code and checking into
      the Dalton Controller.  "Sensor" and "Agent" are very often used
      interchangeably.
 
@@ -1146,8 +1350,9 @@ Frequently Asked Questions
      open source release.  However, if there is a demand for such support, then
      adding support for older Snort versions will be reconsidered.
 
-#. | **Are other sensor engines supported such as Bro?**
-   | No; currently only Suricata and Snort are supported.
+#. | **So then is Snort 3 supported?**
+   | Not at this time.  Snort 3 support is certainly possible and is being
+     considered.
 
 #. | **Does Dalton support authentication such as username/password/API tokens or 
      authorization enforcement like discretionary access control?**
@@ -1169,11 +1374,13 @@ Frequently Asked Questions
 #. | **When I submit jobs to Suricata Agents with multiple pcaps, the job zipfile
      only has one pcap. What's going on?**
    | In read pcap mode, which is how the Suricata and Snort engines process pcaps,
-     Suricata only supports the reading of a single pcap.  Therefore, to support 
+     older version of Suricata only support the reading of a single pcap.  Therefore,
+     *for jobs submitted to such older Suricata Agents*, to support
      multiple pcaps in the same Suricata job, the Dalton Controller will combine 
      the pcaps into a single file before making the job available for Agents to
-     grab.  By default, the pcap merging is done with 
+     grab. By default, the pcap merging is done with
      `mergecap <https://www.wireshark.org/docs/man-pages/mergecap.html>`__.
+     For more details see `Packet Captures <#Packet-Captures>`__.
 
 #. | **Can I have more than one Agent with the same engine/version? For example, can
      I have multiple Agents running Suricata 4.0.1?**
@@ -1225,6 +1432,8 @@ Contributors
 
 -  Rob Vinson
 -  George P. Burdell
+-  Adam Mosesso
+-  Donald Campbell
  
 
 Feedback including bug reports, suggestions, improvements, questions,

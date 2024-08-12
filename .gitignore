@@ -4,6 +4,7 @@
 rulesets/*.rules
 rulesets/snort/
 rulesets/suricata/
+rulesets/zeek/
 
 # don't include configs
 app/static/engine-configs/snort/
@@ -106,6 +107,8 @@ celerybeat-schedule
 # virtualenv
 venv/
 ENV/
+.venv
+.vscode
 
 # Spyder project settings
 .spyderproject
@@ -115,3 +118,8 @@ ENV/
 
 *.iml
 .idea
+
+
+# don't inlude backups
+*.bak
+*.orig
