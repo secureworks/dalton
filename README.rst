@@ -1305,6 +1305,27 @@ build mode wizards. After the synth has been submitted, a pcap will be generated
 and a download link provided. The pcap can also be directly submitted from the web interface 
 to Dalton, to be used in a Suricata or Snort job.
 
+It's also possible to pre-populate the compile page, either via a GET or POST request.
+
+Example 1:
+
+.. code:: text
+
+    http://127.0.0.1/flowsynth/compile?flowsynth=_flowsynth_code_goes_here_
+
+Example 2:
+
+.. code-block:: html
+
+    <form action="http://127.0.0.1/flowsynth/compile" method="POST">
+      <div>
+        <label for="synth">What do you want to synth?</label>
+        <textarea rows=20 class="field span11" name="synth"></textarea>
+      </div>
+      <input type="submit">
+    </form>
+
+
 Zeek
 ====
 

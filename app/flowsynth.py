@@ -267,16 +267,10 @@ def compile_fs():
     #render the results page
     return render_template('/pcapwg/packet.html', buildstatus = synthstatus, filename=fname)
 
-@flowsynth_blueprint.route('/compile', methods=['GET'])
+@flowsynth_blueprint.route('/compile', methods=['GET', 'POST'])
 def compile_page():
-    return render_template('/pcapwg/compile.html', page='compile')
-
-
-@flowsynth_blueprint.route('/compile', methods=['POST'])
-def compile_page_post():
-    synth = request.form.get('synth')
-    return render_template('/pcapwg/compile.html', page='compile', flowsynth_code=synth)
-
+    flowsynth = request.values.get('flowsynth', '')
+    return render_template('/pcapwg/compile.html', page='compile', flowsynth_code=flowsynth)
 
 @flowsynth_blueprint.route('/about')
 def about_page():
