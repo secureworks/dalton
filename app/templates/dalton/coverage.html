@@ -33,30 +33,30 @@
         document.getElementById("versionHeading").innerHTML = newstr;
     }
     $(document).ready(function() {
-        function toggleCustomScript() {
+        function writeCustom_Script() {
             if ($('#optionScriptCustom').prop('checked')) {
                 $('#custom_script').show();
             } else {
                 $('#custom_script').hide();
             }
         }
-        toggleCustomScript();
+        writeCustom_Script();
         $('#optionScriptCustom').change(function() {
-            toggleCustomScript();
+            writeCustom_Script();
         });
     });
 
     $(document).ready(function() {
-        function toggleCustomScriptfile() {
+        function uploadCustom_Script_file() {
             if ($('#optionScriptCustomfile').prop('checked')) {
                 $('#custom_script_file').show();
             } else {
                 $('#custom_script_file').hide();
             }
         }
-        toggleCustomScriptfile();
+        uploadCustom_Script_file();
         $('#optionScriptCustomfile').change(function() {
-            toggleCustomScriptfile();
+            uploadCustom_Script_file();
         });
     });
 
