@@ -65,6 +65,7 @@ try:
     dalton_config.read(dalton_config_filename)
     TEMP_STORAGE_PATH = dalton_config.get('dalton', 'temp_path')
     RULESET_STORAGE_PATH = dalton_config.get('dalton', 'ruleset_path')
+    SCRIPT_STORAGE_PATH = dalton_config.get('dalton', 'script_path')
     JOB_STORAGE_PATH = dalton_config.get('dalton', 'job_path')
     CONF_STORAGE_PATH = dalton_config.get('dalton', 'engine_conf_path')
     REDIS_EXPIRE = (dalton_config.getint('dalton', 'redis_expire') * 60)
@@ -1291,6 +1292,25 @@ def page_coverage_summary():
             delete_temp_files(job_id)
             return render_template('/dalton/error.html', jid='', msg=[err_msg])
         pcap_files.append({'filename': fspcap, 'pcappath': os.path.join(FS_PCAP_PATH, os.path.basename(fspcap))})
+    
+    #zeek-customscript
+    uiupload_file_path = os.path.join(SCRIPT_STORAGE_PATH, 'uiupload.zeek')
+    if os.path.isfile(uiupload_file_path):
+        os.remove(uiupload_file_path)
+
+    file = request.files.get("zeek-custom")
+    if file:
+        file.save(uiupload_file_path)
+
+    uiwrite_file_path = os.path.join(SCRIPT_STORAGE_PATH, 'uiwrite.zeek') 
+    checkbox_value = request.form.get("optionCustomScript")
+    if not checkbox_value:
+        if os.path.isfile(uiwrite_file_path):
+            os.remove(uiwrite_file_path)
+    if checkbox_value:
+        custom_script = request.form.get('custom_script', '')
+        with open(uiwrite_file_path, 'w') as file:
+            file.write(custom_script)
 
     bSplitCap = False
     try:
