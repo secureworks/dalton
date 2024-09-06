@@ -1311,11 +1311,10 @@ def page_coverage_summary():
         if os.path.isfile(uiwrite_file_path):
             os.remove(uiwrite_file_path)
     bCustomscriptwrite = False
-    if checkbox_value:
-        if custom_script:
-            bCustomscriptwrite = True
-            with open(uiwrite_file_path, 'w') as file:
-                file.write(custom_script)
+    if checkbox_value and custom_script:
+        bCustomscriptwrite = True
+        with open(uiwrite_file_path, 'w') as file:
+            file.write(custom_script)
         
     bSplitCap = False
     try:
