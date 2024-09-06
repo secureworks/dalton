@@ -1299,8 +1299,9 @@ def page_coverage_summary():
         os.remove(uiupload_file_path)
 
     file = request.files.get("zeek-custom")
+    checkbox_value1 = request.form.get("optionCustomScriptfile")
     bCustomscriptfile = False
-    if file:
+    if file and checkbox_value1:
         bCustomscriptfile = True
         file.save(uiupload_file_path)
 
