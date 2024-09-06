@@ -1299,19 +1299,24 @@ def page_coverage_summary():
         os.remove(uiupload_file_path)
 
     file = request.files.get("zeek-custom")
+    bCustomscriptfile = False
     if file:
+        bCustomscriptfile = True
         file.save(uiupload_file_path)
 
     uiwrite_file_path = os.path.join(SCRIPT_STORAGE_PATH, 'uiwrite.zeek') 
     checkbox_value = request.form.get("optionCustomScript")
-    if not checkbox_value:
+    custom_script = request.form.get('custom_script', '')
+    if not checkbox_value or not custom_script:
         if os.path.isfile(uiwrite_file_path):
             os.remove(uiwrite_file_path)
+    bCustomscriptwrite = False
     if checkbox_value:
-        custom_script = request.form.get('custom_script', '')
-        with open(uiwrite_file_path, 'w') as file:
-            file.write(custom_script)
-
+        if custom_script:
+            bCustomscriptwrite = True
+            with open(uiwrite_file_path, 'w') as file:
+                file.write(custom_script)
+        
     bSplitCap = False
     try:
         if request.form.get("optionSplitcap"):
@@ -2075,6 +2080,8 @@ def page_coverage_summary():
                 json_job['override-external-net'] = bOverrideExternalNet
                 json_job['suricata-eve'] = bGetEveLog
                 json_job['zeek-json-logs'] = boptionZeekJSON
+                json_job['custom-script-file'] = bCustomscriptfile
+                json_job['custom-script-write'] = bCustomscriptwrite
                 # add var and other fields too
                 str_job = json.dumps(json_job)
 
