@@ -440,7 +440,7 @@
                                 Write custom script
                             </label>
                             <span id="custom_script">
-                                <textarea rows='10' class='span'; style='margin-left:0;' name="custom_script" placeholder='event zeek_init() { print "Hello World!"; }'>{% if manifest and manifest['custom-script'] and custom_script %}{{custom_script}}{% endif %}</textarea>
+                                <textarea rows='10' class='span'; style='margin-left:0;' name="custom_script" placeholder='event zeek_init() { print "Hello World!"; }'>{% if custom_script %}{{custom_script}}{% endif %}</textarea>
                             </span>                        
                         {% endif %}
 						{% if not sensor_tech.startswith('zeek') %}
