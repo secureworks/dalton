@@ -170,7 +170,12 @@ def get_engine_version(path):
     engine = "unknown"
     version = "unknown"
     try:
-        process = subprocess.Popen("%s -V" % path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        binary_name = os.path.basename(path).lower()
+        if 'zeek' in binary_name:
+            command = f"{path} --version"
+        elif 'snort' in binary_name or 'suricata' in binary_name:
+            command = f"{path} -V"
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         stdout, stderr = process.communicate()
         regex = re.compile(r"(Version|(Suricata|zeek) version)\s+(?P<version>\d+[\d\x2E\x2D\5FA-Za-z]*)")
         if stderr:

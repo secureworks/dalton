@@ -297,10 +297,10 @@
             console.debug("Version: " + version);
             var new_engine_conf = $.get("/dalton/controller_api/request_engine_conf?sensor=" + version, function( data ) {
                 if (data && data != '') {
-                    document.getElementById('custom_engineconf_t').value = data;
-                    updateHeading(version);
+                    document.getElementById('custom_engineconf_t').value = data;        
                 }
             });
+            updateHeading(version);
             show_hide_log_options(version);
             show_hide_suricatasc_options(version);
         });

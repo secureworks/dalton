@@ -2,10 +2,38 @@ FROM ubuntu:20.04
 
 ARG ZEEK_VERSION
 
-RUN apt-get update --fix-missing -y && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-	tcpdump cmake make gcc g++ flex bison libpcap-dev libssl-dev python3.8 python3.8-dev swig zlib1g-dev
+# Set non-interactive frontend to avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
 
-# download, build, and install Zeek from source
+# Update package list and install required packages including Node.js and Python
+RUN apt-get update --fix-missing -y && \
+    apt-get install -y \
+        curl \
+        gnupg \
+        build-essential \
+        tcpdump \
+        cmake \
+        make \
+        gcc \
+        g++ \
+        flex \
+        bison \
+        libpcap-dev \
+        libssl-dev \
+        python3 \
+        python3-dev \
+        python3-pip \
+        swig \
+        zlib1g-dev \
+        && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/usr/local/zeek/bin/:${PATH}"
+
 RUN mkdir -p /src/zeek-${ZEEK_VERSION}
 WORKDIR /src
 ADD https://download.zeek.org/zeek-${ZEEK_VERSION}.tar.gz zeek-${ZEEK_VERSION}.tar.gz
@@ -13,11 +41,10 @@ RUN tar -zxf zeek-${ZEEK_VERSION}.tar.gz -C zeek-${ZEEK_VERSION} --strip-compone
 WORKDIR /src/zeek-${ZEEK_VERSION}
 RUN ./configure && make -j $(nproc) && make install
 
-env PATH /usr/local/zeek/bin/:$PATH
-
 RUN mkdir -p /opt/dalton-agent/
 WORKDIR /opt/dalton-agent
 COPY dalton-agent.py /opt/dalton-agent/dalton-agent.py
 COPY dalton-agent.conf /opt/dalton-agent/dalton-agent.conf
 
-CMD python3.8 /opt/dalton-agent/dalton-agent.py -c /opt/dalton-agent/dalton-agent.conf 2>&1
+# Set the default command to run the application
+CMD ["python3", "/opt/dalton-agent/dalton-agent.py", "-c", "/opt/dalton-agent/dalton-agent.conf"]
