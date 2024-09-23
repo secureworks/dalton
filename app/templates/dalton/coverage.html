@@ -32,6 +32,39 @@
         }
         document.getElementById("versionHeading").innerHTML = newstr;
     }
+    $(document).ready(function() {
+        function writeCustom_Script() {
+            if ($('#optionScriptCustom').prop('checked')) {
+                $('#custom_script').show();
+            } else {
+                $('#custom_script').hide();
+            }
+        }
+        writeCustom_Script();
+        $('#optionScriptCustom').change(function() {
+            writeCustom_Script();
+        });
+    });
+
+    $(document).ready(function() {
+        function uploadCustom_Script_file() {
+            if ($('#optionScriptCustomfile').prop('checked')) {
+                $('#custom_script_file').show();
+            } else {
+                $('#custom_script_file').hide();
+            }
+        }
+        uploadCustom_Script_file();
+        $('#optionScriptCustomfile').change(function() {
+            uploadCustom_Script_file();
+        });
+    });
+
+    $(document).ready(function() {
+        $('#resetscript').click(function() {
+          $('#zeek-custom').val('');
+        });
+    });
 
 	$(document).ready(function() {
 		$('#prod_ruleset').show();
@@ -264,10 +297,10 @@
             console.debug("Version: " + version);
             var new_engine_conf = $.get("/dalton/controller_api/request_engine_conf?sensor=" + version, function( data ) {
                 if (data && data != '') {
-                    document.getElementById('custom_engineconf_t').value = data;
-                    updateHeading(version);
+                    document.getElementById('custom_engineconf_t').value = data;        
                 }
             });
+            updateHeading(version);
             show_hide_log_options(version);
             show_hide_suricatasc_options(version);
         });
@@ -386,7 +419,30 @@
                                         Use Suricata Socket Control Pcap Processing Mode
                                     </label>
                                 </div>
-
+                        {% if sensor_tech.startswith('zeek') %}
+                            <div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">
+                                Custom Scripts
+                            </div>
+                            <label class="checkbox">
+                                <input type="checkbox" name="optionCustomScriptfile" id="optionScriptCustomfile" value="scriptfile" {% if manifest and manifest['custom-script-file'] %} checked{% endif %}>
+                                Upload custom script file
+                            </label>
+                            <span id="custom_script_file">
+                                <input type="file" name="zeek-custom" id="zeek-custom" placeholder="Select a script" accept=".zeek">
+                                <p></p>
+                                <div id="resetscript">
+                                    <a href="#">Reset Script</a>
+                                </div>
+                            </span>
+                            <br>
+                            <label class="checkbox">
+                                <input type="checkbox" name="optionCustomScript" id="optionScriptCustom" value="script" {% if manifest and manifest['custom-script-write'] %} checked{% endif %}>
+                                Write custom script
+                            </label>
+                            <span id="custom_script">
+                                <textarea rows='10' class='span'; style='margin-left:0;' name="custom_script" placeholder='event zeek_init() { print "Hello World!"; }'>{% if custom_script %}{{custom_script}}{% endif %}</textarea>
+                            </span>                        
+                        {% endif %}
 						{% if not sensor_tech.startswith('zeek') %}
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Ruleset</div>
 							<label class="checkbox">
