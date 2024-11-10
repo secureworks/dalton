@@ -32,7 +32,6 @@ import zipfile
 import tarfile
 import gzip
 import bz2
-import sys
 import shutil
 from distutils.version import LooseVersion
 import configparser
@@ -42,7 +41,6 @@ import subprocess
 from ruamel import yaml
 import base64
 import traceback
-import subprocess
 import random
 from threading import Thread
 import tempfile
@@ -465,7 +463,6 @@ def delete_old_job_files():
             )
 
     # these values represent number of minutes
-    job_mmin = REDIS_EXPIRE
     teapot_mmin = TEAPOT_REDIS_EXPIRE
 
     if os.path.exists(JOB_STORAGE_PATH):
@@ -545,7 +542,7 @@ def api_get_engine_conf_file():
     global supported_engines
     try:
         sensor = request.args["sensor"]
-    except Exception as e:
+    except Exception:
         sensor = None
     if not sensor or len(sensor) == 0:
         return Response(
@@ -568,7 +565,6 @@ def get_engine_conf_file(sensor):
     # Also called by API handler
     try:
         conf_file = None
-        vars_file = None
         custom_config = None
         try:
             # if custom config used
@@ -682,23 +678,23 @@ def sensor_request_job():
 
     try:
         SENSOR_UID = request.args["SENSOR_UID"]
-    except Exception as e:
+    except Exception:
         SENSOR_UID = "unknown"
 
     SENSOR_IP = request.remote_addr
 
     try:
         AGENT_VERSION = request.args["AGENT_VERSION"]
-    except Exception as e:
+    except Exception:
         AGENT_VERSION = "unknown"
 
     try:
         SENSOR_ENGINE = request.args["SENSOR_ENGINE"]
-    except Exception as e:
+    except Exception:
         SENSOR_ENGINE = "unknown"
     try:
         SENSOR_ENGINE_VERSION = request.args["SENSOR_ENGINE_VERSION"]
-    except Exception as e:
+    except Exception:
         SENSOR_ENGINE_VERSION = "unknown"
 
     sensor_tech = f"{SENSOR_ENGINE}/{SENSOR_ENGINE_VERSION}"
@@ -707,7 +703,7 @@ def sensor_request_job():
     if "SENSOR_CONFIG" in request.args.keys():
         try:
             SENSOR_CONFIG = request.args["SENSOR_CONFIG"]
-        except Exception as e:
+        except Exception:
             SENSOR_CONFIG = None
 
     if SENSOR_CONFIG and len(SENSOR_CONFIG) > 0:
@@ -731,7 +727,7 @@ def sensor_request_job():
 
     # grab a job! If it doesn't exist, return sleep.
     response = r.lpop(sensor_tech)
-    if response == None:
+    if response is None:
         return "sleep"
     else:
         respobj = json.loads(response)
@@ -818,7 +814,7 @@ def post_job_results(jobid):
     SENSOR_UID = "unknown"
     try:
         SENSOR_UID = request.args["SENSOR_UID"]
-    except Exception as e:
+    except Exception:
         SENSOR_UID = "unknown"
     hash = hashlib.md5()
     hash.update(SENSOR_UID.encode("utf-8"))
@@ -1145,9 +1141,9 @@ def page_coverage_jid(jid, error=None):
         manifest = json.loads(zf.read("manifest.json").decode())
         sensor_tech = manifest["sensor-tech"].split("/")[0]
         for f in zf.namelist():
-            if f.endswith(f".conf") or f.endswith(f".yaml"):
+            if f.endswith(".conf") or f.endswith(".yaml"):
                 engine_conf = zf.read(f).decode()
-            elif f == "dalton-custom.rules" and manifest["custom-rules"] == True:
+            elif f == "dalton-custom.rules" and manifest["custom-rules"] is True:
                 custom_rules = zf.read(f).decode()
 
     # extend job life by moving file mod date into the future, thereby delaying the usual expiry process
@@ -1191,10 +1187,10 @@ def page_coverage_jid(jid, error=None):
                 ),
                 reverse=True,
             )
-        except Exception as e:
+        except Exception:
             try:
                 sensors.sort(key=LooseVersion, reverse=True)
-            except Exception as ee:
+            except Exception:
                 sensors.sort(reverse=True)
         logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
 
@@ -1222,7 +1218,6 @@ def page_coverage_default(sensor_tech, error=None):
     """the default coverage wizard page"""
     global CONF_STORAGE_PATH, MAX_PCAP_FILES
     global r
-    ruleset_dirs = []
     sensor_tech = sensor_tech.split("-")[0]
     conf_dir = os.path.join(CONF_STORAGE_PATH, clean_path(sensor_tech))
     if sensor_tech is None:
@@ -1258,7 +1253,7 @@ def page_coverage_default(sensor_tech, error=None):
     try:
         fspcap = request.args["fspcap"]
         err_msg = verify_fs_pcap(fspcap)
-        if err_msg != None:
+        if err_msg is not None:
             return render_template("/dalton/error.html", jid="", msg=[f"{err_msg}"])
     except:
         fspcap = None
@@ -1294,10 +1289,10 @@ def page_coverage_default(sensor_tech, error=None):
                 ),
                 reverse=True,
             )
-        except Exception as e:
+        except Exception:
             try:
                 sensors.sort(key=LooseVersion, reverse=True)
-            except Exception as ee:
+            except Exception:
                 sensors.sort(reverse=True)
         logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
     # get conf or yaml file if sensor supports it
@@ -1365,7 +1360,7 @@ def page_show_job(jid):
 
         try:
             zeek_json = r.get(f"{jid}-zeek_json")
-        except Exception as e:
+        except Exception:
             # logger.debug(f"Problem getting {jid}-zeek_json:\n{e}")
             zeek_json = "False"
 
@@ -1376,13 +1371,13 @@ def page_show_job(jid):
             if tech.startswith("zeek") and zeek_json == "False":
                 for other_log in other_logs:
                     other_logs[other_log] = parseZeekASCIILog(other_logs[other_log])
-        except Exception as e:
+        except Exception:
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
             # logger.error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
         try:
             eve = r.get(f"{jid}-eve")
-        except Exception as e:
+        except Exception:
             # logger.debug(f"Problem getting {jid}-eve log:\n{e}")
             eve = ""
         event_types = []
@@ -1401,10 +1396,10 @@ def page_show_job(jid):
         custom_rules = False
         try:
             debug = r.get("%s-debug" % jid)
-        except Exception as e:
+        except Exception:
             debug = ""
         overview = {}
-        if alert != None:
+        if alert is not None:
             overview["alert_count"] = get_alert_count(jid)
         else:
             overview["alert_count"] = 0
@@ -1737,7 +1732,7 @@ def page_coverage_summary():
     # make this a list so I can pass by reference
     dupcount = [0]
     job_zip = request.form.get("job-zip")
-    if job_zip != None and re.match(r"^[a-f0-9]{16}\.zip$", job_zip):
+    if job_zip is not None and re.match(r"^[a-f0-9]{16}\.zip$", job_zip):
         filename = clean_filename(os.path.basename(job_zip))
         filepath = os.path.join(JOB_STORAGE_PATH, filename)
         if not os.path.isfile(filepath):
@@ -1756,8 +1751,8 @@ def page_coverage_summary():
             coverage_pcaps = request.files.getlist("coverage-pcap%d" % i)
             for pcap_file in coverage_pcaps:
                 if (
-                    pcap_file != None
-                    and pcap_file.filename != None
+                    pcap_file is not None
+                    and pcap_file.filename is not None
                     and pcap_file.filename != "<fdopen>"
                     and (len(pcap_file.filename) > 0)
                 ):
@@ -1816,8 +1811,8 @@ def page_coverage_summary():
             "/dalton/error.html", jid="", msg=["You must specify a PCAP file."]
         )
     elif (
-        request.form.get("optionProdRuleset") == None
-        and request.form.get("optionCustomRuleset") == None
+        request.form.get("optionProdRuleset") is None
+        and request.form.get("optionCustomRuleset") is None
     ) and not sensor_tech.startswith("zeek"):
         # throw an error, no rules defined
         delete_temp_files(job_id)
@@ -2096,7 +2091,7 @@ def page_coverage_summary():
                             jid="",
                             msg=[
                                 f"Invalid rule, action (first word in rule) of '{line.split()[0]}' not supported.  Rule:",
-                                f"line",
+                                "line",
                             ],
                         )
 
@@ -2191,8 +2186,6 @@ def page_coverage_summary():
                 "/dalton/error.html", jid="", msg=["No configuration file provided."]
             )
 
-        bLockConfig = False
-
         if sensor_tech.startswith("suri"):
             # just in case someone edited and didn't quote a boolean
             conf_file = re.sub(
@@ -2219,7 +2212,7 @@ def page_coverage_summary():
                 # set EXTERNAL_NET to 'any' if option set
                 try:
                     if bOverrideExternalNet:
-                        if not "EXTERNAL_NET" in config["vars"]["address-groups"]:
+                        if "EXTERNAL_NET" not in config["vars"]["address-groups"]:
                             logger.warn(
                                 "EXTERNAL_NET IP variable not set in config; setting to 'any'"
                             )
@@ -2231,7 +2224,7 @@ def page_coverage_summary():
                 # first, do rule includes
                 # should references to other rule files be removed?
                 removeOtherRuleFiles = True
-                if not "rule-files" in config or removeOtherRuleFiles:
+                if "rule-files" not in config or removeOtherRuleFiles:
                     config["rule-files"] = []
                 if request.form.get("optionProdRuleset"):
                     # some code re-use here
@@ -2334,7 +2327,7 @@ def page_coverage_summary():
                             deployment = config["outputs"][
                                 olist.index("unified2-alert")
                             ]["unified2-alert"]["xff"]["deployment"]
-                        except Exception as e:
+                        except Exception:
                             logger.debug(
                                 "Could not get outputs->unified2-alert->xff->deployment.  Using default value of '%s'"
                                 % deployment
@@ -2343,7 +2336,7 @@ def page_coverage_summary():
                             header = config["outputs"][olist.index("unified2-alert")][
                                 "unified2-alert"
                             ]["xff"]["header"]
-                        except Exception as e:
+                        except Exception:
                             logger.debug(
                                 "Could not get outputs->unified2-alert->xff->header.  Using default value of '%s'"
                                 % header
@@ -2379,7 +2372,7 @@ def page_coverage_summary():
                 else:
                     config["outputs"].append(stats_config)
 
-                if not "profiling" in config:
+                if "profiling" not in config:
                     config["profiling"] = {}
 
                 # always return Engine stats for Suri
@@ -2492,7 +2485,7 @@ def page_coverage_summary():
                                             "Removed outputs->eve-log->types->alert->tls"
                                         )
                                         break
-                                except Exception as e:
+                                except Exception:
                                     # logger.debug("Possible issue when removing outputs->eve-log->types->alert->tls (EVE TLS log). Error: %s" % e)
                                     pass
 
@@ -2520,7 +2513,7 @@ def page_coverage_summary():
                                             "Removed outputs->eve-log->types->tls"
                                         )
                                         break
-                                except Exception as e:
+                                except Exception:
                                     # logger.debug("Possible issue when removing outputs->eve-log->types->tls (EVE TLS log). Error: %s" % e)
                                     pass
                     else:
@@ -2537,7 +2530,7 @@ def page_coverage_summary():
                 # set filename for rule and keyword profiling
                 if bTrackPerformance:
                     # rule profiling
-                    if not "rules" in config["profiling"]:
+                    if "rules" not in config["profiling"]:
                         config["profiling"]["rules"] = {
                             "enabled": True,
                             "filename": "dalton-rule_perf.log",
@@ -3256,10 +3249,10 @@ def controller_api_get_current_sensors(engine):
             ),
             reverse=True,
         )
-    except Exception as e:
+    except Exception:
         try:
             sensors.sort(key=LooseVersion, reverse=True)
-        except Exception as ee:
+        except Exception:
             sensors.sort(reverse=True)
 
     # return json

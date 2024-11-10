@@ -220,7 +220,6 @@ def page_index():
 def generate_fs():
     """receive and handle a request to generate a PCAP"""
 
-    packet_hexdump = ""
     formobj = request.form
 
     # generate flowsynth file
@@ -296,7 +295,7 @@ def compile_fs():
     """compile a flowsynth file"""
     global PCAP_PATH
 
-    if os.path.isdir(PCAP_PATH) == False:
+    if os.path.isdir(PCAP_PATH) is False:
         os.mkdir(PCAP_PATH)
         os.chmod(PCAP_PATH, 0o777)
 
@@ -305,7 +304,7 @@ def compile_fs():
     hashobj = hashlib.md5()
     hashobj.update(f"{fs_code}{random.randint(1,10000)}".encode("utf-8"))
     fname = hashobj.hexdigest()[0:15]
-    output_url = "get_pcap/%s" % (fname)
+    "get_pcap/%s" % (fname)
     inpath = tempfile.mkstemp()[1]
     outpath = "%s/%s.pcap" % (PCAP_PATH, fname)
 

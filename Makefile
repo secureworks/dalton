@@ -15,8 +15,8 @@ coverage:
 
 lint:
 	.venv/bin/ruff format --check
-	# .venv/bin/ruff check
+	.venv/bin/ruff check
 
 fix:
 	.venv/bin/ruff format
-	# .venv/bin/ruff check --fix
+	.venv/bin/ruff check --fix
