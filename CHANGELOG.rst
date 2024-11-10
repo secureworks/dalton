@@ -149,3 +149,7 @@ Zeek Enhancements (#177)
 
 Author: Nikhileswar Reddy <nreddy@octolabs.io>
 
+4.0.0
+##################
+
+* Use pyproject.toml (#184)
