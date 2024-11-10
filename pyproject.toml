@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dalton"
+version = "4.0.0"
+description = "Run pcaps against an IDS"
+requires-python = ">=3.10"
+dependencies = [
+    "Jinja2==3.0.3",
+    "Flask==1.1.1",
+    "Flask-Assets==0.12",
+    "Flask-Script==2.0.6",
+    "Flask-Caching==1.8.0",
+    "Flask-Compress==1.4.0",
+    "redis==2.10.6",
+    "ruamel.yaml==0.16.12",
+    "idstools==0.6.4",
+    "flowsynth>=1.4.1",
+    "werkzeug==0.16.1",
+    "itsdangerous==2.0.1",
+]
+authors = [
+    { name = "David Wharton and others" }
+]
+readme = "README.rst"
+classifiers = [
+    "Private :: Do Not Upload",
+    "License :: OSI Approved :: Apache Software License",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/secureworks/dalton"
+
+[project.optional-dependencies]
+testing = [
+    "pytest",
+]
+devtools = [
+    "ruff",
+    "coverage",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "."
+]
+
+[tool.setuptools.packages.find]
+# Include only the "app" directory.
+include = ["app"]
