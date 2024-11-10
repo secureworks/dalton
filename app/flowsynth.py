@@ -171,14 +171,15 @@ def payload_cert(formobj):
 
     try:
         file_content = request.files["cert_file"].read()
-        if formobj.get("cert_file_type") == "pem":
+        cert_file_type = formobj.get("cert_file_type")
+        if cert_file_type == "pem":
             file_content = file_content.decode("utf-8")
             if certsynth.pem_cert_validate(file_content.strip()):
                 return certsynth.cert_to_synth(file_content.strip(), "PEM")
             else:
                 logger.error("Unable to validate submitted pem file.")
                 return None
-        elif formobj.get("cert_file_type") == "der":
+        elif cert_file_type == "der":
             return certsynth.cert_to_synth(file_content, "DER")
         else:
             # this shouldn't happen if people are behaving
@@ -220,7 +221,6 @@ def page_index():
 def generate_fs():
     """receive and handle a request to generate a PCAP"""
 
-    packet_hexdump = ""
     formobj = request.form
 
     # generate flowsynth file
@@ -296,7 +296,7 @@ def compile_fs():
     """compile a flowsynth file"""
     global PCAP_PATH
 
-    if os.path.isdir(PCAP_PATH) == False:
+    if os.path.isdir(PCAP_PATH) is False:
         os.mkdir(PCAP_PATH)
         os.chmod(PCAP_PATH, 0o777)
 
@@ -305,7 +305,7 @@ def compile_fs():
     hashobj = hashlib.md5()
     hashobj.update(f"{fs_code}{random.randint(1,10000)}".encode("utf-8"))
     fname = hashobj.hexdigest()[0:15]
-    output_url = "get_pcap/%s" % (fname)
+    "get_pcap/%s" % (fname)
     inpath = tempfile.mkstemp()[1]
     outpath = "%s/%s.pcap" % (PCAP_PATH, fname)
 

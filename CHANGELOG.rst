@@ -152,4 +152,6 @@ Author: Nikhileswar Reddy <nreddy@octolabs.io>
 4.0.0
 ##################
 
-* Use pyproject.toml (#184)
+* Use pyproject.toml (#184) (#189)
+* Use ruff format to format the code (#183) (#190)
+* Use ruff check --fix to make style changes (#183) (#191)
