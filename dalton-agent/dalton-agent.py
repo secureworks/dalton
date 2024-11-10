@@ -170,7 +170,12 @@ def get_engine_version(path):
     engine = "unknown"
     version = "unknown"
     try:
-        process = subprocess.Popen("%s -V" % path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        binary_name = os.path.basename(path).lower()
+        if 'zeek' in binary_name:
+            command = f"{path} --version"
+        elif 'snort' in binary_name or 'suricata' in binary_name:
+            command = f"{path} -V"
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         stdout, stderr = process.communicate()
         regex = re.compile(r"(Version|(Suricata|zeek) version)\s+(?P<version>\d+[\d\x2E\x2D\5FA-Za-z]*)")
         if stderr:
@@ -538,7 +543,7 @@ class SocketController:
                 if "engine started" in line.lower():
                     self.log_offset = suri_output_fh.tell()
                     break
-                if "<Error>" in line:
+                if "<Error>" in line or "Error: " in line:
                     # submit_job() errors out before JOB_IDS_LOG is copied so
                     # copy over output log to JOB_IDS_LOG here so it gets returned
                     shutil.copyfile(suricata_logging_outputs_file, JOB_IDS_LOG)
@@ -1114,7 +1119,7 @@ def check_for_errors(tech):
         ids_log_fh = open(JOB_IDS_LOG, "r")
         for line in ids_log_fh:
             if tech.startswith('suri'):
-                if ("<Error>" in line or line.startswith("ERROR") or line.startswith("Failed to parse configuration file")):
+                if ("<Error>" in line or "Error: " in line or line.startswith("ERROR") or line.startswith("Failed to parse configuration file")):
                     error_lines.append(line)
                     if "bad dump file format" in line or "unknown file format" in line:
                         error_lines.append("Bad pcap file(s) submitted to Suricata. Pcap files should be in libpcap format (pcapng is not supported in older Suricata versions).\n")
