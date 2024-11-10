@@ -55,3 +55,7 @@ pythonpath = [
 [tool.setuptools.packages.find]
 # Include only the "app" directory.
 include = ["app"]
+
+[tool.ruff]
+include = ["pyproject.toml", "app/**/*.py", "api/**/*.py"]
+exclude = ["app/static/**/*.py"]
