@@ -1,4 +1,5 @@
 """Dalton API client."""
+
 import requests
 import time
 
@@ -142,6 +143,7 @@ class DaltonAPI:
             'tech': 'suricata/5.0.7',
             'agent_version': '3.1.1'}}
         """
-        response = self._dalton_get("dalton/controller_api/get-current-sensors-json-full")
+        response = self._dalton_get(
+            "dalton/controller_api/get-current-sensors-json-full"
+        )
         return response.json()
-    

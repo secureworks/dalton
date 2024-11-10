@@ -1,4 +1,5 @@
 """Example on how to submit a job using the Dalton Client API. Mock data is in mocks directory."""
+
 import os
 
 from api.dalton import DaltonAPI
