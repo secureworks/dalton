@@ -171,14 +171,15 @@ def payload_cert(formobj):
 
     try:
         file_content = request.files["cert_file"].read()
-        if formobj.get("cert_file_type") == "pem":
+        cert_file_type = formobj.get("cert_file_type")
+        if cert_file_type == "pem":
             file_content = file_content.decode("utf-8")
             if certsynth.pem_cert_validate(file_content.strip()):
                 return certsynth.cert_to_synth(file_content.strip(), "PEM")
             else:
                 logger.error("Unable to validate submitted pem file.")
                 return None
-        elif formobj.get("cert_file_type") == "der":
+        elif cert_file_type == "der":
             return certsynth.cert_to_synth(file_content, "DER")
         else:
             # this shouldn't happen if people are behaving

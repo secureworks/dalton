@@ -377,7 +377,7 @@ def set_keys_timeout(jobid):
         r.expire("%s-eve" % jobid, EXPIRE_VALUE)
         r.expire("%s-teapotjob" % jobid, EXPIRE_VALUE)
         r.expire("%s-zeek_json" % jobid, EXPIRE_VALUE)
-    except:
+    except Exception:
         pass
 
 
@@ -409,7 +409,7 @@ def expire_all_keys(jid):
     try:
         for cur_key in keys_to_delete:
             r.delete("%s-%s" % (jid, cur_key))
-    except:
+    except Exception:
         pass
 
 
@@ -418,7 +418,7 @@ def check_for_timeout(jobid):
     global r
     try:
         start_time = int(r.get("%s-start_time" % jobid))
-    except:
+    except Exception:
         start_time = int(time.time()) - (JOB_RUN_TIMEOUT + 1)
     # logger.debug("Dalton in check_for_timeout(): job %s start time: %d" % (jobid, start_time))
     if not start_time or ((int(time.time()) - start_time) > JOB_RUN_TIMEOUT):
@@ -1255,7 +1255,7 @@ def page_coverage_default(sensor_tech, error=None):
         err_msg = verify_fs_pcap(fspcap)
         if err_msg is not None:
             return render_template("/dalton/error.html", jid="", msg=[f"{err_msg}"])
-    except:
+    except Exception:
         fspcap = None
 
     # get list of rulesets based on engine
@@ -1723,7 +1723,7 @@ def page_coverage_summary():
     try:
         if request.form.get("optionSplitcap"):
             bSplitCap = True
-    except:
+    except Exception:
         pass
 
     # grab the user submitted files from the web form (max number of arbitrary files allowed on the web form
@@ -1775,7 +1775,7 @@ def page_coverage_summary():
                             )
                     else:
                         form_pcap_files.append(pcap_file)
-        except:
+        except Exception:
             logger.debug("%s" % traceback.format_exc())
             pass
 
@@ -1925,7 +1925,7 @@ def page_coverage_summary():
             try:
                 if request.form.get("optionUseSC"):
                     bSuricataSC = True
-            except:
+            except Exception:
                 pass
 
         # get enable all rules option
@@ -1952,7 +1952,7 @@ def page_coverage_summary():
         try:
             if request.form.get("optionStats"):
                 bGetEngineStats = True
-        except:
+        except Exception:
             pass
 
         # get generate fast pattern option
@@ -1960,7 +1960,7 @@ def page_coverage_summary():
         try:
             if request.form.get("optionFastPattern"):
                 bGetFastPattern = True
-        except:
+        except Exception:
             pass
 
         # A 'teapot' job is one that shouldn't be stored for a long period of time; it can be used by
@@ -1972,7 +1972,7 @@ def page_coverage_summary():
         try:
             if request.form.get("teapotJob"):
                 bteapotJob = True
-        except:
+        except Exception:
             pass
 
         # used to tell the agent to return pcap data from alerts.
@@ -1987,7 +1987,7 @@ def page_coverage_summary():
                 and int(sensor_tech_version.split(".")[0]) >= 6
             ):
                 bGetAlertDetailed = False
-        except:
+        except Exception:
             pass
 
         # generate EVE log (only supported by Suricata)
@@ -2000,7 +2000,7 @@ def page_coverage_summary():
                 and int(sensor_tech_version.split(".")[0]) < 2
             ):
                 bGetEveLog = False
-        except:
+        except Exception:
             pass
 
         # get other logs (only supported in Suricata for now)
@@ -2017,7 +2017,7 @@ def page_coverage_summary():
                 sensor_tech_version
             ) < LooseVersion("2.9.9.0"):
                 bGetBufferDumps = False
-        except:
+        except Exception:
             pass
 
         # get dumps from buffers
@@ -2025,7 +2025,7 @@ def page_coverage_summary():
         try:
             if request.form.get("optionDumpBuffers"):
                 bGetBufferDumps = True
-        except:
+        except Exception:
             pass
 
         # JSON output for Zeek logs
@@ -2033,7 +2033,7 @@ def page_coverage_summary():
         try:
             if request.form.get("optionZeekJSON"):
                 boptionZeekJSON = True
-        except:
+        except Exception:
             pass
 
         # get custom rules (if defined)
@@ -2171,7 +2171,7 @@ def page_coverage_summary():
         try:
             if request.form.get("overrideExternalNet"):
                 bOverrideExternalNet = True
-        except:
+        except Exception:
             pass
 
         # pre-set IP vars to add to the config if they don't exist.
@@ -2829,8 +2829,8 @@ def page_coverage_summary():
                         "custom_ruleset"
                     ):
                         zf.write(custom_rules_file, arcname="dalton-custom.rules")
-                except:
-                    logger.warn("Problem adding custom rules: %s", e)
+                except Exception as e:
+                    logger.exception("Problem adding custom rules: %s", e)
                     pass
                 vars_file = None
                 if vars_file is not None:
@@ -2973,7 +2973,7 @@ def page_queue_default():
 
     try:
         num_jobs_to_show = int(request.args["numjobs"])
-    except:
+    except Exception:
         num_jobs_to_show = num_jobs_to_show_default
 
     if not num_jobs_to_show or num_jobs_to_show < 0:
@@ -3097,7 +3097,7 @@ def controller_api_get_job_data(jid, requested_data):
     else:
         try:
             status = get_job_status(jid)
-        except:
+        except Exception:
             status = None
         if not status:
             # job doesn't exist
@@ -3164,7 +3164,7 @@ def controller_api_get_job_data(jid, requested_data):
                 else:
                     try:
                         ret_data = r.get("%s-%s" % (jid, requested_data))
-                    except:
+                    except Exception:
                         json_response["error"] = True
                         json_response["error_msg"] = (
                             "Unexpected error: cannot pull '%s' for jobid %s,"
