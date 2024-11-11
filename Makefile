@@ -20,3 +20,6 @@ lint:
 fix:
 	.venv/bin/ruff format
 	.venv/bin/ruff check --fix
+
+hadolint: Dockerfile-dalton Dockerfile-nginx
+	docker run -t --rm -v `pwd`:/app -w /app hadolint/hadolint /bin/hadolint $^
