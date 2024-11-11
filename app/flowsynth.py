@@ -301,7 +301,6 @@ def generate_fs():
 @flowsynth_blueprint.route("/pcap/compile_fs", methods=["POST"])
 def compile_fs():
     """compile a flowsynth file"""
-    global PCAP_PATH
 
     if os.path.isdir(PCAP_PATH) is False:
         os.mkdir(PCAP_PATH)
@@ -312,7 +311,6 @@ def compile_fs():
     hashobj = hashlib.md5()
     hashobj.update(f"{fs_code}{random.randint(1,10000)}".encode("utf-8"))
     fname = hashobj.hexdigest()[0:15]
-    "get_pcap/%s" % (fname)
     inpath = tempfile.mkstemp()[1]
     outpath = "%s/%s.pcap" % (PCAP_PATH, fname)
 
@@ -366,7 +364,6 @@ def about_page():
 @flowsynth_blueprint.route("/pcap/get_pcap/<pcapid>")
 def retrieve_pcap(pcapid):
     """returns a PCAP to the user"""
-    global PCAP_PATH, logger
     if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", pcapid):
         logger.error("Bad pcapid in get_pcap request: '%s'" % pcapid)
         return render_template(
