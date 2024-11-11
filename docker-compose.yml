@@ -11,6 +11,8 @@ services:
         - no_proxy=${no_proxy}
     image: dalton:latest
     container_name: dalton_controller
+    depends_on:
+      - redis
     environment:
       - CONTROLLER_DEBUG=${CONTROLLER_DEBUG}
     volumes:
@@ -28,6 +30,8 @@ services:
         - DALTON_EXTERNAL_PORT_SSL=${DALTON_EXTERNAL_PORT_SSL}
     image: nginx-dalton:latest
     container_name: dalton_web
+    depends_on:
+      - controller
     ports:
         # external HTTP listen port
         # to change, set DALTON_EXTERNAL_PORT in the '.env' file (NOT here)
@@ -41,7 +45,7 @@ services:
     restart: always
 
   redis:
-    image: redis:3.2.12
+    image: redis:7.4.1
     container_name: dalton_redis  
     restart: always
 

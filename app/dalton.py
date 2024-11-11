@@ -68,7 +68,7 @@ def setup_dalton_logging():
 
 try:
     dalton_config_filename = "dalton.conf"
-    dalton_config = configparser.SafeConfigParser()
+    dalton_config = configparser.ConfigParser()
     dalton_config.read(dalton_config_filename)
     TEMP_STORAGE_PATH = dalton_config.get("dalton", "temp_path")
     RULESET_STORAGE_PATH = dalton_config.get("dalton", "ruleset_path")
@@ -831,7 +831,7 @@ def post_job_results(jobid):
     hash.update(SENSOR_UID.encode("utf-8"))
     hash.update(SENSOR_IP.encode("utf-8"))
     SENSOR_HASH = hash.hexdigest()
-    r.set(f"{SENSOR_HASH}-current_job", None)
+    r.set(f"{SENSOR_HASH}-current_job", "")
     r.expire(f"{SENSOR_HASH}-current_job", REDIS_EXPIRE)
 
     logger.info(
@@ -932,7 +932,8 @@ def post_job_results(jobid):
     r.set("%s-alert_detailed" % jobid, alert_detailed)
     r.set("%s-other_logs" % jobid, other_logs)
     r.set("%s-eve" % jobid, eve)
-    r.set("%s-zeek_json" % jobid, zeek_json)
+    if zeek_json:
+        r.set("%s-zeek_json" % jobid, zeek_json)
     set_keys_timeout(jobid)
     logger.debug("Done saving job data to redis.")
 
