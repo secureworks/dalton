@@ -170,7 +170,7 @@ def find_file(name):
             raise
         else:
             ret_path = stdout.decode("utf-8").strip()
-    except:
+    except Exception:
         # file not in PATH, try manually searching
         paths = ["/usr/sbin", "/usr/bin", "/usr/local/bin", "/usr/local/sbin"]
         for path in paths:
@@ -265,7 +265,11 @@ def hash_file(filenames):
                 lines = fh.readlines()
                 hash.update(
                     "".join(
-                        [l for l in lines if not l.startswith("default-rule-path:")]
+                        [
+                            line
+                            for line in lines
+                            if not line.startswith("default-rule-path:")
+                        ]
                     ).encode("utf-8")
                 )
         else:
@@ -853,11 +857,11 @@ def post_results(json_data):
     except Exception as e:
         try:
             re.search("(^[^\?]*)", url).group(1)
-        except:
+        except Exception:
             pass
 
         raise Exception(
-            f"Error in sensor '{SENSOR_UID}' while processing job {job_id}"
+            f"Error in sensor '{SENSOR_UID}' while processing job {JOB_ID}"
             "Could not communicate with controller in post_results().\n\tAttempted URL:\n\t"
             + re.sub(r"\x26API_KEY=[^\x26]+", "", url)
             + "\n\tError:\n\t"
@@ -2015,7 +2019,7 @@ while True:
                 SCONTROL.connect()
                 SCONTROL.shutdown()
                 SCONTROL.close()
-        except:
+        except Exception:
             pass
         sys.exit(0)
     except DaltonError as e:
