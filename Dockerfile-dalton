@@ -28,4 +28,4 @@ COPY engine-configs /opt/dalton/engine-configs
 STOPSIGNAL SIGINT
 EXPOSE 8080
 
-CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf
+CMD ["python", "/opt/dalton/run.py", "-c", "/opt/dalton/dalton.conf"]
