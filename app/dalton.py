@@ -51,14 +51,16 @@ dalton_blueprint = Blueprint(
     "dalton_blueprint", __name__, template_folder="templates/dalton/"
 )
 
-# logging
-file_handler = RotatingFileHandler("/var/log/dalton.log", "a", 1 * 1024 * 1024, 10)
-file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
 logger = logging.getLogger("dalton")
-logger.addHandler(file_handler)
-logger.setLevel(logging.INFO)
 
-logger.info("Logging started")
+def setup_dalton_logging():
+    """Set up logging."""
+    file_handler = RotatingFileHandler("/var/log/dalton.log", "a", 1 * 1024 * 1024, 10)
+    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
+    logger.addHandler(file_handler)
+    logger.setLevel(logging.INFO)
+
+    logger.info("Logging started")
 
 try:
     dalton_config_filename = "dalton.conf"
@@ -118,36 +120,37 @@ except Exception as e:
 # if there are no rules, use idstools rulecat to download a set for Suri and Snort
 # if rulecat fails (eaten by proxy), empty rules file(s) may be created
 # TODO: change this to use suricata-update?
-for engine in ["suricata", "snort"]:
-    ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
-    rules = [
-        f
-        for f in os.listdir(ruleset_dir)
-        if (os.path.isfile(os.path.join(ruleset_dir, f)) and f.endswith(".rules"))
-    ]
-    if len(rules) == 0:
-        filename = "ET-%s-all-%s.rules" % (
-            datetime.datetime.utcnow().strftime("%Y%m%d"),
-            engine,
-        )
-        logger.info(
-            "No rulesets for %s found. Downloading the latest ET set as '%s'"
-            % (engine, filename)
-        )
-        if engine == "suricata":
-            url = "https://rules.emergingthreats.net/open/suricata-5.0/emerging.rules.tar.gz"
-        if engine == "snort":
-            url = "https://rules.emergingthreats.net/open/snort-2.9.0/emerging.rules.tar.gz"
-        command = "%s --url %s --merged %s" % (
-            RULECAT_SCRIPT,
-            url,
-            os.path.join(ruleset_dir, filename),
-        )
-        try:
-            subprocess.call(command, stdin=None, stdout=None, stderr=None, shell=True)
-        except Exception as e:
-            logger.info("Unable to download ruleset for %s" % engine)
-            logger.debug("Exception: %s" % e)
+def ensure_rulesets_exist():
+    for engine in ["suricata", "snort"]:
+        ruleset_dir = os.path.join(RULESET_STORAGE_PATH, engine)
+        rules = [
+            f
+            for f in os.listdir(ruleset_dir)
+            if (os.path.isfile(os.path.join(ruleset_dir, f)) and f.endswith(".rules"))
+        ]
+        if len(rules) == 0:
+            filename = "ET-%s-all-%s.rules" % (
+                datetime.datetime.utcnow().strftime("%Y%m%d"),
+                engine,
+            )
+            logger.info(
+                "No rulesets for %s found. Downloading the latest ET set as '%s'"
+                % (engine, filename)
+            )
+            if engine == "suricata":
+                url = "https://rules.emergingthreats.net/open/suricata-5.0/emerging.rules.tar.gz"
+            if engine == "snort":
+                url = "https://rules.emergingthreats.net/open/snort-2.9.0/emerging.rules.tar.gz"
+            command = "%s --url %s --merged %s" % (
+                RULECAT_SCRIPT,
+                url,
+                os.path.join(ruleset_dir, filename),
+            )
+            try:
+                subprocess.call(command, stdin=None, stdout=None, stderr=None, shell=True)
+            except Exception as e:
+                logger.info("Unable to download ruleset for %s" % engine)
+                logger.debug("Exception: %s" % e)
 
 # check for sane timeout values
 if REDIS_EXPIRE <= 0:

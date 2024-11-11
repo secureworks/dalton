@@ -20,14 +20,16 @@ flowsynth_blueprint = Blueprint(
     "flowsynth_blueprint", __name__, template_folder="templates/"
 )
 
-# logging
-file_handler = RotatingFileHandler("/var/log/flowsynth.log", "a", 1 * 1024 * 1024, 10)
-file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
 logger = logging.getLogger("flowsynth")
-logger.addHandler(file_handler)
-logger.setLevel(logging.INFO)
 
-logger.info("Logging started")
+def setup_flowsynth_logging():
+    """Set up logging."""
+    file_handler = RotatingFileHandler("/var/log/flowsynth.log", "a", 1 * 1024 * 1024, 10)
+    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
+    logger.addHandler(file_handler)
+    logger.setLevel(logging.INFO)
+
+    logger.info("Logging started")
 
 
 def payload_raw(formobj):
