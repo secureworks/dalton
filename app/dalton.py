@@ -53,14 +53,18 @@ dalton_blueprint = Blueprint(
 
 logger = logging.getLogger("dalton")
 
+
 def setup_dalton_logging():
     """Set up logging."""
     file_handler = RotatingFileHandler("/var/log/dalton.log", "a", 1 * 1024 * 1024, 10)
-    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
+    )
     logger.addHandler(file_handler)
     logger.setLevel(logging.INFO)
 
     logger.info("Logging started")
+
 
 try:
     dalton_config_filename = "dalton.conf"
@@ -117,6 +121,7 @@ try:
 except Exception as e:
     logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
 
+
 # if there are no rules, use idstools rulecat to download a set for Suri and Snort
 # if rulecat fails (eaten by proxy), empty rules file(s) may be created
 # TODO: change this to use suricata-update?
@@ -147,10 +152,13 @@ def ensure_rulesets_exist():
                 os.path.join(ruleset_dir, filename),
             )
             try:
-                subprocess.call(command, stdin=None, stdout=None, stderr=None, shell=True)
+                subprocess.call(
+                    command, stdin=None, stdout=None, stderr=None, shell=True
+                )
             except Exception as e:
                 logger.info("Unable to download ruleset for %s" % engine)
                 logger.debug("Exception: %s" % e)
+
 
 # check for sane timeout values
 if REDIS_EXPIRE <= 0:

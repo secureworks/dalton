@@ -22,10 +22,15 @@ flowsynth_blueprint = Blueprint(
 
 logger = logging.getLogger("flowsynth")
 
+
 def setup_flowsynth_logging():
     """Set up logging."""
-    file_handler = RotatingFileHandler("/var/log/flowsynth.log", "a", 1 * 1024 * 1024, 10)
-    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
+    file_handler = RotatingFileHandler(
+        "/var/log/flowsynth.log", "a", 1 * 1024 * 1024, 10
+    )
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
+    )
     logger.addHandler(file_handler)
     logger.setLevel(logging.INFO)
 

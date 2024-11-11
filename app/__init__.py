@@ -7,10 +7,11 @@ from app.dalton import dalton_blueprint, ensure_rulesets_exist, setup_dalton_log
 from app.flowsynth import flowsynth_blueprint, setup_flowsynth_logging
 import logging
 
+
 def create_app(test_config=None):
     """Create the flask app."""
     curdir = os.path.dirname(os.path.abspath(__file__))
-    static_folder = os.path.join(curdir, 'static')
+    static_folder = os.path.join(curdir, "static")
     daltonfs = Flask("app", static_folder=static_folder)
     if test_config:
         # load the test config if passed in
@@ -27,7 +28,7 @@ def create_app(test_config=None):
     daltonfs.register_blueprint(dalton_blueprint)
 
     # flowsynth
-    daltonfs.register_blueprint(flowsynth_blueprint, url_prefix='/flowsynth')
+    daltonfs.register_blueprint(flowsynth_blueprint, url_prefix="/flowsynth")
 
     daltonfs.debug = True
 
@@ -38,10 +39,10 @@ def create_app(test_config=None):
     #  and is superfluous for my current needs.
     try:
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
-    except Exception as e:
+    except Exception:
         pass
 
     compress = Compress()
-    cache = Cache(daltonfs, config={"CACHE_TYPE": "simple"})
+    _ = Cache(daltonfs, config={"CACHE_TYPE": "simple"})
     compress.init_app(daltonfs)
     return daltonfs
