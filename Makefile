@@ -7,7 +7,7 @@ venv:
 	.venv/bin/pip install -e . -e ".[testing]" -e ".[devtools]"
 
 test:
-	.venv/bin/pytest .
+	.venv/bin/pytest -v .
 
 coverage:
 	.venv/bin/coverage run -m pytest
