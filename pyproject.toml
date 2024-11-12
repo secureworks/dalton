@@ -57,5 +57,11 @@ pythonpath = [
 include = ["app"]
 
 [tool.ruff]
-include = ["pyproject.toml", "app/**/*.py", "api/**/*.py", "dalton-agent/**/*.py"]
+include = [
+    "pyproject.toml",
+    "app/**/*.py",
+    "api/**/*.py",
+    "dalton-agent/**/*.py",
+    "tests/**/*.py"
+]
 exclude = ["app/static/**/*.py"]

@@ -1,25 +1,32 @@
 
+VENV := $(or ${VENV},${VENV},$(CURDIR)/.venv)
+PIP=$(VENV)/bin/pip
+PYTHON=$(VENV)/bin/python
+PYTEST=$(VENV)/bin/pytest
+COVERAGE=$(VENV)/bin/coverage
+RUFF=$(VENV)/bin/ruff
+ACTIVATE=$(VENV)/bin/activate
 
 
-venv:
-	python -m venv .venv
-	.venv/bin/pip install --upgrade pip wheel
-	.venv/bin/pip install -e . -e ".[testing]" -e ".[devtools]"
+venv $(VENV):
+	python3 -m venv $(VENV)
+	$(PIP) install --upgrade pip wheel
+	$(PIP) install -e . -e ".[testing]" -e ".[devtools]"
 
-test:
-	.venv/bin/pytest -v .
+test: $(VENV)
+	. $(ACTIVATE) && $(PYTEST) tests
 
-coverage:
-	.venv/bin/coverage run -m pytest
-	.venv/bin/coverage report
+coverage: $(VENV)
+	. $(ACTIVATE) && $(COVERAGE) run -m pytest tests
+	$(COVERAGE) report
 
-lint:
-	.venv/bin/ruff format --check
-	.venv/bin/ruff check
+lint: $(VENV)
+	$(RUFF) format --check
+	$(RUFF) check
 
-fix:
-	.venv/bin/ruff format
-	.venv/bin/ruff check --fix
+fix: $(VENV)
+	$(RUFF) format
+	$(RUFF) check --fix
 
 hadolint: Dockerfile-dalton Dockerfile-nginx
 	docker run -t --rm -v `pwd`:/app -w /app hadolint/hadolint /bin/hadolint $^

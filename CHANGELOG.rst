@@ -159,3 +159,4 @@ Author: Nikhileswar Reddy <nreddy@octolabs.io>
 * Be able to run unit tests on dalton and flowsynth (#182) (#194)
 * Update nginx from 1.19 to 1.27 (#200) (#202)
 * Update redis from 3.2 to 7.4 (#201)
+* Add unit tests for flowsynth (#204)
