@@ -160,3 +160,5 @@ Author: Nikhileswar Reddy <nreddy@octolabs.io>
 * Update nginx from 1.19 to 1.27 (#200) (#202)
 * Update redis from 3.2 to 7.4 (#201)
 * Add unit tests for flowsynth (#204)
+* Sort and format imports (#207)
+* Flake8 bugbears (B) (#209)
