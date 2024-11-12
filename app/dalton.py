@@ -220,12 +220,14 @@ def clean_path(mypath):
     return os.path.normpath("/" + mypath).lstrip("/")
 
 
-def prefix_strip(mystring, prefixes=["rust_"]):
+def prefix_strip(mystring, prefixes=None):
     """strip passed in prefixes from the beginning of passed in string and return it"""
+    if not prefixes:
+        prefixes = ["rust_"]
     if not isinstance(prefixes, list):
         prefixes = [prefixes]
     for prefix in prefixes:
-        if mystring.startswith(prefix):
+        if prefix and mystring.startswith(prefix):
             return mystring[len(prefix) :]
     return mystring
 
