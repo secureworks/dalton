@@ -28,5 +28,5 @@ fix: $(VENV)
 	$(RUFF) format
 	$(RUFF) check --fix
 
-hadolint: Dockerfile-dalton Dockerfile-nginx
+hadolint: Dockerfile-dalton Dockerfile-nginx dalton-agent/Dockerfiles/Dockerfile_*
 	docker run -t --rm -v `pwd`:/app -w /app hadolint/hadolint /bin/hadolint $^
