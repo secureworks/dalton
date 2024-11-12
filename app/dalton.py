@@ -17,34 +17,35 @@ Dalton - a UI and management tool for submitting and viewing IDS jobs
 # limitations under the License.
 
 # app imports
-from flask import Blueprint, render_template, request, Response, redirect, url_for
+import base64
+import bz2
+import configparser
+import copy
+import datetime
+import glob
+import gzip
 
 # from flask_login import current_user
 import hashlib
-import os
-import glob
-import re
-import redis
-import datetime
-import time
 import json
-import zipfile
-import tarfile
-import gzip
-import bz2
-import shutil
-from distutils.version import LooseVersion
-import configparser
 import logging
-from logging.handlers import RotatingFileHandler
-import subprocess
-from ruamel import yaml
-import base64
-import traceback
+import os
 import random
-from threading import Thread
+import re
+import shutil
+import subprocess
+import tarfile
 import tempfile
-import copy
+import time
+import traceback
+import zipfile
+from distutils.version import LooseVersion
+from logging.handlers import RotatingFileHandler
+from threading import Thread
+
+import redis
+from flask import Blueprint, Response, redirect, render_template, request, url_for
+from ruamel import yaml
 
 # setup the dalton blueprint
 dalton_blueprint = Blueprint(

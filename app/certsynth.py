@@ -1,6 +1,6 @@
-import struct
 import binascii
 import re
+import struct
 
 SYNTH_START = """
 ## Client Hello

@@ -1,10 +1,9 @@
 """Dalton API client."""
 
-import requests
 import time
 
+import requests
 from requests.exceptions import HTTPError
-
 
 RETRIES = 3
 SLEEP_TIME = 60

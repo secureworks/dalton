@@ -1,25 +1,20 @@
-import pytest
-import unittest
-
-
-from unittest import mock
-
-import random
-
 import os
+import random
 import shutil
+import unittest
 import uuid
 from io import BytesIO
+from unittest import mock
 from urllib.parse import urlencode
 
+import pytest
 
 from app.flowsynth import (
-    unicode_safe,
     check_pcap_path,
     get_pcap_file_path,
     get_pcap_path,
+    unicode_safe,
 )
-
 
 KNOWN_PCAP_ID = "98765"
 KNOWN_PCAP_CONTENTS = b"hi there"

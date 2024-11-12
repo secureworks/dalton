@@ -1,11 +1,12 @@
+import logging
 import os
 
 from flask import Flask
 from flask_caching import Cache
 from flask_compress import Compress
+
 from app.dalton import dalton_blueprint, ensure_rulesets_exist, setup_dalton_logging
 from app.flowsynth import flowsynth_blueprint, setup_flowsynth_logging
-import logging
 
 
 def create_app(test_config=None):

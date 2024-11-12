@@ -65,3 +65,11 @@ include = [
     "tests/**/*.py"
 ]
 exclude = ["app/static/**/*.py"]
+
+[tool.ruff.lint]
+# see https://docs.astral.sh/ruff/rules/#legend
+# E = errors, F = pyflakes, I = isort
+select = ["E", "F", "I"]
+# ignore D203 because it conflicts with D211
+# ignore D213 because it conflicts with D212
+ignore = ["D203", "D213", "E501"]
