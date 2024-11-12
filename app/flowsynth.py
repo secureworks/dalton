@@ -37,6 +37,25 @@ def setup_flowsynth_logging():
     logger.info("Logging started")
 
 
+def get_pcap_path():
+    """Return the configured path for storing pcaps."""
+    return PCAP_PATH
+
+
+def check_pcap_path(path=None):
+    """Ensure the pcap path exists."""
+    path = path or get_pcap_path()
+    if not os.path.isdir(path):
+        os.mkdir(path)
+        os.chmod(path, 0o755)
+
+
+def get_pcap_file_path(basename, path=None):
+    """Return a full path to a PCAP file based on basename."""
+    path = path or get_pcap_path()
+    return os.path.join(path, f"{basename}.pcap")
+
+
 def payload_raw(formobj):
     """parse and format a raw payload"""
 
@@ -58,8 +77,8 @@ def payload_raw(formobj):
     return synth
 
 
-def payload_http(request):
-    """parse and generate an http payload"""
+def payload_http(formobj):
+    """Parse and generate an http payload."""
 
     # the raw flowsynth we'll return
     synth = ""
@@ -68,15 +87,13 @@ def payload_http(request):
     try:
         request_header = (
             fs_replace_badchars(
-                unicode_safe(request.form.get("request_header")).strip("\r\n")
+                unicode_safe(formobj.get("request_header")).strip("\r\n")
             )
             .replace("\r", "\\x0d\\x0a")
             .replace("\n", "\\x0d\\x0a")
         )
         request_body = (
-            fs_replace_badchars(
-                unicode_safe(request.form.get("request_body")).strip("\r\n")
-            )
+            fs_replace_badchars(unicode_safe(formobj.get("request_body")).strip("\r\n"))
             .replace("\r", "\\x0d\\x0a")
             .replace("\n", "\\x0d\\x0a")
         )
@@ -88,7 +105,7 @@ def payload_http(request):
     # the start of the flowsynth
     synth = 'default > (content:"%s";' % request_header
 
-    if "payload_http_request_contentlength" in request.form:
+    if "payload_http_request_contentlength" in formobj:
         # add or update request content length
         # doesn't add 'Content-Length: 0' if empty request body unless POST
         # will do inline update of Content-Length value if exists in submitted data
@@ -115,19 +132,19 @@ def payload_http(request):
     else:
         synth = "%s );\n" % synth
 
-    if "payload_http_response" in request.form:
+    if "payload_http_response" in formobj:
         # include http response
         try:
             response_header = (
                 fs_replace_badchars(
-                    unicode_safe(request.form.get("response_header")).strip("\r\n")
+                    unicode_safe(formobj.get("response_header")).strip("\r\n")
                 )
                 .replace("\r", "\\x0d\\x0a")
                 .replace("\n", "\\x0d\\x0a")
             )
             response_body = (
                 fs_replace_badchars(
-                    unicode_safe(request.form.get("response_body")).strip("\r\n")
+                    unicode_safe(formobj.get("response_body")).strip("\r\n")
                 )
                 .replace("\r", "\\x0d\\x0a")
                 .replace("\n", "\\x0d\\x0a")
@@ -137,7 +154,7 @@ def payload_http(request):
             logger.error("Problem parsing HTTP Wizard payload response content: %s" % e)
             return None
 
-        if "payload_http_response_contentlength" in request.form:
+        if "payload_http_response_contentlength" in formobj:
             # add or update response content length; include "Content-Length: 0" if body empty
             # will do inline update of Content-Length value if exists in submitted data
             if re.search(
@@ -171,7 +188,7 @@ def payload_http(request):
 
 
 def payload_cert(formobj):
-    # make sure we have stuff we need
+    # Make sure we have stuff we need
     if not ("cert_file_type" in formobj and "cert_file" in request.files):
         logger.error("No cert submitted")
         return None
@@ -198,7 +215,7 @@ def payload_cert(formobj):
 
 
 def fs_replace_badchars(payload):
-    """replace characters that conflict with the flowsynth syntax"""
+    """Replace characters that conflict with the flowsynth syntax."""
     badchars = ['"', "'", ";", ":", " "]
     for char in badchars:
         payload = payload.replace(char, "\\x%s" % str(hex(ord(char)))[2:])
@@ -221,41 +238,39 @@ def index_redirect():
 @flowsynth_blueprint.route("/")
 def page_index():
     """return the packet generator template"""
-    return render_template("/pcapwg/packet_gen.html", page="")
+    return render_template("pcapwg/packet_gen.html", page="")
 
 
 @flowsynth_blueprint.route("/generate", methods=["POST", "GET"])
 def generate_fs():
-    """receive and handle a request to generate a PCAP"""
+    """Receive and handle a request to generate a PCAP."""
 
     formobj = request.form
 
-    # generate flowsynth file
-
-    # options for the flow definition
+    # Generate flowsynth file
     flow_init_opts = ""
 
     # build src ip statement
-    src_ip = str(request.form.get("l3_src_ip"))
+    src_ip = str(formobj.get("l3_src_ip"))
     if src_ip == "$HOME_NET":
         src_ip = "192.168.%s.%s" % (random.randint(1, 254), random.randint(1, 254))
     else:
         src_ip = "172.16.%s.%s" % (random.randint(1, 254), random.randint(1, 254))
 
     # build dst ip statement
-    dst_ip = str(request.form.get("l3_dst_ip"))
+    dst_ip = str(formobj.get("l3_dst_ip"))
     if dst_ip == "$HOME_NET":
         dst_ip = "192.168.%s.%s" % (random.randint(1, 254), random.randint(1, 254))
     else:
         dst_ip = "172.16.%s.%s" % (random.randint(1, 254), random.randint(1, 254))
 
     # build src port statement
-    src_port = str(request.form.get("l4_src_port"))
+    src_port = str(formobj.get("l4_src_port"))
     if src_port.lower() == "any":
         src_port = random.randint(10000, 65000)
 
     # build dst port statement
-    dst_port = str(request.form.get("l4_dst_port"))
+    dst_port = str(formobj.get("l4_dst_port"))
     if dst_port.lower() == "any":
         dst_port = random.randint(10000, 65000)
 
@@ -265,7 +280,7 @@ def generate_fs():
 
     # define the actual flow in the fs syntax
     synth = "flow default %s %s:%s > %s:%s%s;" % (
-        str(request.form.get("l3_protocol")).lower(),
+        str(formobj.get("l3_protocol")).lower(),
         src_ip,
         src_port,
         dst_ip,
@@ -273,51 +288,47 @@ def generate_fs():
         flow_init_opts,
     )
 
-    payload_fmt = str(request.form.get("payload_format"))
-
+    payload_fmt = str(formobj.get("payload_format"))
     payload_cmds = ""
-
     if payload_fmt == "raw":
-        payload_cmds = payload_raw(request.form)
+        payload_cmds = payload_raw(formobj)
     elif payload_fmt == "http":
-        payload_cmds = payload_http(request)
+        payload_cmds = payload_http(formobj)
         if payload_cmds is None:
             return render_template(
-                "/pcapwg/error.html",
+                "pcapwg/error.html",
                 error_text="Unable to process submitted HTTP Wizard content. See log for more details.",
             )
     elif payload_fmt == "cert":
-        payload_cmds = payload_cert(request.form)
+        payload_cmds = payload_cert(formobj)
         if payload_cmds is None:
             return render_template(
-                "/pcapwg/error.html",
+                "pcapwg/error.html",
                 error_text="Unable to process submitted certificate. See log for more details.",
             )
 
     synth = "%s\n%s" % (synth, payload_cmds)
-    return render_template("/pcapwg/compile.html", page="compile", flowsynth_code=synth)
+    return render_template("pcapwg/compile.html", page="compile", flowsynth_code=synth)
 
 
 @flowsynth_blueprint.route("/pcap/compile_fs", methods=["POST"])
 def compile_fs():
-    """compile a flowsynth file"""
+    """Compile a flowsynth file into a downloadable PCAP."""
 
-    if os.path.isdir(PCAP_PATH) is False:
-        os.mkdir(PCAP_PATH)
-        os.chmod(PCAP_PATH, 0o777)
+    check_pcap_path()
 
     # write flowsynth data to file
     fs_code = str(request.form.get("code"))
     hashobj = hashlib.md5()
     hashobj.update(f"{fs_code}{random.randint(1,10000)}".encode("utf-8"))
     fname = hashobj.hexdigest()[0:15]
+
     inpath = tempfile.mkstemp()[1]
-    outpath = "%s/%s.pcap" % (PCAP_PATH, fname)
+    outpath = get_pcap_file_path(fname)
 
     # write to temp input file
-    fptr = open(inpath, "w")
-    fptr.write(fs_code)
-    fptr.close()
+    with open(inpath, "w") as fptr:
+        fptr.write(fs_code)
 
     # run the flowsynth command
     command = "%s %s -f pcap -w %s --display json --no-filecontent" % (
@@ -325,11 +336,11 @@ def compile_fs():
         inpath,
         outpath,
     )
-    print(command)
+    logger.debug(command)
     proc = subprocess.Popen(
         shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
-    output = proc.communicate()[0]
+    output, errors = proc.communicate()
 
     # parse flowsynth json
     try:
@@ -337,14 +348,16 @@ def compile_fs():
     except ValueError:
         # there was a problem producing output.
         logger.error("Problem processing Flowsynth output: %s" % output)
-        return render_template("/pcapwg/error.html", error_text=output)
+        return render_template(
+            "pcapwg/error.html", error_text=output + b"\n\n" + errors
+        )
 
     # delete the tempfile
     os.unlink(inpath)
 
     # render the results page
     return render_template(
-        "/pcapwg/packet.html", buildstatus=synthstatus, filename=fname
+        "pcapwg/packet.html", buildstatus=synthstatus, filename=fname
     )
 
 
@@ -352,30 +365,30 @@ def compile_fs():
 def compile_page():
     flowsynth = request.values.get("flowsynth", "")
     return render_template(
-        "/pcapwg/compile.html", page="compile", flowsynth_code=flowsynth
+        "pcapwg/compile.html", page="compile", flowsynth_code=flowsynth
     )
 
 
 @flowsynth_blueprint.route("/about")
 def about_page():
-    return render_template("/pcapwg/about.html", page="about")
+    return render_template("pcapwg/about.html", page="about")
 
 
 @flowsynth_blueprint.route("/pcap/get_pcap/<pcapid>")
 def retrieve_pcap(pcapid):
-    """returns a PCAP to the user"""
+    """Returns a PCAP to the user."""
     if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", pcapid):
         logger.error("Bad pcapid in get_pcap request: '%s'" % pcapid)
         return render_template(
-            "/pcapwg/error.html", error_text="Bad pcapid: '%s'" % pcapid
+            "pcapwg/error.html", error_text="Bad pcapid: '%s'" % pcapid
         )
-    path = "%s/%s.pcap" % (PCAP_PATH, os.path.basename(pcapid))
+    path = get_pcap_file_path(os.path.basename(pcapid))
     if not os.path.isfile(path):
         logger.error(
             "In get_pcap request: file not found: '%s'" % os.path.basename(path)
         )
         return render_template(
-            "/pcapwg/error.html",
+            "pcapwg/error.html",
             error_text="File not found: '%s'" % os.path.basename(path),
         )
     filedata = open(path, "rb").read()
