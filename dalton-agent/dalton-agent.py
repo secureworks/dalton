@@ -27,33 +27,30 @@ Dalton Agent - runs on IDS engine; receives jobs, runs them, and reports results
 # still present.
 #
 
-import os
-import sys
-import traceback
-import urllib.request
-import urllib.parse
-import urllib.error
-import urllib.request
-import urllib.error
-import urllib.parse
-import re
-import time
+import base64
+import binascii
+import configparser
 import datetime
 import glob
-import shutil
-import base64
-import json
-import subprocess
-import zipfile
-import configparser
-from optparse import OptionParser
-import struct
-import socket
-import logging
-from logging.handlers import RotatingFileHandler
-from distutils.version import LooseVersion
-import binascii
 import hashlib
+import json
+import logging
+import os
+import re
+import shutil
+import socket
+import struct
+import subprocess
+import sys
+import time
+import traceback
+import urllib.error
+import urllib.parse
+import urllib.request
+import zipfile
+from distutils.version import LooseVersion
+from logging.handlers import RotatingFileHandler
+from optparse import OptionParser
 from pathlib import Path
 
 # urllib2 in Python < 2.6 doesn't support setting a timeout so doing it like this
