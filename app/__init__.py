@@ -10,6 +10,7 @@ from app.flowsynth import flowsynth_blueprint, setup_flowsynth_logging
 
 __version__ = "3.4.0"
 
+
 def create_app(test_config=None):
     """Create the flask app."""
     curdir = os.path.dirname(os.path.abspath(__file__))

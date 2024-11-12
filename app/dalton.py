@@ -3071,6 +3071,9 @@ def page_queue_default():
 # @login_required()
 def page_about_default():
     """the about/help page"""
+    # Need to `import app` here, not at the top of the file.
+    import app
+
     return render_template("dalton/about.html", version=app.__version__)
 
 
