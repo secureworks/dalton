@@ -3071,7 +3071,7 @@ def page_queue_default():
 # @login_required()
 def page_about_default():
     """the about/help page"""
-    return render_template("/dalton/about.html", page="")
+    return render_template("dalton/about.html", version=app.__version__)
 
 
 #########################################
