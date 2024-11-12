@@ -8,7 +8,7 @@ from flask_compress import Compress
 from app.dalton import dalton_blueprint, ensure_rulesets_exist, setup_dalton_logging
 from app.flowsynth import flowsynth_blueprint, setup_flowsynth_logging
 
-__version__ = "3.3.6"
+__version__ = "3.4.0"
 
 def create_app(test_config=None):
     """Create the flask app."""
