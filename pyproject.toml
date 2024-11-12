@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dalton"
-version = "4.0.0"
 description = "Run pcaps against an IDS"
+dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
     "Jinja2==3.0.3",
@@ -43,8 +43,9 @@ testing = [
     "pytest",
 ]
 devtools = [
-    "ruff",
+    "bump-my-version",
     "coverage",
+    "ruff",
 ]
 
 [tool.pytest.ini_options]
@@ -75,3 +76,19 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # Defer these fixes to dalton-agent until we have some unit tests
 "dalton-agent/dalton-agent.py" = ["B"]
+
+[tool.bumpversion]
+current_version = "3.4.0"
+
+commit = true
+allow_dirty = false
+message = "Bump version: {current_version} → {new_version}"
+commit_args = "--no-verify"
+
+tag = true
+sign_tags = false
+tag_name = "v{new_version}"
+tag_message = "Bump version: {current_version} → {new_version}"
+
+[[tool.bumpversion.files]]
+filename = "app/__init__.py"

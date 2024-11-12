@@ -149,8 +149,11 @@ Zeek Enhancements (#177)
 
 Author: Nikhileswar Reddy <nreddy@octolabs.io>
 
-4.0.0
+3.4.0 (2024-11-12)
 ##################
+
+Version 3.4.x is available initially on the pilot branch,
+in a sort of pre-release mode.
 
 * Use pyproject.toml (#184) (#189)
 * Use ruff format to format the code (#183) (#190)
@@ -163,3 +166,6 @@ Author: Nikhileswar Reddy <nreddy@octolabs.io>
 * Use ruff to sort and format imports (#207)
 * Use ruff to detect flake8 bugbears (B) (#209)
 * Use pre-built zeek images (#181)
+* Use bump-my-version to update the version and tag (#197)
+  * Also, use bump-my-version to update the dalton-agent version
+  * Also, show the dalton controller version on the About page
