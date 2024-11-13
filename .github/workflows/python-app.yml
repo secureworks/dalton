@@ -42,3 +42,11 @@ jobs:
       - name: Run the tests
         run: |
           make test
+
+  docker-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the hadolint tool on the Dockerfile files
+        run: |
+          make hadolint
