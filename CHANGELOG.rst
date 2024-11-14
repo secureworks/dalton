@@ -169,3 +169,9 @@ in a sort of pre-release mode.
 * Use bump-my-version to update the version and tag (#197)
   * Also, use bump-my-version to update the dalton-agent version
   * Also, show the dalton controller version on the About page
+
+3.4.1 (2024-11-14)
+##################
+
+* Fixed bug with zeek processing. (#213) (#214) (#216)
+* Added some unit tests. (#215)
