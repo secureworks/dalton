@@ -936,7 +936,7 @@ def post_job_results(jobid):
     r.set("%s-other_logs" % jobid, other_logs)
     r.set("%s-eve" % jobid, eve)
     if zeek_json is not None:
-        r.set("%s-zeek_json" % jobid, int(zeek_json))
+        r.set("%s-zeek_json" % jobid, str(zeek_json))
     set_keys_timeout(jobid)
     logger.debug("Done saving job data to redis.")
 
