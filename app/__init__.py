@@ -2,11 +2,9 @@ import logging
 import os
 
 from flask import Flask
-from flask_caching import Cache
-from flask_compress import Compress
 
-from app.dalton import dalton_blueprint, ensure_rulesets_exist, setup_dalton_logging
-from app.flowsynth import flowsynth_blueprint, setup_flowsynth_logging
+from app.dalton import dalton_blueprint, ensure_rulesets_exist
+from app.flowsynth import flowsynth_blueprint
 
 __version__ = "3.4.1"
 
@@ -21,8 +19,6 @@ def create_app(test_config=None):
         daltonfs.config.from_mapping(test_config)
 
     if not daltonfs.testing:
-        setup_dalton_logging()
-        setup_flowsynth_logging()
         ensure_rulesets_exist()
 
     # register modules
@@ -33,19 +29,21 @@ def create_app(test_config=None):
     # flowsynth
     daltonfs.register_blueprint(flowsynth_blueprint, url_prefix="/flowsynth")
 
-    daltonfs.debug = True
+    class NoRequestJobFilter(logging.Filter):
+        def filter(self, record):
+            do_not_want = (
+                "GET /dalton/sensor_api/request_job",
+                "GET /static/",
+                "GET /dalton/controller_api/job_status",
+                "GET /dalton/job/",
+            )
+            msg = record.getMessage()
+            if any(item in msg for item in do_not_want):
+                return False
+            return True
 
-    # Apparently the werkzeug default logger logs every HTTP request
-    #  which bubbles up to the root logger and gets output to the
-    #  console which ends up in the docker logs.  Since each agent
-    #  checks in every second (by default), this can be voluminous
-    #  and is superfluous for my current needs.
-    try:
-        logging.getLogger("werkzeug").setLevel(logging.ERROR)
-    except Exception:
-        pass
+    logging.getLogger("werkzeug").addFilter(NoRequestJobFilter())
+    logging.getLogger("dalton").setLevel(logging.DEBUG)
+    logging.getLogger("flowsynth").setLevel(logging.DEBUG)
 
-    compress = Compress()
-    _ = Cache(daltonfs, config={"CACHE_TYPE": "simple"})
-    compress.init_app(daltonfs)
     return daltonfs

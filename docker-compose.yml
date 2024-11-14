@@ -11,6 +11,8 @@ services:
         - no_proxy=${no_proxy}
     image: dalton:latest
     container_name: dalton_controller
+    # Uncomment the next line to run the app in debug mode
+    # command: flask --app app run --port=8080 --host=0.0.0.0 --debug
     depends_on:
       - redis
     environment:
@@ -83,6 +85,8 @@ services:
         - no_proxy=${no_proxy}
     image: suricata-current:latest
     container_name: suricata-current
+    depends_on:
+      - controller
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
@@ -99,6 +103,8 @@ services:
         - no_proxy=${no_proxy}
     image: suricata-6.0.20:latest
     container_name: suricata-6.0.20
+    depends_on:
+      - controller
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
@@ -430,6 +436,8 @@ services:
         - ZEEK_VERSION=7.0.1
     image: zeek-current:latest
     container_name: zeek-current
+    depends_on:
+      - controller
     volumes:
       - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
     restart: always
@@ -442,6 +450,8 @@ services:
         - ZEEK_VERSION=6.0.6
     image: zeek-6.0.6
     container_name: zeek-6.0.6
+    depends_on:
+      - controller
     volumes:
       - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
     restart: always

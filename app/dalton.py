@@ -41,10 +41,17 @@ import traceback
 import zipfile
 from distutils.version import LooseVersion
 from functools import lru_cache
-from logging.handlers import RotatingFileHandler
 from threading import Thread
 
-from flask import Blueprint, Response, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from redis import Redis
 from ruamel import yaml
 
@@ -53,21 +60,8 @@ dalton_blueprint = Blueprint(
     "dalton_blueprint", __name__, template_folder="templates/dalton/"
 )
 
-logger = logging.getLogger("dalton")
 
 ONLY_RUN_ONCE = lru_cache(maxsize=None)
-
-
-def setup_dalton_logging():
-    """Set up logging."""
-    file_handler = RotatingFileHandler("/var/log/dalton.log", "a", 1 * 1024 * 1024, 10)
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
-    )
-    logger.addHandler(file_handler)
-    logger.setLevel(logging.INFO)
-
-    logger.info("Logging started")
 
 
 try:
@@ -101,17 +95,17 @@ try:
     )  # Path to temporarily store PCAPs
 
 except Exception as e:
-    logger.critical(
+    current_app.logger.critical(
         "Problem parsing config file '%s': %s" % (dalton_config_filename, e)
     )
 
 if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
-    logger.setLevel(logging.DEBUG)
+    current_app.logger.setLevel(logging.DEBUG)
     DEBUG = True
-    logger.debug("DEBUG logging enabled")
+    current_app.logger.debug("DEBUG logging enabled")
 
 if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
-    logger.error(
+    current_app.logger.error(
         "mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap."
         % MERGECAP_BINARY
     )
@@ -134,7 +128,7 @@ def ensure_rulesets_exist():
                 datetime.datetime.utcnow().strftime("%Y%m%d"),
                 engine,
             )
-            logger.info(
+            current_app.logger.info(
                 "No rulesets for %s found. Downloading the latest ET set as '%s'"
                 % (engine, filename)
             )
@@ -152,33 +146,33 @@ def ensure_rulesets_exist():
                     command, stdin=None, stdout=None, stderr=None, shell=True
                 )
             except Exception as e:
-                logger.info("Unable to download ruleset for %s" % engine)
-                logger.debug("Exception: %s" % e)
+                current_app.logger.info("Unable to download ruleset for %s" % engine)
+                current_app.logger.debug("Exception: %s" % e)
 
 
 # check for sane timeout values
 if REDIS_EXPIRE <= 0:
-    logger.critical(
+    current_app.logger.critical(
         "redis_expire value of %d minutes is invalid.  Expect problems."
         % dalton_config.getint("dalton", "redis_expire")
     )
 if TEAPOT_REDIS_EXPIRE <= 0:
-    logger.critical(
+    current_app.logger.critical(
         "teapot_redis_expire value of %d minutes is invalid.  Expect problems."
         % dalton_config.getint("dalton", "teapot_redis_expire")
     )
 if AGENT_PURGE_TIME <= 1:
-    logger.critical(
+    current_app.logger.critical(
         "agent_purge_time value of %d seconds is invalid.  Expect problems."
         % AGENT_PURGE_TIME
     )
 if JOB_RUN_TIMEOUT <= 4:
-    logger.critical(
+    current_app.logger.critical(
         "job_run_time value of %d seconds is invalid.  Expect problems."
         % JOB_RUN_TIMEOUT
     )
 if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
-    logger.warning(
+    current_app.logger.warning(
         "teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis."
         % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE)
     )
@@ -186,7 +180,7 @@ if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
 # other checks
 if MAX_PCAP_FILES < 1:
     default_max = 8
-    logger.warning(
+    current_app.logger.warning(
         "max_pcap_files value of '%d' invalid.  Using '%d'"
         % (MAX_PCAP_FILES, default_max)
     )
@@ -205,8 +199,6 @@ STAT_CODE_TIMEOUT = 4
 
 # engine technologies supported; used for validation (sometimes)
 supported_engines = ["suricata", "snort", "zeek"]
-
-logger.info("Dalton Started.")
 
 
 def clean_path(mypath):
@@ -241,7 +233,7 @@ def get_engine_and_version(sensor_tech):
         version = prefix_strip(sensor_tech.split("/")[1])
         return (engine, version)
     except Exception as e:
-        logger.error(
+        current_app.logger.error(
             f"Unable to process value '{sensor_tech}' in get_engine_and_version(): {e}"
         )
         return (None, None)
@@ -255,7 +247,9 @@ def get_redis():
         # decode them to utf-8.
         return Redis(REDIS_HOST, charset="utf-8", decode_responses=True)
     except Exception as e:
-        logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
+        current_app.logger.critical(
+            "Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e)
+        )
 
 
 def delete_temp_files(job_id):
@@ -318,14 +312,14 @@ def api_get_prod_rulesets(engine):
 def get_rulesets(engine=""):
     """return a list of locally stored ruleset for jobs to use"""
     ruleset_list = []
-    logger.debug("in get_rulesets(engine=%s)" % engine)
+    current_app.logger.debug("in get_rulesets(engine=%s)" % engine)
     # engine var should already be validated but just in case
     if not re.match(r"^[a-zA-Z0-9\_\-\.]*$", engine):
-        logger.error("Invalid engine value '%s' in get_rulesets()" % engine)
+        current_app.logger.error("Invalid engine value '%s' in get_rulesets()" % engine)
         return ruleset_list
     ruleset_dir = os.path.join(RULESET_STORAGE_PATH, clean_path(engine))
     if not os.path.isdir(ruleset_dir):
-        logger.error("Could not find ruleset directory '%s'" % ruleset_dir)
+        current_app.logger.error("Could not find ruleset directory '%s'" % ruleset_dir)
         return ruleset_list
     file_list = os.listdir(ruleset_dir)
     # do we want to descend into directories?
@@ -360,6 +354,7 @@ def get_job_status_msg(redis, jobid):
 
 def set_job_status(redis, jobid, status):
     """set's a job status code"""
+    current_app.logger.debug("Setting job %s status %s" % (jobid, status))
     redis.set("%s-statcode" % jobid, status)
     # statcode keys do not expire if/when they are queued
     if status != STAT_CODE_QUEUED:
@@ -406,7 +401,7 @@ def expire_all_keys(redis, jid):
     """expires (deletes) all keys for a give job ID"""
     # using the redis keys function ('r.keys("%s-*" % jid)') searches thru all keys which is not
     #   efficient for large key sets so we are deleting each one individually
-    logger.debug("Dalton calling expire_all_keys() on job %s" % jid)
+    current_app.logger.debug("Dalton calling expire_all_keys() on job %s" % jid)
     keys_to_delete = [
         "ids",
         "perf",
@@ -439,10 +434,10 @@ def check_for_timeout(redis, jobid):
         start_time = int(redis.get("%s-start_time" % jobid))
     except Exception:
         start_time = int(time.time()) - (JOB_RUN_TIMEOUT + 1)
-    # logger.debug("Dalton in check_for_timeout(): job %s start time: %d" % (jobid, start_time))
+    # current_app.logger.debug("Dalton in check_for_timeout(): job %s start time: %d" % (jobid, start_time))
     if not start_time or ((int(time.time()) - start_time) > JOB_RUN_TIMEOUT):
         if int(get_job_status(redis, jobid)) == STAT_CODE_RUNNING:
-            logger.info(
+            current_app.logger.info(
                 "Dalton in check_for_timeout(): job %s timed out.  Start time: %d, now: %d"
                 % (jobid, start_time, int(time.time()))
             )
@@ -471,12 +466,12 @@ def delete_old_job_files():
         mmin = request.args.get("mmin")
         teapot_mmin = request.args.get("teapot_mmin")
         if mmin is not None:
-            logger.warning(
+            current_app.logger.warning(
                 "Passing a mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for regular jobs."
                 % REDIS_EXPIRE
             )
         if teapot_mmin is not None:
-            logger.warning(
+            current_app.logger.warning(
                 "Passing a teapot_mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for teapot jobs."
                 % TEAPOT_REDIS_EXPIRE
             )
@@ -491,7 +486,7 @@ def delete_old_job_files():
             if os.path.isfile(file):
                 mtime = os.path.getmtime(file)
                 if (now - mtime) > REDIS_EXPIRE:
-                    logger.debug(
+                    current_app.logger.debug(
                         "Deleting job file '%s'. mtime %s; now %s; diff %d seconds; expire threshold %d seconds"
                         % (
                             os.path.basename(file),
@@ -507,7 +502,7 @@ def delete_old_job_files():
             if os.path.isfile(file):
                 mtime = os.path.getmtime(file)
                 if (now - mtime) > TEAPOT_REDIS_EXPIRE:
-                    logger.debug(
+                    current_app.logger.debug(
                         "Deleting teapot job file '%s'. mtime %s; now %s; diff %d seconds; expire threshold %d seconds"
                         % (
                             os.path.basename(file),
@@ -520,7 +515,7 @@ def delete_old_job_files():
                     os.unlink(file)
                     total_deleted += 1
     if total_deleted > 0:
-        logger.info("Deleted %d job file(s) from disk." % total_deleted)
+        current_app.logger.info("Deleted %d job file(s) from disk." % total_deleted)
     # returning a string so Flask can render it; calling functions that use the
     #  return value need to cast it back to int if they wish to use it as an int
     return str(total_deleted)
@@ -528,7 +523,7 @@ def delete_old_job_files():
 
 @dalton_blueprint.route("/")
 def index():
-    logger.debug("ENVIRON:\n%s" % request.environ)
+    current_app.logger.debug("ENVIRON:\n%s" % request.environ)
     # make sure redirect is set to use http or https as appropriate
     rurl = url_for("dalton_blueprint.page_index", _external=True)
     if rurl.startswith("http"):
@@ -536,12 +531,12 @@ def index():
             # if original request was https, make sure redirect uses https
             rurl = rurl.replace("http", request.environ["HTTP_X_FORWARDED_PROTO"])
         else:
-            logger.warning(
+            current_app.logger.warning(
                 "Could not find request.environ['HTTP_X_FORWARDED_PROTO']. Make sure the web server (proxy) is configured to send it."
             )
     else:
         # this shouldn't be the case with '_external=True' passed to url_for()
-        logger.warning("URL does not start with 'http': %s" % rurl)
+        current_app.logger.warning("URL does not start with 'http': %s" % rurl)
     return redirect(rurl)
 
 
@@ -599,9 +594,11 @@ def get_engine_conf_file(sensor):
                 conf_file = "%s.conf" % custom_config
             if conf_file:
                 conf_file = os.path.join(epath, clean_path(conf_file))
-                logger.debug(f"Found custom config file: '{conf_file}'")
+                current_app.logger.debug(f"Found custom config file: '{conf_file}'")
             else:
-                logger.error(f"Unable to find custom config file '{custom_config}'")
+                current_app.logger.error(
+                    f"Unable to find custom config file '{custom_config}'"
+                )
                 engine_config = f"# Unable to find custom config file '{custom_config}'"
                 return engine_config
         except ValueError:
@@ -628,7 +625,7 @@ def get_engine_conf_file(sensor):
                     key=lambda v: LooseVersion(os.path.splitext(v)[0]), reverse=True
                 )
                 conf_file = os.path.join(epath, files[0])
-            logger.debug(
+            current_app.logger.debug(
                 "in get_engine_conf_file(): passed sensor value: '%s', conf file used: '%s'",
                 sensor,
                 os.path.basename(conf_file),
@@ -643,11 +640,11 @@ def get_engine_conf_file(sensor):
             with open(conf_file, "r") as fh:
                 # want to parse each line so put it into a list
                 contents = fh.readlines()
-            logger.debug("Loading config file %s", conf_file)
+            current_app.logger.debug("Loading config file %s", conf_file)
 
             engine_config = "\r\n".join([x.rstrip("\r\n") for x in contents])
         else:
-            logger.warning(
+            current_app.logger.warning(
                 "No suitable configuration file found for sensor '%s'.", sensor
             )
             engine_config = (
@@ -656,7 +653,7 @@ def get_engine_conf_file(sensor):
         return engine_config
 
     except Exception as e:
-        logger.error(
+        current_app.logger.error(
             "Problem getting configuration file for sensor '%s'.  Error: %s\n%s",
             sensor,
             e,
@@ -682,7 +679,9 @@ def sensor_update():
     if int(get_job_status(redis, job)) != STAT_CODE_DONE:
         set_job_status_msg(redis, job, msg)
 
-    logger.debug("Dalton Agent %s sent update for job %s; msg: %s" % (uid, job, msg))
+    current_app.logger.debug(
+        "Dalton Agent %s sent update for job %s; msg: %s" % (uid, job, msg)
+    )
 
     return "OK"
 
@@ -747,7 +746,7 @@ def sensor_request_job():
     else:
         respobj = json.loads(response)
         new_jobid = respobj["id"]
-        logger.info(
+        current_app.logger.info(
             "Dalton Agent %s grabbed job %s for %s"
             % (SENSOR_UID, new_jobid, sensor_tech)
         )
@@ -758,7 +757,7 @@ def sensor_request_job():
         #  job then that means the sensor was interrupted while processing a job and could
         #  not communicate back with the controller.
         existing_job = redis.get("%s-current_job" % SENSOR_HASH)
-        # logger.debug("Dalton in sensor_request_job(): job requested, sensor hash %s, new job: %s, existing job: %s" % (SENSOR_HASH, new_jobid, existing_job))
+        # current_app.logger.debug("Dalton in sensor_request_job(): job requested, sensor hash %s, new job: %s, existing job: %s" % (SENSOR_HASH, new_jobid, existing_job))
         if existing_job and existing_job != new_jobid:
             set_job_status(redis, existing_job, STAT_CODE_INTERRUPTED)
             set_job_status_msg(
@@ -802,7 +801,7 @@ def post_job_results(jobid):
     if redis.exists("%s-time" % jobid) and (
         int(get_job_status(redis, jobid)) not in [STAT_CODE_RUNNING, STAT_CODE_QUEUED]
     ):
-        logger.error(
+        current_app.logger.error(
             "Data for jobid %s already exists in database; not overwriting. Source IP: %s. job_status_code code: %d"
             % (jobid, request.remote_addr, int(get_job_status(redis, jobid)))
         )
@@ -828,7 +827,7 @@ def post_job_results(jobid):
     redis.set(f"{SENSOR_HASH}-current_job", "")
     redis.expire(f"{SENSOR_HASH}-current_job", REDIS_EXPIRE)
 
-    logger.info(
+    current_app.logger.info(
         "Dalton Agent %s submitted results for job %s. Result: %s",
         SENSOR_UID,
         jobid,
@@ -878,7 +877,7 @@ def post_job_results(jobid):
             u2_fh.write(base64.b64decode(result_obj["alert_detailed"]))
             u2_fh.close()
             u2spewfoo_command = "%s %s" % (U2_ANALYZER, u2_file)
-            logger.debug(
+            current_app.logger.debug(
                 "Processing unified2 data with command: '%s'" % u2spewfoo_command
             )
             alert_detailed = subprocess.Popen(
@@ -890,33 +889,35 @@ def post_job_results(jobid):
             # delete u2 file
             os.unlink(u2_file)
         except Exception as e:
-            logger.error("Problem parsing unified2 data from Agent.  Error: %s" % e)
+            current_app.logger.error(
+                "Problem parsing unified2 data from Agent.  Error: %s" % e
+            )
             alert_detailed = ""
     else:
         alert_detailed = ""
 
     # other_logs only supported on Suricata for now
     if "other_logs" in result_obj:
-        logger.debug("Accessing other_log data from agent POST...")
+        current_app.logger.debug("Accessing other_log data from agent POST...")
         other_logs = result_obj["other_logs"]
     else:
         other_logs = ""
 
     # EVE is Suricata only
     if "eve" in result_obj:
-        logger.debug("Accessing EVE data from agent POST...")
+        current_app.logger.debug("Accessing EVE data from agent POST...")
         eve = result_obj["eve"]
     else:
         eve = ""
 
     # Use JSON logs for Zeek
     if "zeek_json" in result_obj:
-        logger.debug("Accessing Zeek JSON data from agent POST...")
+        current_app.logger.debug("Accessing Zeek JSON data from agent POST...")
         zeek_json = result_obj["zeek_json"]
     else:
         zeek_json = False
 
-    logger.debug("Saving job data to redis...")
+    current_app.logger.debug("Saving job data to redis...")
     redis.set("%s-ids" % jobid, ids)
     redis.set("%s-perf" % jobid, perf)
     redis.set("%s-alert" % jobid, alert)
@@ -929,7 +930,7 @@ def post_job_results(jobid):
     if zeek_json is not None:
         redis.set("%s-zeek_json" % jobid, str(zeek_json))
     set_keys_timeout(redis, jobid)
-    logger.debug("Done saving job data to redis.")
+    current_app.logger.debug("Done saving job data to redis.")
 
     if error:
         set_job_status_msg(
@@ -946,7 +947,7 @@ def post_job_results(jobid):
         )
 
     set_job_status(redis, jobid, STAT_CODE_DONE)
-    logger.debug("Returning from post_job_results()")
+    current_app.logger.debug("Returning from post_job_results()")
     return Response("OK", mimetype="text/plain", headers={"X-Dalton-Webapp": "OK"})
 
 
@@ -962,7 +963,7 @@ def get_ajax_job_status_msg(jobid):
             mimetype="text/plain",
             headers={"X-Dalton-Webapp": "OK"},
         )
-    stat_code = get_job_status(redis, jobid)
+    stat_code = int(get_job_status(redis, jobid))
     if stat_code:
         if int(stat_code) == STAT_CODE_RUNNING:
             check_for_timeout(redis, jobid)
@@ -1008,9 +1009,11 @@ def get_ajax_job_status_code(jobid):
 def sensor_get_job(id):
     """user or agent requesting a job zip file"""
     # get the user (for logging)
-    logger.debug("Dalton in sensor_get_job(): request for job zip file %s", id)
+    current_app.logger.debug(
+        "Dalton in sensor_get_job(): request for job zip file %s", id
+    )
     if not validate_jobid(id):
-        logger.error("Bad jobid given: '%s'. Possible hacking attempt.", id)
+        current_app.logger.error("Bad jobid given: '%s'. Possible hacking attempt.", id)
         return render_template(
             "/dalton/error.html",
             jid=id,
@@ -1019,14 +1022,18 @@ def sensor_get_job(id):
     path = f"{JOB_STORAGE_PATH}/{id}.zip"
     if os.path.exists(path):
         with open(path, "rb") as fh:
-            logger.debug(f"Dalton in sensor_get_job(): sending job zip file {id}")
+            current_app.logger.debug(
+                f"Dalton in sensor_get_job(): sending job zip file {id}"
+            )
             return Response(
                 fh.read(),
                 mimetype="application/zip",
                 headers={"Content-Disposition": f"attachment;filename={id}.zip"},
             )
     else:
-        logger.error(f"Dalton in sensor_get_job(): could not find job {id} at {path}.")
+        current_app.logger.error(
+            f"Dalton in sensor_get_job(): could not find job {id} at {path}."
+        )
         return render_template(
             "/dalton/error.html",
             jid=id,
@@ -1051,7 +1058,7 @@ def clear_old_agents(redis):
                 )
             #                minutes_ago = AGENT_PURGE_TIME
             except Exception as e:
-                logger.error("Error in clear_old_agents(): %s", e)
+                current_app.logger.error("Error in clear_old_agents(): %s", e)
                 # screwed something up, perhaps with Python3 strings...
             if minutes_ago >= AGENT_PURGE_TIME:
                 # delete old agents
@@ -1109,15 +1116,15 @@ def verify_fs_pcap(fspcap):
     """
     # require fspcap to be POSIX fully portable filename
     if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", fspcap):
-        logger.error(
+        current_app.logger.error(
             "Bad fspcap filename provided: '%s'. Filename must be POSIX fully portable."
             % fspcap
         )
         return "Bad pcap filename provided: '%s'" % (fspcap)
     fspcap_path = os.path.join(FS_PCAP_PATH, os.path.basename(fspcap))
-    logger.debug("Flowsynth pcap file passed: %s" % fspcap_path)
+    current_app.logger.debug("Flowsynth pcap file passed: %s" % fspcap_path)
     if not os.path.isfile(fspcap_path):
-        logger.error("fspcap file '%s' not found." % fspcap_path)
+        current_app.logger.error("fspcap file '%s' not found." % fspcap_path)
         return "File not found: '%s'" % os.path.basename(fspcap)
     return None
 
@@ -1201,7 +1208,7 @@ def page_coverage_jid(jid, error=None):
                 sensors.sort(key=LooseVersion, reverse=True)
             except Exception:
                 sensors.sort(reverse=True)
-        logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
+        current_app.logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
 
     job_ruleset = manifest.get("prod-ruleset")
     if job_ruleset:
@@ -1302,18 +1309,18 @@ def page_coverage_default(sensor_tech, error=None):
                 sensors.sort(key=LooseVersion, reverse=True)
             except Exception:
                 sensors.sort(reverse=True)
-        logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
+        current_app.logger.debug(f"In page_coverage_default() - sensors:\n{sensors}")
     # get conf or yaml file if sensor supports it
     engine_conf = None
     # return the engine.conf from the first sensor in the list which is sorted (see above)
     # and should be the most recent sensor version (depends on lexical sort done above). It
     # is also the sensor version that is checked by default on the job submission page.
-    if len(sensors) > 0:
+    if len(sensors) > 0 and not sensor_tech.startswith("zeek"):
         try:
-            logger.debug("call to get_engine_conf_file(%s)", sensors[0])
+            current_app.logger.debug("call to get_engine_conf_file(%s)", sensors[0])
             engine_conf = get_engine_conf_file(sensors[0])
         except Exception as e:
-            logger.error(
+            current_app.logger.error(
                 "Could not process response from get_engine_conf_file(): %s", e
             )
             engine_conf = "# not found"
@@ -1338,6 +1345,7 @@ def page_show_job(jid):
     redis = get_redis()
     tech = redis.get("%s-tech" % jid)
     status = get_job_status(redis, jid)
+    current_app.logger.debug("Getting status of job %s and got %s", jid, status)
 
     if not status:
         # job doesn't exist
@@ -1369,7 +1377,7 @@ def page_show_job(jid):
         try:
             zeek_json = redis.get(f"{jid}-zeek_json")
         except Exception:
-            # logger.debug(f"Problem getting {jid}-zeek_json:\n{e}")
+            # current_app.logger.debug(f"Problem getting {jid}-zeek_json:\n{e}")
             zeek_json = "False"
 
         try:
@@ -1382,11 +1390,11 @@ def page_show_job(jid):
         except Exception:
             # if <jid>-other_logs is empty then error, "No JSON object could be decoded" will be thrown so just handling it cleanly
             other_logs = ""
-            # logger.error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
+            # current_app.logger.error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
         try:
             eve = redis.get(f"{jid}-eve")
         except Exception:
-            # logger.debug(f"Problem getting {jid}-eve log:\n{e}")
+            # current_app.logger.debug(f"Problem getting {jid}-eve log:\n{e}")
             eve = ""
         event_types = []
         if len(eve) > 0:
@@ -1399,7 +1407,9 @@ def page_show_job(jid):
                 if len(event_types) > 0:
                     event_types = sorted(event_types)
             except Exception as e:
-                logger.error(f"Problem parsing EVE log for jobid {jid}:\n{e}")
+                current_app.logger.error(
+                    f"Problem parsing EVE log for jobid {jid}:\n{e}"
+                )
         # parse out custom rules option and pass it?
         custom_rules = False
         try:
@@ -1416,6 +1426,7 @@ def page_show_job(jid):
         else:
             overview["status"] = "Error"
 
+        current_app.logger.debug("Rendering dalton/job.html template for job %s", jid)
         return render_template(
             "/dalton/job.html",
             overview=overview,
@@ -1467,7 +1478,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
     included with the Dalton job.
     """
     # Note: archivename already sanitized
-    logger.debug(
+    current_app.logger.debug(
         "Attempting to extract pcaps from  file '%s'" % os.path.basename(archivename)
     )
     if archivename.lower().endswith(".zip"):
@@ -1481,12 +1492,12 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     "File '%s' is not recognized as a valid zip file."
                     % os.path.basename(archivename)
                 )
-                logger.error(msg)
+                current_app.logger.error(msg)
                 return msg
             files_to_extract = []
             zf = zipfile.ZipFile(archivename, mode="r")
             for file in zf.namelist():
-                logger.debug("Processing file '%s' from ZIP archive" % file)
+                current_app.logger.debug("Processing file '%s' from ZIP archive" % file)
                 if file.endswith("/") or "__MACOSX/" in file:
                     continue
                 filename = clean_filename(os.path.basename(file))
@@ -1495,7 +1506,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     ".pcapng",
                     ".cap",
                 ]:
-                    logger.warning(
+                    current_app.logger.warning(
                         "Not adding file '%s' from archive '%s': '.pcap', '.cap', or '.pcapng' extension required."
                         % (file, os.path.basename(archivename))
                     )
@@ -1507,7 +1518,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
             if len(files_to_extract) > 0:
                 # make temporary location for extracting with 7z
                 tempd = tempfile.mkdtemp()
-                logger.debug("temp directory for 7z: %s" % tempd)
+                current_app.logger.debug("temp directory for 7z: %s" % tempd)
                 # try password 'infected' if password on archive
                 p7z_command = [
                     "7z",
@@ -1518,7 +1529,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     "-o%s" % tempd,
                 ] + files_to_extract
                 # does 7z handle invalid/filenames or should more sanitization be attempted?
-                logger.debug("7z command: %s" % p7z_command)
+                current_app.logger.debug("7z command: %s" % p7z_command)
                 # I'm not convinced that 7z outputs to stderr
                 p7z_out = subprocess.Popen(
                     p7z_command,
@@ -1527,12 +1538,12 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     stdout=subprocess.PIPE,
                 ).stdout.read()
                 if b"Everything is Ok" not in p7z_out and b"Errors: " in p7z_out:
-                    logger.error(
+                    current_app.logger.error(
                         "Problem extracting ZIP archive '%s': %s"
                         % (os.path.basename(archivename), p7z_out)
                     )
                     raise Exception("p7zip error. See logs for details")
-                logger.debug("7z out: %s" % p7z_out)
+                current_app.logger.debug("7z out: %s" % p7z_out)
 
                 # move files; handle duplicate filenames
                 for file in files_to_extract:
@@ -1543,7 +1554,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     # copy
                     shutil.move(pcapsrc, pcappath)
                     pcap_files.append({"filename": filename, "pcappath": pcappath})
-                    logger.debug(
+                    current_app.logger.debug(
                         "Successfully extracted and added pcap file '%s'"
                         % os.path.basename(filename)
                     )
@@ -1555,8 +1566,8 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                 os.path.basename(archivename),
                 e,
             )
-            logger.error(msg)
-            logger.debug("%s" % traceback.format_exc())
+            current_app.logger.error(msg)
+            current_app.logger.debug("%s" % traceback.format_exc())
             return msg
     elif os.path.splitext(archivename)[1].lower() in [
         ".gz",
@@ -1565,7 +1576,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
         # gzipped file
         try:
             filename = os.path.basename(os.path.splitext(archivename)[0])
-            logger.debug("Decompressing gzipped file '%s'" % filename)
+            current_app.logger.debug("Decompressing gzipped file '%s'" % filename)
             with gzip.open(archivename, "rb") as gz:
                 filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
                 pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
@@ -1573,14 +1584,14 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                 fh.write(gz.read())
                 fh.close()
                 pcap_files.append({"filename": filename, "pcappath": pcappath})
-                logger.debug("Added %s" % filename)
+                current_app.logger.debug("Added %s" % filename)
         except Exception as e:
             msg = "Problem extracting gzip file '%s': %s" % (
                 os.path.basename(archivename),
                 e,
             )
-            logger.error(msg)
-            logger.debug("%s" % traceback.format_exc())
+            current_app.logger.error(msg)
+            current_app.logger.debug("%s" % traceback.format_exc())
             return msg
     elif os.path.splitext(archivename)[1].lower() in [".bz2"] and os.path.splitext(
         os.path.splitext(archivename)[0]
@@ -1588,7 +1599,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
         # bzip2 file
         try:
             filename = os.path.basename(os.path.splitext(archivename)[0])
-            logger.debug("Decompressing bzip2 file '%s'" % filename)
+            current_app.logger.debug("Decompressing bzip2 file '%s'" % filename)
             with bz2.BZ2File(archivename, "rb") as bz:
                 filename = handle_dup_names(filename, pcap_files, job_id, dupcount)
                 pcappath = os.path.join(TEMP_STORAGE_PATH, job_id, filename)
@@ -1596,22 +1607,24 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                 fh.write(bz.read())
                 fh.close()
                 pcap_files.append({"filename": filename, "pcappath": pcappath})
-                logger.debug("Added %s" % filename)
+                current_app.logger.debug("Added %s" % filename)
         except Exception as e:
             msg = "Problem extracting bzip2 file '%s': %s" % (
                 os.path.basename(archivename),
                 e,
             )
-            logger.error(msg)
-            logger.debug("%s" % traceback.format_exc())
+            current_app.logger.error(msg)
+            current_app.logger.debug("%s" % traceback.format_exc())
             return msg
     else:
         try:
             archive = tarfile.open(archivename, mode="r:*")
             for file in archive.getmembers():
-                logger.debug("Processing file '%s' from archive" % file.name)
+                current_app.logger.debug(
+                    "Processing file '%s' from archive" % file.name
+                )
                 if not file.isfile():
-                    logger.warning(
+                    current_app.logger.warning(
                         "Not adding member '%s' from archive '%s': not a file."
                         % (file.name, os.path.basename(archivename))
                     )
@@ -1622,7 +1635,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     ".pcapng",
                     ".cap",
                 ]:
-                    logger.warning(
+                    current_app.logger.warning(
                         "Not adding file '%s' from archive '%s': '.pcap', '.cap', or '.pcapng' extension required."
                         % (file.name, os.path.basename(archivename))
                     )
@@ -1635,15 +1648,15 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                 fh.write(contentsfh.read())
                 fh.close()
                 pcap_files.append({"filename": filename, "pcappath": pcappath})
-                logger.debug("Added %s" % filename)
+                current_app.logger.debug("Added %s" % filename)
             archive.close()
         except Exception as e:
             msg = "Problem extracting archive file '%s': %s" % (
                 os.path.basename(archivename),
                 e,
             )
-            logger.error(msg)
-            logger.debug("%s" % traceback.format_exc())
+            current_app.logger.error(msg)
+            current_app.logger.debug("%s" % traceback.format_exc())
             return msg
     return None
 
@@ -1651,7 +1664,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
 #  abstracting the job submission method away from the HTTP POST and creating this
 #   function so that it can be called easier (e.g. from an API)
 def submit_job():
-    logger.debug("submit_job() called")
+    current_app.logger.debug("submit_job() called")
     # never finished coding this...
     # TODO: API call that accepts a job zipfile and queues it up for an agent?
     #       would have to beef up input validation on agent probably....
@@ -1664,19 +1677,17 @@ def page_coverage_summary():
     """Handle job submission from UI."""
     # user submitting a job to Dalton via the web interface
     redis = get_redis()
-
     verify_temp_storage_path()
-    digest = hashlib.md5()
-
     prod_ruleset_name = None
 
     # get the user who submitted the job .. not implemented
     user = "undefined"
 
     # generate job_id based of pcap filenames and timestamp
-    digest.update(str(datetime.datetime.now()).encode("utf-8"))
-    digest.update(str(random.randrange(96313375)).encode("utf-8"))
-    job_id = digest.hexdigest()[0:16]  # this is a temporary job id for the filename
+    # this is a temporary job id for the filename
+    job_id = create_hash(
+        [str(datetime.datetime.now()), str(random.randrange(96313375))]
+    )[0:16]
 
     # store the pcaps offline temporarily
     # make temp job directory so there isn't a race condition if more
@@ -1783,7 +1794,7 @@ def page_coverage_summary():
                     else:
                         form_pcap_files.append(pcap_file)
         except Exception:
-            logger.debug("%s" % traceback.format_exc())
+            current_app.logger.debug("%s" % traceback.format_exc())
             pass
 
     # get the sensor technology and queue name
@@ -1797,7 +1808,7 @@ def page_coverage_summary():
                 valid_sensor_tech = True
                 break
     if not valid_sensor_tech:
-        logger.error(
+        current_app.logger.error(
             "Dalton in page_coverage_summary(): Error: user %s submitted a job for invalid sensor tech, '%s'",
             user,
             sensor_tech,
@@ -1842,7 +1853,7 @@ def page_coverage_summary():
 
         (sensor_tech_engine, sensor_tech_version) = get_engine_and_version(sensor_tech)
         if sensor_tech_engine is None or sensor_tech_version is None:
-            logger.error(
+            current_app.logger.error(
                 "Dalton in page_coverage_summary(): Error: user %s submitted a job with invalid sensor tech string, '%s'",
                 user,
                 sensor_tech,
@@ -1864,7 +1875,7 @@ def page_coverage_summary():
             and not bSplitCap
         ):
             if not MERGECAP_BINARY:
-                logger.error(
+                current_app.logger.error(
                     "No mergecap binary; unable to merge pcaps for Suricata job."
                 )
                 delete_temp_files(job_id)
@@ -1881,7 +1892,7 @@ def page_coverage_summary():
                 job_id,
             )
             mergecap_command = f"{MERGECAP_BINARY} -w {combined_file} -a -F pcap {' '.join([p['pcappath'] for p in pcap_files])}"
-            logger.debug(
+            current_app.logger.debug(
                 "Multiple pcap files submitted to Suricata, combining the following into one file:  %s",
                 ", ".join([p["filename"] for p in pcap_files]),
             )
@@ -1895,7 +1906,7 @@ def page_coverage_summary():
                 ).stdout.read()
                 if len(mergecap_output) > 0:
                     # return error?
-                    logger.error(
+                    current_app.logger.error(
                         "Error merging pcaps with command:\n%s\n\nOutput:\n%s",
                         mergecap_command,
                         mergecap_output,
@@ -1918,7 +1929,7 @@ def page_coverage_summary():
                     }
                 ]
             except Exception as e:
-                logger.error("Could not merge pcaps.  Error: %s", e)
+                current_app.logger.error("Could not merge pcaps.  Error: %s", e)
                 delete_temp_files(job_id)
                 return render_template(
                     "/dalton/error.html",
@@ -2211,25 +2222,27 @@ def page_coverage_summary():
                         if v not in config["vars"]["address-groups"]:
                             config["vars"]["address-groups"][v] = ipv2add[v]
                 except Exception as e:
-                    logger.warning(
+                    current_app.logger.warning(
                         "(Not Fatal) Problem customizing Suricata variables; your YAML may be bad. %s",
                         e,
                     )
-                    logger.debug(f"{traceback.format_exc()}")
+                    current_app.logger.debug(f"{traceback.format_exc()}")
                 # set EXTERNAL_NET to 'any' if option set
                 try:
                     if bOverrideExternalNet:
                         if "EXTERNAL_NET" not in config["vars"]["address-groups"]:
-                            logger.warning(
+                            current_app.logger.warning(
                                 "EXTERNAL_NET IP variable not set in config; setting to 'any'"
                             )
                         config["vars"]["address-groups"]["EXTERNAL_NET"] = "any"
-                        logger.debug("Set 'EXTERNAL_NET' IP variable to 'any'")
+                        current_app.logger.debug(
+                            "Set 'EXTERNAL_NET' IP variable to 'any'"
+                        )
                 except Exception as e:
-                    logger.warning(
+                    current_app.logger.warning(
                         "(Not Fatal) Problem overriding EXTERNAL_NET: %s" % e
                     )
-                    logger.debug("%s" % traceback.format_exc())
+                    current_app.logger.debug("%s" % traceback.format_exc())
                 # first, do rule includes
                 # should references to other rule files be removed?
                 removeOtherRuleFiles = True
@@ -2272,7 +2285,7 @@ def page_coverage_summary():
                 for citem in ["outputs", "logging"]:
                     # set outputs
                     if citem not in config:
-                        logger.warning(
+                        current_app.logger.warning(
                             f"No '{citem}' section in Suricata YAML. This may be a problem...."
                         )
                         # going to try to build this from scratch but Suri still may not like it
@@ -2297,7 +2310,7 @@ def page_coverage_summary():
                             "file"
                         ]["level"]
                     except Exception as e:
-                        logger.warning(
+                        current_app.logger.warning(
                             "Unable to get log level from config (logging->outputs->file->level): %s"
                             % e
                         )
@@ -2337,7 +2350,7 @@ def page_coverage_summary():
                                 olist.index("unified2-alert")
                             ]["unified2-alert"]["xff"]["deployment"]
                         except Exception:
-                            logger.debug(
+                            current_app.logger.debug(
                                 "Could not get outputs->unified2-alert->xff->deployment.  Using default value of '%s'"
                                 % deployment
                             )
@@ -2346,7 +2359,7 @@ def page_coverage_summary():
                                 "unified2-alert"
                             ]["xff"]["header"]
                         except Exception:
-                            logger.debug(
+                            current_app.logger.debug(
                                 "Could not get outputs->unified2-alert->xff->header.  Using default value of '%s'"
                                 % header
                             )
@@ -2490,12 +2503,12 @@ def page_coverage_summary():
                                         config["outputs"][olist.index("eve-log")][
                                             "eve-log"
                                         ]["types"][i]["alert"].pop("tls", None)
-                                        logger.debug(
+                                        current_app.logger.debug(
                                             "Removed outputs->eve-log->types->alert->tls"
                                         )
                                         break
                                 except Exception:
-                                    # logger.debug("Possible issue when removing outputs->eve-log->types->alert->tls (EVE TLS log). Error: %s" % e)
+                                    # current_app.logger.debug("Possible issue when removing outputs->eve-log->types->alert->tls (EVE TLS log). Error: %s" % e)
                                     pass
 
                             for i in range(
@@ -2518,12 +2531,12 @@ def page_coverage_summary():
                                         del config["outputs"][olist.index("eve-log")][
                                             "eve-log"
                                         ]["types"][i]
-                                        logger.debug(
+                                        current_app.logger.debug(
                                             "Removed outputs->eve-log->types->tls"
                                         )
                                         break
                                 except Exception:
-                                    # logger.debug("Possible issue when removing outputs->eve-log->types->tls (EVE TLS log). Error: %s" % e)
+                                    # current_app.logger.debug("Possible issue when removing outputs->eve-log->types->tls (EVE TLS log). Error: %s" % e)
                                     pass
                     else:
                         # disable EVE Log if Suricata version supports it
@@ -2533,7 +2546,9 @@ def page_coverage_summary():
                                 "enabled"
                             ] = False
                 except Exception as e:
-                    logger.warning("Problem editing eve-log section of config: %s" % e)
+                    current_app.logger.warning(
+                        "Problem editing eve-log section of config: %s" % e
+                    )
                     pass
 
                 # set filename for rule and keyword profiling
@@ -2587,8 +2602,8 @@ def page_coverage_summary():
                 )
                 engine_conf_fh.close()
             except Exception as e:
-                logger.error("Problem processing YAML file(s): %s", e)
-                logger.debug("%s", traceback.format_exc())
+                current_app.logger.error("Problem processing YAML file(s): %s", e)
+                current_app.logger.debug("%s", traceback.format_exc())
                 delete_temp_files(job_id)
                 return render_template(
                     "/dalton/error.html",
@@ -2626,20 +2641,24 @@ def page_coverage_summary():
                                         # can't modify list we are iterating over so delete from copy
                                         ipv2add_copy.pop(v)
                             except Exception as e:
-                                logger.warning(
+                                current_app.logger.warning(
                                     "(Not Fatal) Problem customizing Snort variables: %s",
                                     e,
                                 )
-                                logger.debug("%s" % traceback.format_exc())
+                                current_app.logger.debug("%s" % traceback.format_exc())
                             if line.startswith("ipvar EXTERNAL_NET "):
                                 external_net_found = True
                                 if bOverrideExternalNet:
                                     line = "ipvar EXTERNAL_NET any"
-                                    logger.debug("Set 'EXTERNAL_NET' ipvar to 'any'")
+                                    current_app.logger.debug(
+                                        "Set 'EXTERNAL_NET' ipvar to 'any'"
+                                    )
                             if line.startswith("var EXTERNAL_NET "):
                                 external_net_found = True
                                 if bOverrideExternalNet:
-                                    logger.debug("Set 'EXTERNAL_NET' var to 'any'")
+                                    current_app.logger.debug(
+                                        "Set 'EXTERNAL_NET' var to 'any'"
+                                    )
                                     line = "var EXTERNAL_NET any"
 
                         # add directive for rule profiling, if requested
@@ -2679,7 +2698,7 @@ def page_coverage_summary():
             elif sensor_tech.startswith("zeek"):
                 engine_conf_file = None
             else:
-                logger.warning(
+                current_app.logger.warning(
                     "Unexpected sensor_tech value submitted: %s", sensor_tech
                 )
                 engine_conf_file = os.path.join(
@@ -2773,8 +2792,8 @@ def page_coverage_summary():
                         prod_ruleset_name = os.path.basename(ruleset_path)
                         if not prod_ruleset_name.endswith(".rules"):
                             prod_ruleset_name = "%s.rules" % prod_ruleset_name
-                    logger.debug("ruleset_path = %s" % ruleset_path)
-                    logger.debug(
+                    current_app.logger.debug("ruleset_path = %s" % ruleset_path)
+                    current_app.logger.debug(
                         "Dalton in page_coverage_summary():   prod_ruleset_name: %s"
                         % (prod_ruleset_name)
                     )
@@ -2842,7 +2861,7 @@ def page_coverage_summary():
                     ):
                         zf.write(custom_rules_file, arcname="dalton-custom.rules")
                 except Exception as e:
-                    logger.exception("Problem adding custom rules: %s", e)
+                    current_app.logger.exception("Problem adding custom rules: %s", e)
                     pass
                 vars_file = None
                 if vars_file is not None:
@@ -2896,7 +2915,7 @@ def page_coverage_summary():
             finally:
                 zf.close()
 
-            logger.debug(
+            current_app.logger.debug(
                 "Dalton in page_coverage_summary(): created job zip file %s for user %s"
                 % (zf_path, user)
             )
@@ -2923,7 +2942,7 @@ def page_coverage_summary():
             # set job as queued and write to the Redis queue
             set_job_status(redis, jid, STAT_CODE_QUEUED)
             set_job_status_msg(redis, jid, f"Queued Job {jid}")
-            logger.info(
+            current_app.logger.info(
                 "Dalton user '%s' submitted Job %s to queue %s"
                 % (user, jid, sensor_tech)
             )
@@ -2961,12 +2980,12 @@ def page_coverage_summary():
                         "http", request.environ["HTTP_X_FORWARDED_PROTO"]
                     )
                 else:
-                    logger.warning(
+                    current_app.logger.warning(
                         "Could not find request.environ['HTTP_X_FORWARDED_PROTO']. Make sure the web server (proxy) is configured to send it."
                     )
             else:
                 # this shouldn't be the case with '_external=True' passed to url_for()
-                logger.warning("URL does not start with 'http': %s" % rurl)
+                current_app.logger.warning("URL does not start with 'http': %s" % rurl)
             return redirect(rurl)
 
 
@@ -3010,14 +3029,16 @@ def page_queue_default():
                 "%s-status" % jid
             ):
                 # job has expired
-                logger.debug("Dalton in page_queue_default(): removing job: %s" % jid)
+                current_app.logger.debug(
+                    "Dalton in page_queue_default(): removing job: %s" % jid
+                )
                 redis.lrem("recent_jobs", jid)
                 # just in case, expire all keys associated with jid
                 expire_all_keys(redis, jid)
             else:
                 status = int(get_job_status(redis, jid))
                 # ^^ have to cast as an int since it gets stored as a string (everything in redis is a string apparently....)
-                # logger.debug("Dalton in page_queue_default(): Job %s, stat code: %d" % (jid, status))
+                # current_app.logger.debug("Dalton in page_queue_default(): Job %s, stat code: %d" % (jid, status))
                 status_msg = "Unknown"
                 if status == STAT_CODE_QUEUED:
                     status_msg = "Queued"
@@ -3146,7 +3167,7 @@ def controller_api_get_job_data(redis, jid, requested_data):
                         "Unexpected error1: cannot pull '%s' data for Job ID %s"
                         % (requested_data, jid)
                     )
-                    logger.debug(f"{json_response['error_msg']}: {e}")
+                    current_app.logger.debug(f"{json_response['error_msg']}: {e}")
             else:
                 ret_data = None
                 if requested_data == "all":
@@ -3174,7 +3195,7 @@ def controller_api_get_job_data(redis, jid, requested_data):
                             "Unexpected error: cannot pull '%s' data for Job ID %s"
                             % (requested_data, jid)
                         )
-                        logger.debug(f"{json_response['error_msg']}: {e}")
+                        current_app.logger.debug(f"{json_response['error_msg']}: {e}")
                 else:
                     try:
                         ret_data = redis.get("%s-%s" % (jid, requested_data))
@@ -3198,7 +3219,7 @@ def controller_api_get_job_data(redis, jid, requested_data):
 )
 # @auth_required()
 def controller_api_get_request(jid, requested_data, raw):
-    logger.debug(
+    current_app.logger.debug(
         f"controller_api_get_request() called, raw: {'True' if raw == 'raw' else 'False'}"
     )
     redis = get_redis()

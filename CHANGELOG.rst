@@ -175,3 +175,10 @@ in a sort of pre-release mode.
 
 * Fixed bug with zeek processing. (#213) (#214) (#216)
 * Added some unit tests. (#215)
+
+3.5.x (2024-11-xx)
+##################
+
+* Updated Flask from version 1 to version 3 (#180)
+  * and update other python dependencies in the controller
+* Simplify logging (#220)

@@ -1,15 +1,13 @@
 import hashlib
 import json
-import logging
 import os
 import random
 import re
 import shlex
 import subprocess
 import tempfile
-from logging.handlers import RotatingFileHandler
 
-from flask import Blueprint, Response, redirect, render_template, request
+from flask import Blueprint, Response, current_app, redirect, render_template, request
 
 from . import certsynth
 from .dalton import FS_BIN_PATH as BIN_PATH
@@ -19,22 +17,6 @@ from .dalton import FS_PCAP_PATH as PCAP_PATH
 flowsynth_blueprint = Blueprint(
     "flowsynth_blueprint", __name__, template_folder="templates/"
 )
-
-logger = logging.getLogger("flowsynth")
-
-
-def setup_flowsynth_logging():
-    """Set up logging."""
-    file_handler = RotatingFileHandler(
-        "/var/log/flowsynth.log", "a", 1 * 1024 * 1024, 10
-    )
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
-    )
-    logger.addHandler(file_handler)
-    logger.setLevel(logging.INFO)
-
-    logger.info("Logging started")
 
 
 def get_pcap_path():
@@ -99,7 +81,9 @@ def payload_http(formobj):
         )
         request_body_len = len(request_body) - (request_body.count("\\x") * 3)
     except Exception as e:
-        logger.error("Problem parsing HTTP Wizard payload request content: %s" % e)
+        current_app.logger.error(
+            "Problem parsing HTTP Wizard payload request content: %s" % e
+        )
         return None
 
     # the start of the flowsynth
@@ -151,7 +135,9 @@ def payload_http(formobj):
             )
             response_body_len = len(response_body) - (response_body.count("\\x") * 3)
         except Exception as e:
-            logger.error("Problem parsing HTTP Wizard payload response content: %s" % e)
+            current_app.logger.error(
+                "Problem parsing HTTP Wizard payload response content: %s" % e
+            )
             return None
 
         if "payload_http_response_contentlength" in formobj:
@@ -190,7 +176,7 @@ def payload_http(formobj):
 def payload_cert(formobj):
     # Make sure we have stuff we need
     if not ("cert_file_type" in formobj and "cert_file" in request.files):
-        logger.error("No cert submitted")
+        current_app.logger.error("No cert submitted")
         return None
 
     try:
@@ -201,16 +187,18 @@ def payload_cert(formobj):
             if certsynth.pem_cert_validate(file_content.strip()):
                 return certsynth.cert_to_synth(file_content.strip(), "PEM")
             else:
-                logger.error("Unable to validate submitted pem file.")
+                current_app.logger.error("Unable to validate submitted pem file.")
                 return None
         elif cert_file_type == "der":
             return certsynth.cert_to_synth(file_content, "DER")
         else:
             # this shouldn't happen if people are behaving
-            logger.error(f"Invalid certificate format given: '{cert_file_type}'")
+            current_app.logger.error(
+                f"Invalid certificate format given: '{cert_file_type}'"
+            )
             return None
     except Exception as e:
-        logger.error(f"Error processing submitted certificate file: {e}")
+        current_app.logger.error(f"Error processing submitted certificate file: {e}")
         return None
 
 
@@ -336,7 +324,7 @@ def compile_fs():
         inpath,
         outpath,
     )
-    logger.debug(command)
+    current_app.logger.debug(command)
     proc = subprocess.Popen(
         shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
@@ -347,7 +335,7 @@ def compile_fs():
         synthstatus = json.loads(output)
     except ValueError:
         # there was a problem producing output.
-        logger.error("Problem processing Flowsynth output: %s" % output)
+        current_app.logger.error("Problem processing Flowsynth output: %s" % output)
         return render_template(
             "pcapwg/error.html", error_text=output + b"\n\n" + errors
         )
@@ -378,13 +366,13 @@ def about_page():
 def retrieve_pcap(pcapid):
     """Returns a PCAP to the user."""
     if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", pcapid):
-        logger.error("Bad pcapid in get_pcap request: '%s'" % pcapid)
+        current_app.logger.error("Bad pcapid in get_pcap request: '%s'" % pcapid)
         return render_template(
             "pcapwg/error.html", error_text="Bad pcapid: '%s'" % pcapid
         )
     path = get_pcap_file_path(os.path.basename(pcapid))
     if not os.path.isfile(path):
-        logger.error(
+        current_app.logger.error(
             "In get_pcap request: file not found: '%s'" % os.path.basename(path)
         )
         return render_template(

@@ -8,18 +8,12 @@ description = "Run pcaps against an IDS"
 dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
-    "Jinja2==3.0.3",
-    "Flask==1.1.1",
-    "Flask-Assets==0.12",
-    "Flask-Script==2.0.6",
-    "Flask-Caching==1.8.0",
-    "Flask-Compress==1.4.0",
+    "Flask==3.0.3",
     "redis==5.2.0",
+    # there is newer ruamel available
     "ruamel.yaml<0.18.0",
-    "idstools==0.6.4",
+    "idstools==0.6.5",
     "flowsynth>=1.4.1",
-    "werkzeug==0.16.1",
-    "itsdangerous==2.0.1",
 ]
 authors = [
     { name = "David Wharton and others" }
