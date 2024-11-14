@@ -40,11 +40,12 @@ import time
 import traceback
 import zipfile
 from distutils.version import LooseVersion
+from functools import lru_cache
 from logging.handlers import RotatingFileHandler
 from threading import Thread
 
-import redis
 from flask import Blueprint, Response, redirect, render_template, request, url_for
+from redis import Redis
 from ruamel import yaml
 
 # setup the dalton blueprint
@@ -53,6 +54,8 @@ dalton_blueprint = Blueprint(
 )
 
 logger = logging.getLogger("dalton")
+
+ONLY_RUN_ONCE = lru_cache(maxsize=None)
 
 
 def setup_dalton_logging():
@@ -113,14 +116,6 @@ if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
         % MERGECAP_BINARY
     )
     MERGECAP_BINARY = None
-
-# connect to the datastore
-try:
-    # redis values are returned as byte objects by default. Automatically
-    # decode them to utf-8.
-    r = redis.Redis(REDIS_HOST, charset="utf-8", decode_responses=True)
-except Exception as e:
-    logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
 
 
 # if there are no rules, use idstools rulecat to download a set for Suri and Snort
@@ -183,7 +178,7 @@ if JOB_RUN_TIMEOUT <= 4:
         % JOB_RUN_TIMEOUT
     )
 if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
-    logger.warn(
+    logger.warning(
         "teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis."
         % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE)
     )
@@ -191,7 +186,7 @@ if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
 # other checks
 if MAX_PCAP_FILES < 1:
     default_max = 8
-    logger.warn(
+    logger.warning(
         "max_pcap_files value of '%d' invalid.  Using '%d'"
         % (MAX_PCAP_FILES, default_max)
     )
@@ -213,10 +208,9 @@ supported_engines = ["suricata", "snort", "zeek"]
 
 logger.info("Dalton Started.")
 
-""" returns normalized path; used to help prevent directory traversal """
-
 
 def clean_path(mypath):
+    """returns normalized path; used to help prevent directory traversal"""
     return os.path.normpath("/" + mypath).lstrip("/")
 
 
@@ -253,9 +247,19 @@ def get_engine_and_version(sensor_tech):
         return (None, None)
 
 
+@ONLY_RUN_ONCE
+def get_redis():
+    """Connect to the datastore."""
+    try:
+        # redis values are returned as byte objects by default. Automatically
+        # decode them to utf-8.
+        return Redis(REDIS_HOST, charset="utf-8", decode_responses=True)
+    except Exception as e:
+        logger.critical("Problem connecting to Redis host '%s': %s" % (REDIS_HOST, e))
+
+
 def delete_temp_files(job_id):
     """deletes temp files for given job ID"""
-    global TEMP_STORAGE_PATH
     if os.path.exists(TEMP_STORAGE_PATH):
         for file in glob.glob(os.path.join(TEMP_STORAGE_PATH, "%s*" % job_id)):
             if os.path.isfile(file):
@@ -268,17 +272,23 @@ def verify_temp_storage_path():
     """verify and create if necessary the temp location where we will store files (PCAPs, configs, etc.)
     when build a job zip file
     """
-    global TEMP_STORAGE_PATH
     if not os.path.exists(TEMP_STORAGE_PATH):
         os.makedirs(TEMP_STORAGE_PATH)
     return True
+
+
+def create_hash(values):
+    """Create an MD5 hash of the values and return the digest."""
+    md5 = hashlib.md5()
+    for val in values:
+        md5.update(val.encode())
+    return md5.hexdigest()
 
 
 @dalton_blueprint.route(
     "/dalton/controller_api/get-prod-rulesets/<engine>", methods=["GET"]
 )
 def api_get_prod_rulesets(engine):
-    global supported_engines
     if engine is None or engine == "" or engine not in supported_engines:
         return Response(
             "Invalid 'engine' supplied.  Must be one of %s.\nExample URI:\n\n/dalton/controller_api/get-prod-rulesets/suricata"
@@ -307,7 +317,6 @@ def api_get_prod_rulesets(engine):
 
 def get_rulesets(engine=""):
     """return a list of locally stored ruleset for jobs to use"""
-    global RULESET_STORAGE_PATH
     ruleset_list = []
     logger.debug("in get_rulesets(engine=%s)" % engine)
     # engine var should already be validated but just in case
@@ -333,73 +342,70 @@ def get_rulesets(engine=""):
     return [[file, os.path.join(ruleset_dir, file)] for file in ruleset_list]
 
 
-def set_job_status_msg(jobid, msg):
+def set_job_status_msg(redis, jobid, msg):
     """set a job's status message"""
-    global r
-    r.set("%s-status" % jobid, msg)
+    redis.set("%s-status" % jobid, msg)
     # status keys do not expire if/when they are queued
     if msg != "Queued":
-        if r.get("%s-teapotjob" % jobid):
-            r.expire("%s-status" % jobid, TEAPOT_REDIS_EXPIRE)
+        if redis.get("%s-teapotjob" % jobid):
+            redis.expire("%s-status" % jobid, TEAPOT_REDIS_EXPIRE)
         else:
-            r.expire("%s-status" % jobid, REDIS_EXPIRE)
+            redis.expire("%s-status" % jobid, REDIS_EXPIRE)
 
 
-def get_job_status_msg(jobid):
+def get_job_status_msg(redis, jobid):
     """returns a job's status message"""
-    return r.get("%s-status" % jobid)
+    return redis.get("%s-status" % jobid)
 
 
-def set_job_status(jobid, status):
+def set_job_status(redis, jobid, status):
     """set's a job status code"""
-    global r
-    r.set("%s-statcode" % jobid, status)
+    redis.set("%s-statcode" % jobid, status)
     # statcode keys do not expire if/when they are queued
     if status != STAT_CODE_QUEUED:
-        if r.get("%s-teapotjob" % jobid):
-            r.expire("%s-statcode" % jobid, TEAPOT_REDIS_EXPIRE)
+        if redis.get("%s-teapotjob" % jobid):
+            redis.expire("%s-statcode" % jobid, TEAPOT_REDIS_EXPIRE)
         else:
-            r.expire("%s-statcode" % jobid, REDIS_EXPIRE)
+            redis.expire("%s-statcode" % jobid, REDIS_EXPIRE)
 
 
-def get_job_status(jobid):
+def get_job_status(redis, jobid):
     """return a job's status code"""
-    return r.get("%s-statcode" % jobid)
+    return redis.get("%s-statcode" % jobid)
 
 
-def get_alert_count(jobid):
-    if r.exists(f"{jobid}-alert"):
-        return r.get(f"{jobid}-alert").count("[**]") // 2
+def get_alert_count(redis, jobid):
+    if redis.exists(f"{jobid}-alert"):
+        return redis.get(f"{jobid}-alert").count("[**]") // 2
     else:
         return None
 
 
-def set_keys_timeout(jobid):
+def set_keys_timeout(redis, jobid):
     """set timeout of REDIS_EXPIRE seconds on keys that (should) be set when job results are posted"""
     EXPIRE_VALUE = REDIS_EXPIRE
-    if r.get("%s-teapotjob" % jobid):
+    if redis.get("%s-teapotjob" % jobid):
         EXPIRE_VALUE = TEAPOT_REDIS_EXPIRE
     try:
-        r.expire("%s-ids" % jobid, EXPIRE_VALUE)
-        r.expire("%s-perf" % jobid, EXPIRE_VALUE)
-        r.expire("%s-alert" % jobid, EXPIRE_VALUE)
-        r.expire("%s-error" % jobid, EXPIRE_VALUE)
-        r.expire("%s-debug" % jobid, EXPIRE_VALUE)
-        r.expire("%s-time" % jobid, EXPIRE_VALUE)
-        r.expire("%s-alert_detailed" % jobid, EXPIRE_VALUE)
-        r.expire("%s-other_logs" % jobid, EXPIRE_VALUE)
-        r.expire("%s-eve" % jobid, EXPIRE_VALUE)
-        r.expire("%s-teapotjob" % jobid, EXPIRE_VALUE)
-        r.expire("%s-zeek_json" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-ids" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-perf" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-alert" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-error" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-debug" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-time" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-alert_detailed" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-other_logs" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-eve" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-teapotjob" % jobid, EXPIRE_VALUE)
+        redis.expire("%s-zeek_json" % jobid, EXPIRE_VALUE)
     except Exception:
         pass
 
 
-def expire_all_keys(jid):
+def expire_all_keys(redis, jid):
     """expires (deletes) all keys for a give job ID"""
     # using the redis keys function ('r.keys("%s-*" % jid)') searches thru all keys which is not
     #   efficient for large key sets so we are deleting each one individually
-    global r
     logger.debug("Dalton calling expire_all_keys() on job %s" % jid)
     keys_to_delete = [
         "ids",
@@ -422,31 +428,31 @@ def expire_all_keys(jid):
     ]
     try:
         for cur_key in keys_to_delete:
-            r.delete("%s-%s" % (jid, cur_key))
+            redis.delete("%s-%s" % (jid, cur_key))
     except Exception:
         pass
 
 
-def check_for_timeout(jobid):
+def check_for_timeout(redis, jobid):
     """checks to see if a job has been running more than JOB_RUN_TIMEOUT seconds and sets it to STAT_CODE_TIMEOUT and sets keys to expire"""
-    global r
     try:
-        start_time = int(r.get("%s-start_time" % jobid))
+        start_time = int(redis.get("%s-start_time" % jobid))
     except Exception:
         start_time = int(time.time()) - (JOB_RUN_TIMEOUT + 1)
     # logger.debug("Dalton in check_for_timeout(): job %s start time: %d" % (jobid, start_time))
     if not start_time or ((int(time.time()) - start_time) > JOB_RUN_TIMEOUT):
-        if int(get_job_status(jobid)) == STAT_CODE_RUNNING:
+        if int(get_job_status(redis, jobid)) == STAT_CODE_RUNNING:
             logger.info(
                 "Dalton in check_for_timeout(): job %s timed out.  Start time: %d, now: %d"
                 % (jobid, start_time, int(time.time()))
             )
-            set_job_status(jobid, STAT_CODE_TIMEOUT)
+            set_job_status(redis, jobid, STAT_CODE_TIMEOUT)
             set_job_status_msg(
+                redis,
                 jobid,
                 "Job %s has timed out, please try submitting the job again." % jobid,
             )
-            set_keys_timeout(jobid)
+            set_keys_timeout(redis, jobid)
             return True
         else:
             return False
@@ -457,7 +463,6 @@ def check_for_timeout(jobid):
 @dalton_blueprint.route("/dalton/controller_api/delete-old-job-files", methods=["GET"])
 def delete_old_job_files():
     """Deletes job files on disk if modification time exceeds expire time(s)"""
-    global REDIS_EXPIRE, TEAPOT_REDIS_EXPIRE, JOB_STORAGE_PATH, logger
     total_deleted = 0
 
     # this coded but not enabled since there isn't any authentication and I don't think
@@ -466,12 +471,12 @@ def delete_old_job_files():
         mmin = request.args.get("mmin")
         teapot_mmin = request.args.get("teapot_mmin")
         if mmin is not None:
-            logger.warn(
+            logger.warning(
                 "Passing a mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for regular jobs."
                 % REDIS_EXPIRE
             )
         if teapot_mmin is not None:
-            logger.warn(
+            logger.warning(
                 "Passing a teapot_mmin value to delete_old_job_files() is currently not enabled.  Using %d seconds for teapot jobs."
                 % TEAPOT_REDIS_EXPIRE
             )
@@ -531,12 +536,12 @@ def index():
             # if original request was https, make sure redirect uses https
             rurl = rurl.replace("http", request.environ["HTTP_X_FORWARDED_PROTO"])
         else:
-            logger.warn(
+            logger.warning(
                 "Could not find request.environ['HTTP_X_FORWARDED_PROTO']. Make sure the web server (proxy) is configured to send it."
             )
     else:
         # this shouldn't be the case with '_external=True' passed to url_for()
-        logger.warn("URL does not start with 'http': %s" % rurl)
+        logger.warning("URL does not start with 'http': %s" % rurl)
     return redirect(rurl)
 
 
@@ -553,7 +558,6 @@ def page_index():
 @dalton_blueprint.route("/dalton/controller_api/request_engine_conf", methods=["GET"])
 # @auth_required()
 def api_get_engine_conf_file():
-    global supported_engines
     try:
         sensor = request.args["sensor"]
     except Exception:
@@ -643,7 +647,9 @@ def get_engine_conf_file(sensor):
 
             engine_config = "\r\n".join([x.rstrip("\r\n") for x in contents])
         else:
-            logger.warn("No suitable configuration file found for sensor '%s'.", sensor)
+            logger.warning(
+                "No suitable configuration file found for sensor '%s'.", sensor
+            )
             engine_config = (
                 f"# No suitable configuration file found for sensor '{sensor}'."
             )
@@ -667,15 +673,14 @@ def get_engine_conf_file(sensor):
 # status update from Dalton Agent
 def sensor_update():
     """a sensor has submitted an api update"""
-    global r
-    global STAT_CODE_DONE
+    redis = get_redis()
 
     uid = request.form.get("uid")
     msg = request.form.get("msg")
     job = request.form.get("job")
 
-    if int(get_job_status(job)) != STAT_CODE_DONE:
-        set_job_status_msg(job, msg)
+    if int(get_job_status(redis, job)) != STAT_CODE_DONE:
+        set_job_status_msg(redis, job, msg)
 
     logger.debug("Dalton Agent %s sent update for job %s; msg: %s" % (uid, job, msg))
 
@@ -687,8 +692,7 @@ def sensor_update():
 def sensor_request_job():
     """Sensor API. Called when a sensor wants a new job"""
     # job request from Dalton Agent
-    global r
-    global STAT_CODE_RUNNING
+    redis = get_redis()
 
     try:
         SENSOR_UID = request.args["SENSOR_UID"]
@@ -727,20 +731,17 @@ def sensor_request_job():
     # note: sensor keys are expired by function clear_old_agents() which removes the sensor
     # when it has not checked in in <x> amount of time (expire time configurable via
     # 'agent_purge_time' parameter in dalton.conf).
-    hash = hashlib.md5()
-    hash.update(SENSOR_UID.encode("utf-8"))
-    hash.update(SENSOR_IP.encode("utf-8"))
-    SENSOR_HASH = hash.hexdigest()
-    r.sadd("sensors", SENSOR_HASH)
-    r.set(f"{SENSOR_HASH}-uid", SENSOR_UID)
-    r.set(f"{SENSOR_HASH}-ip", SENSOR_IP)
-    r.set(f"{SENSOR_HASH}-time", datetime.datetime.now().strftime("%b %d %H:%M:%S"))
-    r.set(f"{SENSOR_HASH}-epoch", int(time.mktime(time.localtime())))
-    r.set(f"{SENSOR_HASH}-tech", sensor_tech)
-    r.set(f"{SENSOR_HASH}-agent_version", AGENT_VERSION)
+    SENSOR_HASH = create_hash([SENSOR_UID, SENSOR_IP])
+    redis.sadd("sensors", SENSOR_HASH)
+    redis.set(f"{SENSOR_HASH}-uid", SENSOR_UID)
+    redis.set(f"{SENSOR_HASH}-ip", SENSOR_IP)
+    redis.set(f"{SENSOR_HASH}-time", datetime.datetime.now().strftime("%b %d %H:%M:%S"))
+    redis.set(f"{SENSOR_HASH}-epoch", int(time.mktime(time.localtime())))
+    redis.set(f"{SENSOR_HASH}-tech", sensor_tech)
+    redis.set(f"{SENSOR_HASH}-agent_version", AGENT_VERSION)
 
     # grab a job! If it doesn't exist, return sleep.
-    response = r.lpop(sensor_tech)
+    response = redis.lpop(sensor_tech)
     if response is None:
         return "sleep"
     else:
@@ -752,38 +753,39 @@ def sensor_request_job():
         )
         # there is a key for each sensor which is ("%s-current_job" % SENSOR_HASH) and has
         #  the value of the current job id it is running.  This value is set when a job is
-        #  requested and set to 'None' when the results are posted.  A sensor can only run
-        #  one job at a time so if there is an exiting job when the sensor requests a new
+        #  requested and set to "" when the results are posted.  A sensor can only run
+        #  one job at a time so if there is an existing job when the sensor requests a new
         #  job then that means the sensor was interrupted while processing a job and could
-        #  did not communicate back with the controller.
-        existing_job = r.get("%s-current_job" % SENSOR_HASH)
+        #  not communicate back with the controller.
+        existing_job = redis.get("%s-current_job" % SENSOR_HASH)
         # logger.debug("Dalton in sensor_request_job(): job requested, sensor hash %s, new job: %s, existing job: %s" % (SENSOR_HASH, new_jobid, existing_job))
         if existing_job and existing_job != new_jobid:
-            set_job_status(existing_job, STAT_CODE_INTERRUPTED)
+            set_job_status(redis, existing_job, STAT_CODE_INTERRUPTED)
             set_job_status_msg(
+                redis,
                 existing_job,
                 "Job %s was unexpectedly interrupted while running on the agent; please try submitting the job again."
                 % existing_job,
             )
             # these shouldn't be populated but set them to expire just in case to prevent redis memory build up
-            set_keys_timeout(existing_job)
-        r.set("%s-current_job" % SENSOR_HASH, new_jobid)
+            set_keys_timeout(redis, existing_job)
+        redis.set("%s-current_job" % SENSOR_HASH, new_jobid)
         EXPIRE_VALUE = REDIS_EXPIRE
-        if r.get("%s-teapotjob" % new_jobid):
+        if redis.get("%s-teapotjob" % new_jobid):
             EXPIRE_VALUE = TEAPOT_REDIS_EXPIRE
-        r.expire("%s-current_job" % SENSOR_HASH, EXPIRE_VALUE)
-        r.set("%s-start_time" % new_jobid, int(time.time()))
-        r.expire("%s-start_time" % new_jobid, EXPIRE_VALUE)
-        set_job_status(new_jobid, STAT_CODE_RUNNING)
+        redis.expire("%s-current_job" % SENSOR_HASH, EXPIRE_VALUE)
+        redis.set("%s-start_time" % new_jobid, int(time.time()))
+        redis.expire("%s-start_time" % new_jobid, EXPIRE_VALUE)
+        set_job_status(redis, new_jobid, STAT_CODE_RUNNING)
         # if a user sees the "Running" message for more than a few dozen seconds (depending on
         #   the size of the pcap(s) and ruleset), then the job is hung on the agent or is going to
         #   timeout. Most likely the agent was killed or died during the job run.
-        set_job_status_msg(new_jobid, "Running...")
+        set_job_status_msg(redis, new_jobid, "Running...")
 
         # set expire times for keys that are stored on server until job is requested
-        r.expire("%s-submission_time" % new_jobid, EXPIRE_VALUE)
-        r.expire("%s-user" % new_jobid, EXPIRE_VALUE)
-        r.expire("%s-tech" % new_jobid, EXPIRE_VALUE)
+        redis.expire("%s-submission_time" % new_jobid, EXPIRE_VALUE)
+        redis.expire("%s-user" % new_jobid, EXPIRE_VALUE)
+        redis.expire("%s-tech" % new_jobid, EXPIRE_VALUE)
         return response
 
 
@@ -793,24 +795,16 @@ def post_job_results(jobid):
     """called by Dalton Agent sending job results"""
     # no authentication or authorization so this is easily abused; anyone with jobid
     # can overwrite results if they submit first.
-    global \
-        STAT_CODE_DONE, \
-        STAT_CODE_RUNNING, \
-        STAT_CODE_QUEUED, \
-        DALTON_URL, \
-        REDIS_EXPIRE, \
-        TEAPOT_REDIS_EXPIRE, \
-        TEMP_STORAGE_PATH
-    global r
+    redis = get_redis()
 
     # check and make sure job results haven't already been posted in order to prevent
     # abuse/overwriting.  This still isn't foolproof.
-    if r.exists("%s-time" % jobid) and (
-        int(get_job_status(jobid)) not in [STAT_CODE_RUNNING, STAT_CODE_QUEUED]
+    if redis.exists("%s-time" % jobid) and (
+        int(get_job_status(redis, jobid)) not in [STAT_CODE_RUNNING, STAT_CODE_QUEUED]
     ):
         logger.error(
             "Data for jobid %s already exists in database; not overwriting. Source IP: %s. job_status_code code: %d"
-            % (jobid, request.remote_addr, int(get_job_status(jobid)))
+            % (jobid, request.remote_addr, int(get_job_status(redis, jobid)))
         )
         # typically this would go back to Agent who then ignores it
         return Response(
@@ -822,7 +816,7 @@ def post_job_results(jobid):
     jsons = request.form.get("json_data")
     result_obj = json.loads(jsons)
 
-    set_job_status_msg(jobid, "Final Job Status: %s" % result_obj["status"])
+    set_job_status_msg(redis, jobid, "Final Job Status: %s" % result_obj["status"])
     # get sensor hash and update ("%s-current_job" % SENSOR_HASH) with 'None'
     SENSOR_IP = request.remote_addr
     SENSOR_UID = "unknown"
@@ -830,12 +824,9 @@ def post_job_results(jobid):
         SENSOR_UID = request.args["SENSOR_UID"]
     except Exception:
         SENSOR_UID = "unknown"
-    hash = hashlib.md5()
-    hash.update(SENSOR_UID.encode("utf-8"))
-    hash.update(SENSOR_IP.encode("utf-8"))
-    SENSOR_HASH = hash.hexdigest()
-    r.set(f"{SENSOR_HASH}-current_job", "")
-    r.expire(f"{SENSOR_HASH}-current_job", REDIS_EXPIRE)
+    SENSOR_HASH = create_hash([SENSOR_UID, SENSOR_IP])
+    redis.set(f"{SENSOR_HASH}-current_job", "")
+    redis.expire(f"{SENSOR_HASH}-current_job", REDIS_EXPIRE)
 
     logger.info(
         "Dalton Agent %s submitted results for job %s. Result: %s",
@@ -926,33 +917,35 @@ def post_job_results(jobid):
         zeek_json = False
 
     logger.debug("Saving job data to redis...")
-    r.set("%s-ids" % jobid, ids)
-    r.set("%s-perf" % jobid, perf)
-    r.set("%s-alert" % jobid, alert)
-    r.set("%s-error" % jobid, error)
-    r.set("%s-debug" % jobid, debug)
-    r.set("%s-time" % jobid, time)
-    r.set("%s-alert_detailed" % jobid, alert_detailed)
-    r.set("%s-other_logs" % jobid, other_logs)
-    r.set("%s-eve" % jobid, eve)
+    redis.set("%s-ids" % jobid, ids)
+    redis.set("%s-perf" % jobid, perf)
+    redis.set("%s-alert" % jobid, alert)
+    redis.set("%s-error" % jobid, error)
+    redis.set("%s-debug" % jobid, debug)
+    redis.set("%s-time" % jobid, time)
+    redis.set("%s-alert_detailed" % jobid, alert_detailed)
+    redis.set("%s-other_logs" % jobid, other_logs)
+    redis.set("%s-eve" % jobid, eve)
     if zeek_json is not None:
-        r.set("%s-zeek_json" % jobid, str(zeek_json))
-    set_keys_timeout(jobid)
+        redis.set("%s-zeek_json" % jobid, str(zeek_json))
+    set_keys_timeout(redis, jobid)
     logger.debug("Done saving job data to redis.")
 
     if error:
         set_job_status_msg(
+            redis,
             jobid,
             '<div style="color:red">ERROR!</div> <a href="/dalton/job/%s">Click here for details</a>'
             % jobid,
         )
     else:
         set_job_status_msg(
+            redis,
             jobid,
             '<a href="/dalton/job/%s">Click here to view your results</a>' % jobid,
         )
 
-    set_job_status(jobid, STAT_CODE_DONE)
+    set_job_status(redis, jobid, STAT_CODE_DONE)
     logger.debug("Returning from post_job_results()")
     return Response("OK", mimetype="text/plain", headers={"X-Dalton-Webapp": "OK"})
 
@@ -961,19 +954,19 @@ def post_job_results(jobid):
 # @login_required()
 def get_ajax_job_status_msg(jobid):
     """return the job status msg (as a string)"""
+    redis = get_redis()
     # user's browser requesting job status msg
-    global STAT_CODE_RUNNING
     if not validate_jobid(jobid):
         return Response(
             "Invalid Job ID: %s" % jobid,
             mimetype="text/plain",
             headers={"X-Dalton-Webapp": "OK"},
         )
-    stat_code = get_job_status(jobid)
+    stat_code = get_job_status(redis, jobid)
     if stat_code:
         if int(stat_code) == STAT_CODE_RUNNING:
-            check_for_timeout(jobid)
-        r_status_msg = get_job_status_msg(jobid)
+            check_for_timeout(redis, jobid)
+        r_status_msg = get_job_status_msg(redis, jobid)
         if r_status_msg:
             return Response(
                 r_status_msg, mimetype="text/plain", headers={"X-Dalton-Webapp": "OK"}
@@ -996,17 +989,18 @@ def get_ajax_job_status_msg(jobid):
 # @login_required()
 def get_ajax_job_status_code(jobid):
     """return the job status code (AS A STRING! -- you need to cast the return value as an int if you want to use it as an int)"""
+    redis = get_redis()
     # user's browser requesting job status code
     if not validate_jobid(jobid):
         return "%d" % STAT_CODE_INVALID
-    r_status_code = get_job_status(jobid)
+    r_status_code = get_job_status(redis, jobid)
     if not r_status_code:
         # invalid jobid
         return "%d" % STAT_CODE_INVALID
     else:
         if int(r_status_code) == STAT_CODE_RUNNING:
-            check_for_timeout(jobid)
-        return get_job_status(jobid)
+            check_for_timeout(redis, jobid)
+        return get_job_status(redis, jobid)
 
 
 @dalton_blueprint.route("/dalton/sensor_api/get_job/<id>", methods=["GET"])
@@ -1042,16 +1036,15 @@ def sensor_get_job(id):
         )
 
 
-def clear_old_agents():
-    global r, AGENT_PURGE_TIME
-    if r.exists("sensors"):
-        for sensor in r.smembers("sensors"):
+def clear_old_agents(redis):
+    if redis.exists("sensors"):
+        for sensor in redis.smembers("sensors"):
             try:
                 minutes_ago = int(
                     round(
                         (
                             int(time.mktime(time.localtime()))
-                            - int(r.get(f"{sensor}-epoch"))
+                            - int(redis.get(f"{sensor}-epoch"))
                         )
                         / 60
                     )
@@ -1062,41 +1055,44 @@ def clear_old_agents():
                 # screwed something up, perhaps with Python3 strings...
             if minutes_ago >= AGENT_PURGE_TIME:
                 # delete old agents
-                r.delete(f"{sensor}-uid")
-                r.delete(f"{sensor}-ip")
-                r.delete(f"{sensor}-time")
-                r.delete(f"{sensor}-epoch")
-                r.delete(f"{sensor}-tech")
-                r.delete(f"{sensor}-agent_version")
-                r.srem("sensors", sensor)
+                redis.delete(f"{sensor}-uid")
+                redis.delete(f"{sensor}-ip")
+                redis.delete(f"{sensor}-time")
+                redis.delete(f"{sensor}-epoch")
+                redis.delete(f"{sensor}-tech")
+                redis.delete(f"{sensor}-agent_version")
+                redis.srem("sensors", sensor)
 
 
 @dalton_blueprint.route("/dalton/sensor", methods=["GET"])
 # @login_required()
 def page_sensor_default(return_dict=False):
     """the default sensor page"""
-    global r
+    redis = get_redis()
     sensors = {}
     # first clear out old agents ('sensors')
-    clear_old_agents()
-    if r.exists("sensors"):
-        for sensor in r.smembers("sensors"):
+    clear_old_agents(redis)
+    if redis.exists("sensors"):
+        for sensor in redis.smembers("sensors"):
             # looks like redis keys are byte
             minutes_ago = int(
                 round(
-                    (int(time.mktime(time.localtime())) - int(r.get(f"{sensor}-epoch")))
+                    (
+                        int(time.mktime(time.localtime()))
+                        - int(redis.get(f"{sensor}-epoch"))
+                    )
                     / 60
                 )
             )
             sensors[sensor] = {}
-            sensors[sensor]["uid"] = r.get(f"{sensor}-uid")
-            sensors[sensor]["ip"] = r.get(f"{sensor}-ip")
+            sensors[sensor]["uid"] = redis.get(f"{sensor}-uid")
+            sensors[sensor]["ip"] = redis.get(f"{sensor}-ip")
             sensors[sensor]["time"] = "{} ({} minutes ago)".format(
-                r.get(f"{sensor}-time"), minutes_ago
+                redis.get(f"{sensor}-time"), minutes_ago
             )
-            sensors[sensor]["tech"] = "{}".format(r.get(f"{sensor}-tech"))
+            sensors[sensor]["tech"] = "{}".format(redis.get(f"{sensor}-tech"))
             sensors[sensor]["agent_version"] = "{}".format(
-                r.get(f"{sensor}-agent_version")
+                redis.get(f"{sensor}-agent_version")
             )
     if return_dict:
         return sensors
@@ -1104,11 +1100,13 @@ def page_sensor_default(return_dict=False):
         return render_template("/dalton/sensor.html", page="", sensors=sensors)
 
 
-# validates passed in filename (should be from Flowsynth) to verify
-# that it exists and isn't trying to do something nefarious like
-# directory traversal
 def verify_fs_pcap(fspcap):
-    global FS_PCAP_PATH
+    """Validate the filename for the pcap.
+
+    Validates passed in filename (should be from Flowsynth) to verify
+    that it exists and isn't trying to do something nefarious like
+    directory traversal.
+    """
     # require fspcap to be POSIX fully portable filename
     if not re.match(r"^[A-Za-z0-9\x5F\x2D\x2E]+$", fspcap):
         logger.error(
@@ -1124,10 +1122,8 @@ def verify_fs_pcap(fspcap):
     return None
 
 
-"""validate that job_id has expected characters; prevent directory traversal"""
-
-
 def validate_jobid(jid):
+    """validate that job_id has expected characters; prevent directory traversal"""
     if not re.match(r"^(teapot_)?[a-zA-Z\d]+$", jid):
         return False
     else:
@@ -1136,9 +1132,7 @@ def validate_jobid(jid):
 
 @dalton_blueprint.route("/dalton/coverage/job/<jid>", methods=["GET"])
 def page_coverage_jid(jid, error=None):
-    global JOB_STORAGE_PATH
-    global TEMP_STORAGE_PATH
-    global RULESET_STORAGE_PATH
+    redis = get_redis()
 
     if not re.match(r"^[a-f0-9]{16}$", jid):
         return render_template(
@@ -1176,12 +1170,12 @@ def page_coverage_jid(jid, error=None):
 
     # enumerate sensor versions based on available sensors and pass them to coverage.html
     #   This way we can dynamically update the submission page as soon as new sensor versions check in
-    clear_old_agents()
+    clear_old_agents(redis)
     sensors = []
-    if r.exists("sensors"):
-        for sensor in r.smembers("sensors"):
+    if redis.exists("sensors"):
+        for sensor in redis.smembers("sensors"):
             try:
-                tech = r.get("%s-tech" % sensor)
+                tech = redis.get("%s-tech" % sensor)
                 if tech.startswith(sensor_tech):
                     if tech not in sensors:
                         sensors.append(tech)
@@ -1231,8 +1225,7 @@ def page_coverage_jid(jid, error=None):
 # @login_required()
 def page_coverage_default(sensor_tech, error=None):
     """the default coverage wizard page"""
-    global CONF_STORAGE_PATH, MAX_PCAP_FILES
-    global r
+    redis = get_redis()
     sensor_tech = sensor_tech.split("-")[0]
     conf_dir = os.path.join(CONF_STORAGE_PATH, clean_path(sensor_tech))
     if sensor_tech is None:
@@ -1278,12 +1271,12 @@ def page_coverage_default(sensor_tech, error=None):
 
     # enumerate sensor versions based on available sensors and pass them to coverage.html
     #   This way we can dynamically update the submission page as soon as new sensor versions check in
-    clear_old_agents()
+    clear_old_agents(redis)
     sensors = []
-    if r.exists("sensors"):
-        for sensor in r.smembers("sensors"):
+    if redis.exists("sensors"):
+        for sensor in redis.smembers("sensors"):
             try:
-                tech = r.get("%s-tech" % sensor)
+                tech = redis.get("%s-tech" % sensor)
                 if tech.startswith(sensor_tech):
                     if tech not in sensors:
                         sensors.append(tech)
@@ -1342,14 +1335,14 @@ def page_coverage_default(sensor_tech, error=None):
 @dalton_blueprint.route("/dalton/job/<jid>")
 # @auth_required()
 def page_show_job(jid):
-    global r
-    tech = r.get("%s-tech" % jid)
-    status = get_job_status(jid)
+    redis = get_redis()
+    tech = redis.get("%s-tech" % jid)
+    status = get_job_status(redis, jid)
 
     if not status:
         # job doesn't exist
         # expire (delete) all keys related to the job just in case to prevent memory leaks
-        expire_all_keys(jid)
+        expire_all_keys(redis, jid)
         return render_template(
             "/dalton/error.html",
             jid=jid,
@@ -1366,15 +1359,15 @@ def page_show_job(jid):
         )
     else:
         # job exists and is done
-        ids = r.get(f"{jid}-ids")
-        perf = r.get(f"{jid}-perf")
-        alert = r.get(f"{jid}-alert")
-        error = r.get(f"{jid}-error")
-        total_time = r.get(f"{jid}-time")
-        alert_detailed = r.get(f"{jid}-alert_detailed")
+        ids = redis.get(f"{jid}-ids")
+        perf = redis.get(f"{jid}-perf")
+        alert = redis.get(f"{jid}-alert")
+        error = redis.get(f"{jid}-error")
+        total_time = redis.get(f"{jid}-time")
+        alert_detailed = redis.get(f"{jid}-alert_detailed")
 
         try:
-            zeek_json = r.get(f"{jid}-zeek_json")
+            zeek_json = redis.get(f"{jid}-zeek_json")
         except Exception:
             # logger.debug(f"Problem getting {jid}-zeek_json:\n{e}")
             zeek_json = "False"
@@ -1382,7 +1375,7 @@ def page_show_job(jid):
         try:
             # this gets passed as json with log description as key and log contents as value
             # attempt to load it as json before we pass it to job.html
-            other_logs = json.loads(r.get(f"{jid}-other_logs"))
+            other_logs = json.loads(redis.get(f"{jid}-other_logs"))
             if tech.startswith("zeek") and zeek_json == "False":
                 for other_log in other_logs:
                     other_logs[other_log] = parseZeekASCIILog(other_logs[other_log])
@@ -1391,7 +1384,7 @@ def page_show_job(jid):
             other_logs = ""
             # logger.error("could not load json other_logs:\n%s\n\nvalue:\n%s" % (e,r.get("%s-other_logs" % jid)))
         try:
-            eve = r.get(f"{jid}-eve")
+            eve = redis.get(f"{jid}-eve")
         except Exception:
             # logger.debug(f"Problem getting {jid}-eve log:\n{e}")
             eve = ""
@@ -1410,12 +1403,12 @@ def page_show_job(jid):
         # parse out custom rules option and pass it?
         custom_rules = False
         try:
-            debug = r.get("%s-debug" % jid)
+            debug = redis.get("%s-debug" % jid)
         except Exception:
             debug = ""
         overview = {}
         if alert is not None:
-            overview["alert_count"] = get_alert_count(jid)
+            overview["alert_count"] = get_alert_count(redis, jid)
         else:
             overview["alert_count"] = 0
         if error == "":
@@ -1444,14 +1437,17 @@ def page_show_job(jid):
         )
 
 
-# sanitize passed in filename (string) and make it POSIX (fully portable)
 def clean_filename(filename):
+    """sanitize passed in filename (string) and make it POSIX (fully portable)."""
     return re.sub(r"[^a-zA-Z0-9\_\-\.]", "_", filename)
 
 
-# handle duplicate filenames (e.g. same pcap submitted more than once)
-#  by renaming pcaps with same name
 def handle_dup_names(filename, pcap_files, job_id, dupcount):
+    """Handle duplicate filenames.
+
+    Handle duplicate filenames (e.g. same pcap submitted more than once)
+    by renaming pcaps with same name.
+    """
     for pcap in pcap_files:
         if pcap["filename"] == filename:
             filename = "%s_%s_%d.pcap" % (
@@ -1464,10 +1460,12 @@ def handle_dup_names(filename, pcap_files, job_id, dupcount):
     return filename
 
 
-# extracts files from an archive and add them to the list to be
-#  included with the Dalton job
 def extract_pcaps(archivename, pcap_files, job_id, dupcount):
-    global TEMP_STORAGE_PATH
+    """Extract the packet capture files.
+
+    extracts files from an archive and add them to the list to be
+    included with the Dalton job.
+    """
     # Note: archivename already sanitized
     logger.debug(
         "Attempting to extract pcaps from  file '%s'" % os.path.basename(archivename)
@@ -1497,7 +1495,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     ".pcapng",
                     ".cap",
                 ]:
-                    logger.warn(
+                    logger.warning(
                         "Not adding file '%s' from archive '%s': '.pcap', '.cap', or '.pcapng' extension required."
                         % (file, os.path.basename(archivename))
                     )
@@ -1613,7 +1611,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
             for file in archive.getmembers():
                 logger.debug("Processing file '%s' from archive" % file.name)
                 if not file.isfile():
-                    logger.warn(
+                    logger.warning(
                         "Not adding member '%s' from archive '%s': not a file."
                         % (file.name, os.path.basename(archivename))
                     )
@@ -1624,7 +1622,7 @@ def extract_pcaps(archivename, pcap_files, job_id, dupcount):
                     ".pcapng",
                     ".cap",
                 ]:
-                    logger.warn(
+                    logger.warning(
                         "Not adding file '%s' from archive '%s': '.pcap', '.cap', or '.pcapng' extension required."
                         % (file.name, os.path.basename(archivename))
                     )
@@ -1665,13 +1663,7 @@ def submit_job():
 def page_coverage_summary():
     """Handle job submission from UI."""
     # user submitting a job to Dalton via the web interface
-    global JOB_STORAGE_PATH
-    global TEMP_STORAGE_PATH
-    global RULESET_STORAGE_PATH
-    global r
-    global STAT_CODE_QUEUED
-    global FS_PCAP_PATH
-    global MAX_PCAP_FILES
+    redis = get_redis()
 
     verify_temp_storage_path()
     digest = hashlib.md5()
@@ -1799,9 +1791,9 @@ def page_coverage_summary():
 
     # verify that we have a sensor that can handle the submitted sensor_tech
     valid_sensor_tech = False
-    if r.exists("sensors"):
-        for sensor in r.smembers("sensors"):
-            if r.get("%s-tech" % sensor) == sensor_tech:
+    if redis.exists("sensors"):
+        for sensor in redis.smembers("sensors"):
+            if redis.get("%s-tech" % sensor) == sensor_tech:
                 valid_sensor_tech = True
                 break
     if not valid_sensor_tech:
@@ -2219,7 +2211,7 @@ def page_coverage_summary():
                         if v not in config["vars"]["address-groups"]:
                             config["vars"]["address-groups"][v] = ipv2add[v]
                 except Exception as e:
-                    logger.warn(
+                    logger.warning(
                         "(Not Fatal) Problem customizing Suricata variables; your YAML may be bad. %s",
                         e,
                     )
@@ -2228,13 +2220,15 @@ def page_coverage_summary():
                 try:
                     if bOverrideExternalNet:
                         if "EXTERNAL_NET" not in config["vars"]["address-groups"]:
-                            logger.warn(
+                            logger.warning(
                                 "EXTERNAL_NET IP variable not set in config; setting to 'any'"
                             )
                         config["vars"]["address-groups"]["EXTERNAL_NET"] = "any"
                         logger.debug("Set 'EXTERNAL_NET' IP variable to 'any'")
                 except Exception as e:
-                    logger.warn("(Not Fatal) Problem overriding EXTERNAL_NET: %s" % e)
+                    logger.warning(
+                        "(Not Fatal) Problem overriding EXTERNAL_NET: %s" % e
+                    )
                     logger.debug("%s" % traceback.format_exc())
                 # first, do rule includes
                 # should references to other rule files be removed?
@@ -2278,7 +2272,7 @@ def page_coverage_summary():
                 for citem in ["outputs", "logging"]:
                     # set outputs
                     if citem not in config:
-                        logger.warn(
+                        logger.warning(
                             f"No '{citem}' section in Suricata YAML. This may be a problem...."
                         )
                         # going to try to build this from scratch but Suri still may not like it
@@ -2303,7 +2297,7 @@ def page_coverage_summary():
                             "file"
                         ]["level"]
                     except Exception as e:
-                        logger.warn(
+                        logger.warning(
                             "Unable to get log level from config (logging->outputs->file->level): %s"
                             % e
                         )
@@ -2539,7 +2533,7 @@ def page_coverage_summary():
                                 "enabled"
                             ] = False
                 except Exception as e:
-                    logger.warn("Problem editing eve-log section of config: %s" % e)
+                    logger.warning("Problem editing eve-log section of config: %s" % e)
                     pass
 
                 # set filename for rule and keyword profiling
@@ -2632,7 +2626,7 @@ def page_coverage_summary():
                                         # can't modify list we are iterating over so delete from copy
                                         ipv2add_copy.pop(v)
                             except Exception as e:
-                                logger.warn(
+                                logger.warning(
                                     "(Not Fatal) Problem customizing Snort variables: %s",
                                     e,
                                 )
@@ -2685,7 +2679,9 @@ def page_coverage_summary():
             elif sensor_tech.startswith("zeek"):
                 engine_conf_file = None
             else:
-                logger.warn("Unexpected sensor_tech value submitted: %s", sensor_tech)
+                logger.warning(
+                    "Unexpected sensor_tech value submitted: %s", sensor_tech
+                )
                 engine_conf_file = os.path.join(
                     TEMP_STORAGE_PATH, f"{job_id}_engine.conf"
                 )
@@ -2720,6 +2716,7 @@ def page_coverage_summary():
                 jid = f"teapot_{jid}"
             if bSplitCap:
                 set_job_status_msg(
+                    redis,
                     jid,
                     f"Creating job for pcap '{os.path.basename(splitcap['filename'])}'...",
                 )
@@ -2908,32 +2905,32 @@ def page_coverage_summary():
             # be set when job is requested by agent
 
             # store user name
-            r.set("%s-user" % jid, user)
+            redis.set("%s-user" % jid, user)
 
             # store sensor tech for job
-            r.set("%s-tech" % jid, sensor_tech)
+            redis.set("%s-tech" % jid, sensor_tech)
 
             # store submission time for job
-            r.set(
+            redis.set(
                 "%s-submission_time" % jid,
                 datetime.datetime.now().strftime("%b %d %H:%M:%S"),
             )
 
             # if this is a teapot job,
             if bteapotJob:
-                r.set("%s-teapotjob" % jid, bteapotJob)
+                redis.set("%s-teapotjob" % jid, bteapotJob)
 
             # set job as queued and write to the Redis queue
-            set_job_status(jid, STAT_CODE_QUEUED)
-            set_job_status_msg(jid, f"Queued Job {jid}")
+            set_job_status(redis, jid, STAT_CODE_QUEUED)
+            set_job_status_msg(redis, jid, f"Queued Job {jid}")
             logger.info(
                 "Dalton user '%s' submitted Job %s to queue %s"
                 % (user, jid, sensor_tech)
             )
-            r.rpush(sensor_tech, str_job)
+            redis.rpush(sensor_tech, str_job)
 
             # add to list for queue web page
-            r.lpush("recent_jobs", jid)
+            redis.lpush("recent_jobs", jid)
 
             if bSplitCap:
                 splitcap_jid_list.append(jid)
@@ -2964,12 +2961,12 @@ def page_coverage_summary():
                         "http", request.environ["HTTP_X_FORWARDED_PROTO"]
                     )
                 else:
-                    logger.warn(
+                    logger.warning(
                         "Could not find request.environ['HTTP_X_FORWARDED_PROTO']. Make sure the web server (proxy) is configured to send it."
                     )
             else:
                 # this shouldn't be the case with '_external=True' passed to url_for()
-                logger.warn("URL does not start with 'http': %s" % rurl)
+                logger.warning("URL does not start with 'http': %s" % rurl)
             return redirect(rurl)
 
 
@@ -2977,7 +2974,7 @@ def page_coverage_summary():
 # @login_required()
 def page_queue_default():
     """the default queue page"""
-    global r
+    redis = get_redis()
     num_jobs_to_show_default = 25
 
     # clear old job files from disk
@@ -2998,10 +2995,10 @@ def page_queue_default():
     queue = []
     queued_jobs = 0
     running_jobs = 0
-    if r.exists("recent_jobs") and r.llen("recent_jobs") > 0:
+    if redis.exists("recent_jobs") and redis.llen("recent_jobs") > 0:
         # get the last num_jobs_to_show jobs; can adjust if you want (default set above in exception handler)
         count = 0
-        jobs = r.lrange("recent_jobs", 0, -1)
+        jobs = redis.lrange("recent_jobs", 0, -1)
         for jid in jobs:
             # iterate thru all jobs and get total number of queued and running but only return
             #  the most recent num_jobs_to_show jobs
@@ -3009,16 +3006,16 @@ def page_queue_default():
             # Using 'jid-submission_time' and jid=status as tests -- if these don't exist the other keys associated
             # with that jid should be expired or will expire shortly.  That key gets set to expire
             # after a job is requested/sent to a sensor so we won't clear out queued jobs.
-            if not r.exists("%s-submission_time" % jid) or not r.exists(
+            if not redis.exists("%s-submission_time" % jid) or not redis.exists(
                 "%s-status" % jid
             ):
                 # job has expired
                 logger.debug("Dalton in page_queue_default(): removing job: %s" % jid)
-                r.lrem("recent_jobs", jid)
+                redis.lrem("recent_jobs", jid)
                 # just in case, expire all keys associated with jid
-                expire_all_keys(jid)
+                expire_all_keys(redis, jid)
             else:
-                status = int(get_job_status(jid))
+                status = int(get_job_status(redis, jid))
                 # ^^ have to cast as an int since it gets stored as a string (everything in redis is a string apparently....)
                 # logger.debug("Dalton in page_queue_default(): Job %s, stat code: %d" % (jid, status))
                 status_msg = "Unknown"
@@ -3026,7 +3023,7 @@ def page_queue_default():
                     status_msg = "Queued"
                     queued_jobs += 1
                 elif status == STAT_CODE_RUNNING:
-                    if check_for_timeout(jid):
+                    if check_for_timeout(redis, jid):
                         status_msg = "Timeout"
                     else:
                         running_jobs += 1
@@ -3034,7 +3031,7 @@ def page_queue_default():
                 if count < num_jobs_to_show:
                     if status == STAT_CODE_DONE:
                         status_msg = "Complete"
-                        if r.get("%s-error" % jid):
+                        if redis.get("%s-error" % jid):
                             status_msg += " (Error)"
                         else:
                             status_msg += " (Success)"
@@ -3045,11 +3042,11 @@ def page_queue_default():
                     # Note: could add logic to not show teapot jobs?; add if teapotjob: job['teapot'] = "True" else: "False"
                     job = {}
                     job["jid"] = jid
-                    job["tech"] = "%s" % r.get("%s-tech" % jid)
-                    job["time"] = "%s" % r.get("%s-submission_time" % jid)
-                    job["user"] = "%s" % r.get("%s-user" % jid)
+                    job["tech"] = "%s" % redis.get("%s-tech" % jid)
+                    job["time"] = "%s" % redis.get("%s-submission_time" % jid)
+                    job["user"] = "%s" % redis.get("%s-user" % jid)
                     job["status"] = status_msg
-                    alert_count = get_alert_count(jid)
+                    alert_count = get_alert_count(redis, jid)
                     if status != STAT_CODE_DONE:
                         job["alert_count"] = "-"
                     elif alert_count is not None:
@@ -3082,8 +3079,7 @@ def page_about_default():
 #########################################
 
 
-def controller_api_get_job_data(jid, requested_data):
-    global r
+def controller_api_get_job_data(redis, jid, requested_data):
     # add to as necessary
     valid_keys = (
         "alert",
@@ -3114,13 +3110,13 @@ def controller_api_get_job_data(jid, requested_data):
         json_response["error_msg"] = "Invalid request for data: %s" % requested_data
     else:
         try:
-            status = get_job_status(jid)
+            status = get_job_status(redis, jid)
         except Exception:
             status = None
         if not status:
             # job doesn't exist
             # expire (delete) all keys related to the job just in case to prevent memory leaks
-            expire_all_keys(jid)
+            expire_all_keys(redis, jid)
             json_response["error"] = True
             json_response["error_msg"] = "Job ID %s does not exist" % jid
         else:
@@ -3129,7 +3125,7 @@ def controller_api_get_job_data(jid, requested_data):
             if requested_data not in valid_keys:
                 # check other_logs
                 try:
-                    ologs = r.get("%s-%s" % (jid, "other_logs"))
+                    ologs = redis.get("%s-%s" % (jid, "other_logs"))
                     if len(ologs) > 0:
                         ologs = json.loads(ologs)
                         for k in ologs.keys():
@@ -3162,7 +3158,7 @@ def controller_api_get_job_data(jid, requested_data):
                                 continue
                             elif key == "other_logs":
                                 # go thru other_logs struct and make each top-level entries in the response
-                                ologs = r.get("%s-%s" % (jid, key))
+                                ologs = redis.get("%s-%s" % (jid, key))
                                 if len(ologs) > 0:
                                     ologs = json.loads(ologs)
                                     for k in ologs.keys():
@@ -3171,7 +3167,7 @@ def controller_api_get_job_data(jid, requested_data):
                                         k = k.replace(" ", "_")
                                         ret_data[k] = kdata
                             else:
-                                ret_data[key] = r.get("%s-%s" % (jid, key))
+                                ret_data[key] = redis.get("%s-%s" % (jid, key))
                     except Exception as e:
                         json_response["error"] = True
                         json_response["error_msg"] = (
@@ -3181,7 +3177,7 @@ def controller_api_get_job_data(jid, requested_data):
                         logger.debug(f"{json_response['error_msg']}: {e}")
                 else:
                     try:
-                        ret_data = r.get("%s-%s" % (jid, requested_data))
+                        ret_data = redis.get("%s-%s" % (jid, requested_data))
                     except Exception:
                         json_response["error"] = True
                         json_response["error_msg"] = (
@@ -3205,7 +3201,10 @@ def controller_api_get_request(jid, requested_data, raw):
     logger.debug(
         f"controller_api_get_request() called, raw: {'True' if raw == 'raw' else 'False'}"
     )
-    json_response = controller_api_get_job_data(jid=jid, requested_data=requested_data)
+    redis = get_redis()
+    json_response = controller_api_get_job_data(
+        redis, jid=jid, requested_data=requested_data
+    )
     if raw != "raw" or json_response["error"]:
         return Response(
             json.dumps(json_response),
@@ -3237,7 +3236,7 @@ def controller_api_get_request(jid, requested_data, raw):
 )
 def controller_api_get_current_sensors(engine):
     """Returns a list of current active sensors"""
-    global r, supported_engines
+    redis = get_redis()
     sensors = []
 
     if engine is None or engine == "" or engine not in supported_engines:
@@ -3250,12 +3249,12 @@ def controller_api_get_current_sensors(engine):
         )
 
     # first, clean out old sensors
-    clear_old_agents()
+    clear_old_agents(redis)
 
     # get active sensors based on engine
-    if r.exists("sensors"):
-        for sensor in r.smembers("sensors"):
-            t = r.get("%s-tech" % sensor)
+    if redis.exists("sensors"):
+        for sensor in redis.smembers("sensors"):
+            t = redis.get("%s-tech" % sensor)
             if t.lower().startswith(engine.lower()):
                 sensors.append(t)
 
