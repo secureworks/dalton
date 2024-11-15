@@ -43,4 +43,8 @@ def create_app(test_config=None):
     except Exception:
         pass
 
+    # Allow the user or the agent to upload large files
+    daltonfs.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024
+    daltonfs.config["MAX_FORM_MEMORY_SIZE"] = None
+
     return daltonfs

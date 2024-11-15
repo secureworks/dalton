@@ -28,4 +28,5 @@ COPY engine-configs /opt/dalton/engine-configs
 STOPSIGNAL SIGINT
 EXPOSE 8080
 
-CMD ["python", "/opt/dalton/run.py", "-c", "/opt/dalton/dalton.conf"]
+# Note: if changing the next line, also look to change the command in docker-compose.yml
+CMD ["flask", "--app", "app", "run", "--port=8080", "--host=0.0.0.0"]

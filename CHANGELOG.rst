@@ -174,4 +174,10 @@ in a sort of pre-release mode.
 ##################
 
 * Fixed bug with zeek processing. (#213) (#214) (#216)
-* Added some unit tests. (#215)
+* Added some unit tests. (#203) (#215)
+
+3.4.2 (2024-11-15)
+##################
+
+* Updated flask dependencies (#180) (#222)
+  * Configure flask maximum content length
