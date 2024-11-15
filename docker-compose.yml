@@ -11,6 +11,8 @@ services:
         - no_proxy=${no_proxy}
     image: dalton:latest
     container_name: dalton_controller
+    # Uncomment the next line to run the app in debug mode
+    # command: flask --app app run --port=8080 --host=0.0.0.0 --debug
     depends_on:
       - redis
     environment:
