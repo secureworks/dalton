@@ -2,8 +2,6 @@ import logging
 import os
 
 from flask import Flask
-from flask_caching import Cache
-from flask_compress import Compress
 
 from app.dalton import dalton_blueprint, ensure_rulesets_exist, setup_dalton_logging
 from app.flowsynth import flowsynth_blueprint, setup_flowsynth_logging
@@ -45,7 +43,4 @@ def create_app(test_config=None):
     except Exception:
         pass
 
-    compress = Compress()
-    _ = Cache(daltonfs, config={"CACHE_TYPE": "simple"})
-    compress.init_app(daltonfs)
     return daltonfs
