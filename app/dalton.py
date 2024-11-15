@@ -64,52 +64,91 @@ dalton_blueprint = Blueprint(
 ONLY_RUN_ONCE = lru_cache(maxsize=None)
 
 
-try:
-    dalton_config_filename = "dalton.conf"
-    dalton_config = configparser.ConfigParser()
-    dalton_config.read(dalton_config_filename)
-    TEMP_STORAGE_PATH = dalton_config.get("dalton", "temp_path")
-    RULESET_STORAGE_PATH = dalton_config.get("dalton", "ruleset_path")
-    SCRIPT_STORAGE_PATH = dalton_config.get("dalton", "script_path")
-    JOB_STORAGE_PATH = dalton_config.get("dalton", "job_path")
-    CONF_STORAGE_PATH = dalton_config.get("dalton", "engine_conf_path")
-    REDIS_EXPIRE = dalton_config.getint("dalton", "redis_expire") * 60
-    SHARE_EXPIRE = dalton_config.getint("dalton", "share_expire") * 60
-    TEAPOT_REDIS_EXPIRE = dalton_config.getint("dalton", "teapot_redis_expire") * 60
-    JOB_RUN_TIMEOUT = dalton_config.getint("dalton", "job_run_timeout")
-    AGENT_PURGE_TIME = dalton_config.getint("dalton", "agent_purge_time")
-    REDIS_HOST = dalton_config.get("dalton", "redis_host")
-    API_KEYS = dalton_config.get("dalton", "api_keys")
-    MERGECAP_BINARY = dalton_config.get("dalton", "mergecap_binary")
-    U2_ANALYZER = dalton_config.get("dalton", "u2_analyzer")
-    RULECAT_SCRIPT = dalton_config.get("dalton", "rulecat_script")
-    MAX_PCAP_FILES = dalton_config.getint("dalton", "max_pcap_files")
-    DEBUG = dalton_config.getboolean("dalton", "debug")
+def update_dalton_config(current_app):
+    try:
+        dalton_config_filename = "dalton.conf"
+        dalton_config = configparser.ConfigParser()
+        dalton_config.read(dalton_config_filename)
+        TEMP_STORAGE_PATH = dalton_config.get("dalton", "temp_path")
+        RULESET_STORAGE_PATH = dalton_config.get("dalton", "ruleset_path")
+        SCRIPT_STORAGE_PATH = dalton_config.get("dalton", "script_path")
+        JOB_STORAGE_PATH = dalton_config.get("dalton", "job_path")
+        CONF_STORAGE_PATH = dalton_config.get("dalton", "engine_conf_path")
+        REDIS_EXPIRE = dalton_config.getint("dalton", "redis_expire") * 60
+        SHARE_EXPIRE = dalton_config.getint("dalton", "share_expire") * 60
+        TEAPOT_REDIS_EXPIRE = dalton_config.getint("dalton", "teapot_redis_expire") * 60
+        JOB_RUN_TIMEOUT = dalton_config.getint("dalton", "job_run_timeout")
+        AGENT_PURGE_TIME = dalton_config.getint("dalton", "agent_purge_time")
+        REDIS_HOST = dalton_config.get("dalton", "redis_host")
+        API_KEYS = dalton_config.get("dalton", "api_keys")
+        MERGECAP_BINARY = dalton_config.get("dalton", "mergecap_binary")
+        U2_ANALYZER = dalton_config.get("dalton", "u2_analyzer")
+        RULECAT_SCRIPT = dalton_config.get("dalton", "rulecat_script")
+        MAX_PCAP_FILES = dalton_config.getint("dalton", "max_pcap_files")
+        DEBUG = dalton_config.getboolean("dalton", "debug")
 
-    # options for flowsynth
-    FS_BIN_PATH = dalton_config.get(
-        "flowsynth-web", "bin_path"
-    )  # Path to the flowsynth application
-    FS_PCAP_PATH = dalton_config.get(
-        "flowsynth-web", "pcap_path"
-    )  # Path to temporarily store PCAPs
+        # options for flowsynth
+        FS_BIN_PATH = dalton_config.get(
+            "flowsynth-web", "bin_path"
+        )  # Path to the flowsynth application
+        FS_PCAP_PATH = dalton_config.get(
+            "flowsynth-web", "pcap_path"
+        )  # Path to temporarily store PCAPs
 
-except Exception as e:
-    current_app.logger.critical(
-        "Problem parsing config file '%s': %s" % (dalton_config_filename, e)
-    )
+    except Exception as e:
+        current_app.logger.critical(
+            "Problem parsing config file '%s': %s" % (dalton_config_filename, e)
+        )
 
-if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
-    current_app.logger.setLevel(logging.DEBUG)
-    DEBUG = True
-    current_app.logger.debug("DEBUG logging enabled")
+    if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
+        current_app.logger.setLevel(logging.DEBUG)
+        DEBUG = True
+        current_app.logger.debug("DEBUG logging enabled")
 
-if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
-    current_app.logger.error(
-        "mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap."
-        % MERGECAP_BINARY
-    )
-    MERGECAP_BINARY = None
+    if not MERGECAP_BINARY or not os.path.exists(MERGECAP_BINARY):
+        current_app.logger.error(
+            "mergecap binary '%s'  not found.  Suricata jobs cannot contain more than one pcap."
+            % MERGECAP_BINARY
+        )
+        MERGECAP_BINARY = None
+
+
+    # check for sane timeout values
+    if REDIS_EXPIRE <= 0:
+        current_app.logger.critical(
+            "redis_expire value of %d minutes is invalid.  Expect problems."
+            % dalton_config.getint("dalton", "redis_expire")
+        )
+    if TEAPOT_REDIS_EXPIRE <= 0:
+        current_app.logger.critical(
+            "teapot_redis_expire value of %d minutes is invalid.  Expect problems."
+            % dalton_config.getint("dalton", "teapot_redis_expire")
+        )
+    if AGENT_PURGE_TIME <= 1:
+        current_app.logger.critical(
+            "agent_purge_time value of %d seconds is invalid.  Expect problems."
+            % AGENT_PURGE_TIME
+        )
+    if JOB_RUN_TIMEOUT <= 4:
+        current_app.logger.critical(
+            "job_run_time value of %d seconds is invalid.  Expect problems."
+            % JOB_RUN_TIMEOUT
+        )
+    if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
+        current_app.logger.warning(
+            "teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis."
+            % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE)
+        )
+
+    # other checks
+    if MAX_PCAP_FILES < 1:
+        default_max = 8
+        current_app.logger.warning(
+            "max_pcap_files value of '%d' invalid.  Using '%d'"
+            % (MAX_PCAP_FILES, default_max)
+        )
+        MAX_PCAP_FILES = default_max
+
 
 
 # if there are no rules, use idstools rulecat to download a set for Suri and Snort
@@ -148,43 +187,6 @@ def ensure_rulesets_exist():
             except Exception as e:
                 current_app.logger.info("Unable to download ruleset for %s" % engine)
                 current_app.logger.debug("Exception: %s" % e)
-
-
-# check for sane timeout values
-if REDIS_EXPIRE <= 0:
-    current_app.logger.critical(
-        "redis_expire value of %d minutes is invalid.  Expect problems."
-        % dalton_config.getint("dalton", "redis_expire")
-    )
-if TEAPOT_REDIS_EXPIRE <= 0:
-    current_app.logger.critical(
-        "teapot_redis_expire value of %d minutes is invalid.  Expect problems."
-        % dalton_config.getint("dalton", "teapot_redis_expire")
-    )
-if AGENT_PURGE_TIME <= 1:
-    current_app.logger.critical(
-        "agent_purge_time value of %d seconds is invalid.  Expect problems."
-        % AGENT_PURGE_TIME
-    )
-if JOB_RUN_TIMEOUT <= 4:
-    current_app.logger.critical(
-        "job_run_time value of %d seconds is invalid.  Expect problems."
-        % JOB_RUN_TIMEOUT
-    )
-if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
-    current_app.logger.warning(
-        "teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis."
-        % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE)
-    )
-
-# other checks
-if MAX_PCAP_FILES < 1:
-    default_max = 8
-    current_app.logger.warning(
-        "max_pcap_files value of '%d' invalid.  Using '%d'"
-        % (MAX_PCAP_FILES, default_max)
-    )
-    MAX_PCAP_FILES = default_max
 
 # global values used by Flask
 TRAP_BAD_REQUEST_KEY_ERRORS = True

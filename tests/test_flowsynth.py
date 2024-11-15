@@ -1,13 +1,12 @@
 import os
 import random
 import shutil
-import unittest
 import uuid
 from io import BytesIO
 from unittest import mock
 from urllib.parse import urlencode
 
-import pytest
+from base import FlaskTest
 
 from app.flowsynth import (
     check_pcap_path,
@@ -20,13 +19,14 @@ KNOWN_PCAP_ID = "98765"
 KNOWN_PCAP_CONTENTS = b"hi there"
 
 
-@pytest.mark.usefixtures("client")
-class TestFlowsynth(unittest.TestCase):
+class TestFlowsynth(FlaskTest):
     def setUp(self):
+        super().setUp()
         self.pcap_base = "/tmp/pcaps"
         check_pcap_path(self.pcap_base)
 
     def tearDown(self):
+        super().tearDown()
         shutil.rmtree(self.pcap_base)
 
     def test_flowsynth_home(self):

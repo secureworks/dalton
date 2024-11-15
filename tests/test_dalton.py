@@ -2,10 +2,9 @@
 
 import json
 import random
-import unittest
 from unittest import mock
 
-import pytest
+from base import FlaskTest
 
 from app.dalton import (
     REDIS_EXPIRE,
@@ -15,8 +14,7 @@ from app.dalton import (
 )
 
 
-@pytest.mark.usefixtures("client")
-class TestDalton(unittest.TestCase):
+class TestDalton(FlaskTest):
     """Test dalton functionality."""
 
     def test_dalton_main(self):
