@@ -1,9 +1,8 @@
 # spin up nginx with custom conf
-FROM nginx:1.19.4
-MAINTAINER David Wharton
+FROM nginx:1.27.2
 
-ARG DALTON_EXTERNAL_PORT
-ARG DALTON_EXTERNAL_PORT_SSL
+ARG DALTON_EXTERNAL_PORT=80
+ARG DALTON_EXTERNAL_PORT_SSL=443
 
 RUN rm /etc/nginx/nginx.conf && rm -rf /etc/nginx/conf.d
 COPY nginx-conf/nginx.conf /etc/nginx/nginx.conf
@@ -13,6 +12,5 @@ COPY nginx-conf/tls /etc/nginx/tls
 # adjust nginx config so redirects point to external port(s).
 # order of sed operations matters since one replaced string is a subset of the other.
 RUN sed -i 's/REPLACE_AT_DOCKER_BUILD_SSL/'"${DALTON_EXTERNAL_PORT_SSL}"'/' /etc/nginx/conf.d/dalton.conf
+# hadolint ignore=DL3059
 RUN sed -i 's/REPLACE_AT_DOCKER_BUILD/'"${DALTON_EXTERNAL_PORT}"'/' /etc/nginx/conf.d/dalton.conf
-
-CMD nginx

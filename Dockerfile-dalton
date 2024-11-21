@@ -1,24 +1,32 @@
-FROM python:3.9.0
-MAINTAINER David Wharton
+FROM python:3.10.15
 
 # wireshark needed for mergecap; statically compiled
 #  mergecap would be smaller but doing this for now
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y install wireshark-common \
-    p7zip-full
+
+# hadolint ignore=DL3008
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    wireshark-common \
+    p7zip-full \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # for development; not needed by the app
 #RUN apt-get install -y less nano net-tools
 
 WORKDIR /opt/dalton
 
-COPY requirements.txt /opt/dalton/requirements.txt
-RUN pip install -r requirements.txt
 
+COPY pyproject.toml /opt/dalton
 COPY app /opt/dalton/app
+RUN pip install --no-cache-dir -e .
 COPY run.py /opt/dalton/run.py
 COPY dalton.conf /opt/dalton/dalton.conf
 COPY rulesets /opt/dalton/rulesets
 COPY engine-configs /opt/dalton/engine-configs
 
-CMD python /opt/dalton/run.py -c /opt/dalton/dalton.conf
+STOPSIGNAL SIGINT
+EXPOSE 8080
+
+# Note: if changing the next line, also look to change the command in docker-compose.yml
+CMD ["flask", "--app", "app", "run", "--port=8080", "--host=0.0.0.0"]

@@ -1,9 +1,9 @@
 """Dalton API client."""
-import requests
+
 import time
 
+import requests
 from requests.exceptions import HTTPError
-
 
 RETRIES = 3
 SLEEP_TIME = 60
@@ -142,6 +142,7 @@ class DaltonAPI:
             'tech': 'suricata/5.0.7',
             'agent_version': '3.1.1'}}
         """
-        response = self._dalton_get("dalton/controller_api/get-current-sensors-json-full")
+        response = self._dalton_get(
+            "dalton/controller_api/get-current-sensors-json-full"
+        )
         return response.json()
-    

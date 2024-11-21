@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dalton"
+description = "Run pcaps against an IDS"
+dynamic = ["version"]
+requires-python = ">=3.10"
+dependencies = [
+    "Jinja2==3.1.4",
+    "Flask==3.1.0",
+    "redis==5.2.0",
+    # there is newer ruamel available
+    "ruamel.yaml<0.18.0",
+    "idstools==0.6.5",
+    "flowsynth>=1.4.1",
+    "Werkzeug==3.1.3",
+    "itsdangerous==2.2.0",
+]
+authors = [
+    { name = "David Wharton and others" }
+]
+readme = "README.rst"
+classifiers = [
+    "Private :: Do Not Upload",
+    "License :: OSI Approved :: Apache Software License",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/secureworks/dalton"
+
+[project.optional-dependencies]
+testing = [
+    "pytest",
+]
+devtools = [
+    "bump-my-version",
+    "coverage",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "."
+]
+
+[tool.setuptools.packages.find]
+# Include only the "app" directory.
+include = ["app"]
+
+[tool.ruff]
+include = [
+    "pyproject.toml",
+    "app/**/*.py",
+    "api/**/*.py",
+    "dalton-agent/**/*.py",
+    "tests/**/*.py"
+]
+exclude = ["app/static/**/*.py"]
+
+[tool.ruff.lint]
+# see https://docs.astral.sh/ruff/rules/#legend
+# E = errors, F = pyflakes, I = isort, B = bugbears
+select = ["E", "F", "I", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Defer these fixes to dalton-agent until we have some unit tests
+"dalton-agent/dalton-agent.py" = ["B"]
+
+[tool.bumpversion]
+current_version = "3.4.2"
+
+commit = true
+allow_dirty = false
+message = "Bump version: {current_version} → {new_version}"
+commit_args = "--no-verify"
+
+tag = true
+sign_tags = false
+tag_name = "v{new_version}"
+tag_message = "Bump version: {current_version} → {new_version}"
+
+[[tool.bumpversion.files]]
+filename = "app/__init__.py"

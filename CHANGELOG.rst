@@ -149,3 +149,35 @@ Zeek Enhancements (#177)
 
 Author: Nikhileswar Reddy <nreddy@octolabs.io>
 
+3.4.0 (2024-11-12)
+##################
+
+Version 3.4.x is available initially on the pilot branch,
+in a sort of pre-release mode.
+
+* Use pyproject.toml (#184) (#189)
+* Use ruff format to format the code (#183) (#190)
+* Use ruff check --fix to make style changes (#183) (#192)
+* Add github actions CI (#191) (#193)
+* Be able to run unit tests on dalton and flowsynth (#182) (#194)
+* Update nginx from 1.19 to 1.27 (#200) (#202)
+* Update redis from 3.2 to 7.4 (#201)
+* Add unit tests for flowsynth (#204)
+* Use ruff to sort and format imports (#207)
+* Use ruff to detect flake8 bugbears (B) (#209)
+* Use pre-built zeek images (#181)
+* Use bump-my-version to update the version and tag (#197)
+  * Also, use bump-my-version to update the dalton-agent version
+  * Also, show the dalton controller version on the About page
+
+3.4.1 (2024-11-14)
+##################
+
+* Fixed bug with zeek processing. (#213) (#214) (#216)
+* Added some unit tests. (#203) (#215)
+
+3.4.2 (2024-11-15)
+##################
+
+* Updated flask dependencies (#180) (#222)
+  * Configure flask maximum content length
