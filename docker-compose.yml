@@ -448,3 +448,13 @@ services:
       - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
     restart: always
 
+###########################
+## Cyberchef Integration ##
+###########################
+
+# Official cyberchef docker image, from github container repo (ghcr)
+  cyberchef:
+    image: ghcr.io/gchq/cyberchef:latest
+    container_name: cyberchef_current
+    hostname: cyberchef_current
+    restart: always
