@@ -1,15 +1,16 @@
 # Builds Suricata Dalton agent using Suricata source tarball
-FROM ubuntu:18.04
+FROM ubuntu:24.04
 
 ARG SURI_VERSION
 ARG ENABLE_RUST
 
 # tcpdump is for pcap analysis; not *required* for
 #  the agent but nice to have....
+# changing the python3.8 package to python3 python3-dev and python3-pip
 # hadolint ignore=DL3008
 RUN apt-get update -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    python3.8 \
+    python3 python3-dev python3-pip \
     tcpdump \
     libpcre3 libpcre3-dbg libpcre3-dev libnss3-dev \
     build-essential autoconf automake libtool libpcap-dev libnet1-dev \
@@ -52,4 +53,4 @@ COPY tls.lua /opt/dalton-agent/tls.lua
 
 RUN sed -i 's/REPLACE_AT_DOCKER_BUILD-VERSION/'"${SURI_VERSION}"'/' /opt/dalton-agent/dalton-agent.conf
 
-CMD ["python3.8", "/opt/dalton-agent/dalton-agent.py", "-c", "/opt/dalton-agent/dalton-agent.conf"]
+CMD ["python3", "/opt/dalton-agent/dalton-agent.py", "-c", "/opt/dalton-agent/dalton-agent.conf"]
