@@ -320,7 +320,7 @@ def compile_fs():
     # write flowsynth data to file
     fs_code = str(request.form.get("code"))
     hashobj = hashlib.md5()
-    hashobj.update(f"{fs_code}{random.randint(1,10000)}".encode("utf-8"))
+    hashobj.update(f"{fs_code}{random.randint(1, 10000)}".encode("utf-8"))
     fname = hashobj.hexdigest()[0:15]
 
     inpath = tempfile.mkstemp()[1]
