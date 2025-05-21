@@ -71,6 +71,8 @@ Contents
 -  `Adding Sensor Configs <#adding-sensor-configs>`__
 -  `Logging and Debugging <#logging-and-debugging>`__
 -  `Flowsynth WebUI <#flowsynth-webui>`__
+-  `Zeek <#zeek>`__
+-  `CyberChef <#cyberchef>`__
 -  `Frequently Asked Questions <#frequently-asked-questions>`__
 -  `Authors <#authors>`__
 
@@ -147,7 +149,7 @@ While all the above systems could be independent physical (or virtual)
 machines (and in fact this setup has been done), for ease of install and
 use, everything has also been architected as a group of
 `Docker <https://www.docker.com/>`__ containers. The Dalton codebase
-includes Dockerfiles, “docker-compose.yaml”, and associated
+includes Dockerfiles, “docker-compose.yml”, and associated
 configuration files to facilitate easy application launch using a set of
 Docker containers.
 
@@ -1235,7 +1237,7 @@ by setting the ``CONTROLLER_DEBUG`` environment variable (e.g.
 process and set in the ``.env`` file.  If either the config file or environment 
 variable has debugging set, debug logging will be enabled.
 
-For the Dalton Controller, debugging can be enabled in ``dalton-agent.conf`` file or 
+For the Dalton Agents, debugging can be enabled in ``dalton-agent.conf`` file or 
 by setting the ``AGENT_DEBUG`` environment variable (e.g. 
 ``AGENT_DEBUG=1``.  This can also be passed during the container build 
 process and set in the ``.env`` file.  If either the config file or environment 
@@ -1329,9 +1331,19 @@ Example 2:
 Zeek
 ====
 
-Dalton now supports Zeek as a sensor as of version 3.2.0. There is limited support in the API and
+Starting with Dalton version 3.2.0, Zeek as a sensor is supported. There is limited support in the API and
 configurations/rulesets cannot be changed at runtime from the UI. However, Zeek scripts can be
 added in the rulesets directory and will be executed with every run.
+
+
+CyberChef
+=========
+
+For convenience, Dalton has the ability to easily build and run a
+`CyberChef <https://gchq.github.io/CyberChef/>`__ container.  This is enabled by default in the
+``docker-compose.yml`` file.  Accessing CyberChef can be done via the 'CyberChef' link
+in the Dalton toolbar, or directly using the '/cyberchef' URI path.
+
 
 Frequently Asked Questions
 ==========================
