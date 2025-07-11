@@ -345,7 +345,7 @@ if USE_SURICATA_SOCKET_CONTROL:
     # Socket Control supported in Suricata 1.4 and later
     if float(".".join(prefix_strip(eng_ver).split(".")[:2])) < 3.0:
         msg = f"Dalton Agent does not support Suricata Socket Control for Suricata versions before 3.0. This is running Suricata version {eng_ver}.  Disabling Suricata Socket Control Mode."
-        print_warning(msg)
+        logger.warning(msg)
         USE_SURICATA_SOCKET_CONTROL = False
 
 if USE_SURICATA_SOCKET_CONTROL:
