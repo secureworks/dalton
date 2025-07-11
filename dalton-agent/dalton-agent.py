@@ -466,10 +466,12 @@ def print_msg(msg):
     logger.debug(msg)
     send_update(msg, JOB_ID)
 
+
 def print_warning(msg):
     logger.warning(msg)
     msg = "WARNING: %s" % msg
     print_debug(msg)
+
 
 def print_debug(msg):
     global JOB_DEBUG_LOG
@@ -1645,16 +1647,23 @@ def submit_job(job_id, job_directory):
                     # should not be necessary but just in case
                     USE_SURICATA_SOCKET_CONTROL = False
                 else:
-                    if USE_SURICATA_SOCKET_CONTROL == USE_SURICATA_SOCKET_CONTROL_CONFIG_SETTING:
+                    if (
+                        USE_SURICATA_SOCKET_CONTROL
+                        == USE_SURICATA_SOCKET_CONTROL_CONFIG_SETTING
+                    ):
                         msg = f"Changing Suricata Socket Control option to '{useSuricataSC}' per job settings."
                         logger.info(msg)
                         print_debug(msg)
                         USE_SURICATA_SOCKET_CONTROL = useSuricataSC
                     else:
                         # Suricata Socket Control has been disabled upstream in the code for some reason (e.g. Python libs not present)
-                        print_warning("Unable to use Suricata Socket Control. Either the Suricata version does not support it or the libs could not be found.")
+                        print_warning(
+                            "Unable to use Suricata Socket Control. Either the Suricata version does not support it or the libs could not be found."
+                        )
         except Exception as e:
-            logger.warning("Problem getting 'use-suricatasc' value from manifest: %s" % e)
+            logger.warning(
+                "Problem getting 'use-suricatasc' value from manifest: %s" % e
+            )
 
     trackPerformance = False
     try:
