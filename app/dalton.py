@@ -182,6 +182,12 @@ if TEAPOT_REDIS_EXPIRE > REDIS_EXPIRE:
         "teapot_redis_expire value %d greater than redis_expire value %d. This is not recommended and may result in teapot jobs being deleted from disk before they expire in Redis."
         % (TEAPOT_REDIS_EXPIRE, REDIS_EXPIRE)
     )
+if SHARE_EXPIRE < REDIS_EXPIRE:
+    logger.warning(
+        "share_expire value %d less than redis_expire value %d. This is not recommended; using redis_expire value %d as the share_expire value instead."
+        % (SHARE_EXPIRE, REDIS_EXPIRE, REDIS_EXPIRE)
+    )
+    SHARE_EXPIRE = REDIS_EXPIRE
 
 # other checks
 if MAX_PCAP_FILES < 1:
@@ -3011,7 +3017,7 @@ def page_queue_default():
             ):
                 # job has expired
                 logger.debug("Dalton in page_queue_default(): removing job: %s" % jid)
-                redis.lrem("recent_jobs", jid)
+                redis.lrem("recent_jobs", 0, jid)
                 # just in case, expire all keys associated with jid
                 expire_all_keys(redis, jid)
             else:

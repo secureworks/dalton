@@ -105,9 +105,10 @@ try:
     API_KEY = config.get("dalton", "API_KEY")
     POLL_INTERVAL = int(config.get("dalton", "POLL_INTERVAL"))
     KEEP_JOB_FILES = config.getboolean("dalton", "KEEP_JOB_FILES")
-    USE_SURICATA_SOCKET_CONTROL = config.getboolean(
+    USE_SURICATA_SOCKET_CONTROL_CONFIG_SETTING = config.getboolean(
         "dalton", "USE_SURICATA_SOCKET_CONTROL"
     )
+    USE_SURICATA_SOCKET_CONTROL = USE_SURICATA_SOCKET_CONTROL_CONFIG_SETTING
     SURICATA_SC_PYTHON_MODULE = config.get("dalton", "SURICATA_SC_PYTHON_MODULE")
     SURICATA_SOCKET_NAME = config.get("dalton", "SURICATA_SOCKET_NAME")
 
@@ -210,7 +211,7 @@ def get_engine_version(path):
         else:
             # use filename of binary
             engine = os.path.basename(path).lower()
-            logger.warn(
+            logger.warning(
                 "Could not determine engine name, using '%s' from IDS_BINARY path"
                 % engine
             )
@@ -235,7 +236,7 @@ def get_engine_version(path):
                 # rust support exists
                 version = "rust_%s" % version
     except Exception as e:
-        logger.warn("Exception in get_engine_version(): %s" % e)
+        logger.warning("Exception in get_engine_version(): %s" % e)
         pass
     logger.debug(
         "Using IDS binary '%s': engine: '%s', version '%s'" % (path, engine, version)
@@ -294,19 +295,19 @@ TCPDUMP_BINARY = "auto"
 try:
     TCPDUMP_BINARY = config.get("dalton", "TCPDUMP_BINARY")
 except Exception as e:
-    logger.warn("Unable to get config value 'TCPDUMP_BINARY': %s" % e)
+    logger.warning("Unable to get config value 'TCPDUMP_BINARY': %s" % e)
     pass
 if TCPDUMP_BINARY == "auto":
     TCPDUMP_BINARY = find_file("tcpdump")
 if not TCPDUMP_BINARY or not os.path.exists(TCPDUMP_BINARY):
-    logger.warn("Could not find 'tcpdump' binary.")
+    logger.warning("Could not find 'tcpdump' binary.")
     TCPDUMP_BINARY = ""
 
 IDS_BINARY = "auto"
 try:
     IDS_BINARY = config.get("dalton", "IDS_BINARY")
 except Exception as e:
-    logger.warn("Unable to get config value 'IDS_BINARY': %s" % e)
+    logger.warning("Unable to get config value 'IDS_BINARY': %s" % e)
     pass
 if IDS_BINARY == "auto":
     IDS_BINARY = find_file("suricata")
@@ -344,7 +345,7 @@ if USE_SURICATA_SOCKET_CONTROL:
     # Socket Control supported in Suricata 1.4 and later
     if float(".".join(prefix_strip(eng_ver).split(".")[:2])) < 3.0:
         msg = f"Dalton Agent does not support Suricata Socket Control for Suricata versions before 3.0. This is running Suricata version {eng_ver}.  Disabling Suricata Socket Control Mode."
-        logger.warn(msg)
+        logger.warning(msg)
         USE_SURICATA_SOCKET_CONTROL = False
 
 if USE_SURICATA_SOCKET_CONTROL:
@@ -466,6 +467,12 @@ def print_msg(msg):
     send_update(msg, JOB_ID)
 
 
+def print_warning(msg):
+    logger.warning(msg)
+    msg = "WARNING: %s" % msg
+    print_debug(msg)
+
+
 def print_debug(msg):
     global JOB_DEBUG_LOG
     if JOB_DEBUG_LOG:
@@ -473,7 +480,7 @@ def print_debug(msg):
         fh.write("*****\n%s\n" % msg)
         fh.close()
     else:
-        logger.debug("print_debug() called but no JOB_DEBUG_LOG exists")
+        logger.warning("print_debug() called but no JOB_DEBUG_LOG exists")
 
 
 # **********************
@@ -545,7 +552,7 @@ class SocketController:
         """Stop Suricata daemon using socket control."""
         logger.debug("stop_suricata_daemon() called")
         if not self.suricata_is_running:
-            logger.warn(
+            logger.warning(
                 "stop_suricata_daemon() called but Suricata may not be running."
                 " Still attempting shutdown but it will likely error."
             )
@@ -853,7 +860,7 @@ def post_results(json_data):
         urllib.request.urlopen(req, timeout=URLLIB_TIMEOUT)
     except Exception as e:
         try:
-            re.search("(^[^\?]*)", url).group(1)
+            re.search(r"(^[^?]*)", url).group(1)
         except Exception:
             pass
 
@@ -1122,7 +1129,7 @@ def run_suricata_sc():
         SCONTROL.restart_suricata_socket_mode(newconfig=IDS_CONFIG_FILE)
     else:
         if not SCONTROL.suricata_is_running:
-            logger.warn("Suricata thread not running ... starting it back up....")
+            logger.warning("Suricata thread not running ... starting it back up....")
             SCONTROL.ruleset_hash = ruleset_hash
             SCONTROL.config_hash = config_hash
             SCONTROL.restart_suricata_socket_mode(newconfig=IDS_CONFIG_FILE)
@@ -1364,7 +1371,7 @@ def check_for_errors(tech):
                             "Bad pcap file(s) submitted to Snort. Pcap files should be in libpcap or pcapng format.\n"
                         )
             else:
-                logger.warn(
+                logger.warning(
                     f"Unexpected engine value passed to check_for_errors(): {tech}"
                 )
         ids_log_fh.close()
@@ -1636,16 +1643,27 @@ def submit_job(job_id, job_directory):
                     < 3.0
                 ):
                     msg = f"Dalton Agent does not support Suricata Socket Control for Suricata versions before 3.0. This is running Suricata version {eng_ver}.  Cannot use Suricata Socket Control Mode."
-                    logger.warn(msg)
+                    print_warning(msg)
                     # should not be necessary but just in case
                     USE_SURICATA_SOCKET_CONTROL = False
                 else:
-                    msg = f"Changing Suricata Socket Control option to '{useSuricataSC}' per job settings."
-                    logger.info(msg)
-                    print_debug(msg)
-                    USE_SURICATA_SOCKET_CONTROL = useSuricataSC
+                    if (
+                        USE_SURICATA_SOCKET_CONTROL
+                        == USE_SURICATA_SOCKET_CONTROL_CONFIG_SETTING
+                    ):
+                        msg = f"Changing Suricata Socket Control option to '{useSuricataSC}' per job settings."
+                        logger.info(msg)
+                        print_debug(msg)
+                        USE_SURICATA_SOCKET_CONTROL = useSuricataSC
+                    else:
+                        # Suricata Socket Control has been disabled upstream in the code for some reason (e.g. Python libs not present)
+                        print_warning(
+                            "Unable to use Suricata Socket Control. Either the Suricata version does not support it or the libs could not be found."
+                        )
         except Exception as e:
-            logger.warn("Problem getting 'use-suricatasc' value from manifest: %s" % e)
+            logger.warning(
+                "Problem getting 'use-suricatasc' value from manifest: %s" % e
+            )
 
     trackPerformance = False
     try:
@@ -1825,8 +1843,7 @@ def submit_job(job_id, job_directory):
         # cannot get rule profiling or keyword profiling when using Socket Control
         if trackPerformance and USE_SURICATA_SOCKET_CONTROL:
             msg = "'Rule profiling' enabled, disabling Suricata Socket control."
-            logger.warn(msg)
-            print_debug(msg)
+            print_warning(msg)
             USE_SURICATA_SOCKET_CONTROL = False
         # run the Suricata job
         if USE_SURICATA_SOCKET_CONTROL:
@@ -2028,7 +2045,7 @@ while True:
         )
         if JOB_ID:
             # unexpected error happened on agent when trying to process a job but there may not be job data so compile an empty response with the exception error message and try to send it
-            logger.warn(
+            logger.warning(
                 "Possible communication error processing jobid %s.  Attempting to send error message to controller."
                 % JOB_ID
             )
