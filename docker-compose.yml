@@ -89,6 +89,22 @@ services:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
+# Suricata 7.0.10 from source
+  agent-suricata-7.0.10:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_suricata
+      args:
+        - SURI_VERSION=7.0.10
+        - http_proxy=${http_proxy}
+        - https_proxy=${https_proxy}
+        - no_proxy=${no_proxy}
+    image: suricata-7.0.10:latest
+    container_name: suricata-7.0.10
+    environment:
+      - AGENT_DEBUG=${AGENT_DEBUG}
+    restart: always
+
 # Suricata 6.0.20 from source, with Rust support
   agent-suricata-6.0.20:
     build:
