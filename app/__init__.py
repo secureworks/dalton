@@ -6,7 +6,7 @@ from flask import Flask
 from app.dalton import dalton_blueprint, ensure_rulesets_exist, setup_dalton_logging
 from app.flowsynth import flowsynth_blueprint, setup_flowsynth_logging
 
-__version__ = "3.4.2"
+__version__ = "3.5.0"
 
 
 def create_app(test_config=None):

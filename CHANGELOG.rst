@@ -181,3 +181,16 @@ in a sort of pre-release mode.
 
 * Updated flask dependencies (#180) (#222)
   * Configure flask maximum content length
+
+3.5.0 (2025-09-18)
+##################
+
+* Addressed issue #245, sanitize input on post_job_results - thanks @whartond
+* Updated documentation
+* Code cleanup (ruff)
+* Bump dependencies
+  * jinja2 to 3.1.6
+  * flask to 3.1.1
+* Contributions from @da667 - thank you!
+  * Added cyberchef container (#235)
+  * Updated base OS to Ubuntu 24.04 (#234)
