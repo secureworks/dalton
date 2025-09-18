@@ -113,3 +113,20 @@ class TestDalton(unittest.TestCase):
         redis.set.assert_any_call(f"{the_hash}-current_job", "")
         redis.expire.assert_any_call(f"{the_hash}-current_job", REDIS_EXPIRE)
         redis.set.assert_any_call(f"{job_id}-statcode", STAT_CODE_DONE)
+
+    @mock.patch("app.dalton.get_redis")
+    def test_post_job_results_invalid_format(self, get_redis):
+        """Validate job id format in `post_job_results`.
+
+        Issue #245
+        """
+        job_id = "${};!"
+        url = f"/dalton/sensor_api/results/{job_id}"
+        job_results = {"status": "1"}
+        data = dict(json_data=json.dumps(job_results))
+        res = self.client.post(url, data=data)
+        self.assertIn(
+            "Invalid Job ID",
+            res.data.decode(),
+        )
+        self.assertEqual("Error", res.headers["X-Dalton-Webapp"])
