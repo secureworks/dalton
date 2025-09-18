@@ -799,6 +799,15 @@ def sensor_request_job():
 # @auth_required('write')
 def post_job_results(jobid):
     """called by Dalton Agent sending job results"""
+
+    if not validate_jobid(jobid):
+        logger.error(f"Bad jobid given: '{jobid}'. Possible hacking attempt.")
+        return Response(
+            "Error: Invalid Job ID",
+            mimetype="text/plain",
+            headers={"X-Dalton-Webapp": "Error"},
+        )
+
     # no authentication or authorization so this is easily abused; anyone with jobid
     # can overwrite results if they submit first.
     redis = get_redis()
