@@ -40,7 +40,7 @@ import time
 import traceback
 import zipfile
 from distutils.version import LooseVersion
-from functools import lru_cache
+from functools import lru_cache, wraps
 from logging.handlers import RotatingFileHandler
 from threading import Thread
 
@@ -91,6 +91,7 @@ try:
     RULECAT_SCRIPT = dalton_config.get("dalton", "rulecat_script")
     MAX_PCAP_FILES = dalton_config.getint("dalton", "max_pcap_files")
     DEBUG = dalton_config.getboolean("dalton", "debug")
+    AUTH_PREFIX = dalton_config.get("dalton", "auth_prefix")
 
     # options for flowsynth
     FS_BIN_PATH = dalton_config.get(
@@ -532,9 +533,25 @@ def delete_old_job_files():
     return str(total_deleted)
 
 
+def check_user(f):
+    @wraps(f)
+    def check_user_fun(*args, **kwargs):
+        user = None
+        try:
+            user = request.cookies.get('dalton_user')
+        except Exception as e:
+            user = None
+        if user is None or not user.startswith(AUTH_PREFIX):
+            return redirect(url_for('dalton_blueprint.set_user'))
+        return f(*args, **kwargs)
+    return check_user_fun
+
+
 @dalton_blueprint.route("/")
+@check_user
 def index():
     logger.debug("ENVIRON:\n%s" % request.environ)
+
     # make sure redirect is set to use http or https as appropriate
     rurl = url_for("dalton_blueprint.page_index", _external=True)
     if rurl.startswith("http"):
@@ -551,9 +568,37 @@ def index():
     return redirect(rurl)
 
 
+@dalton_blueprint.route("/dalton/logout", methods=["GET"])
+@dalton_blueprint.route("/dalton/logout/", methods=["GET"])
+@dalton_blueprint.route("/logout", methods=["GET"])
+@dalton_blueprint.route("/logout/", methods=["GET"])
+def logout():
+    response = redirect(url_for('dalton_blueprint.set_user'))
+    response.set_cookie('dalton_user', "", domain='.app.localhost')
+    return response
+
+
+@dalton_blueprint.route("/dalton/setuser", methods=["GET", "POST"])
+def set_user():
+    user = None
+    try:
+        if request.method == 'POST':
+            user = request.form.get("username")
+        else:
+            user = request.cookies.get('dalton_user')
+    except Exception as e:
+        user = None
+    if user is None or not user.startswith(AUTH_PREFIX):
+        return render_template("/dalton/setuser.html", user="")
+
+    response = redirect(url_for('dalton_blueprint.page_index'))
+    response.set_cookie('dalton_user', user, max_age=432000, domain='.app.localhost') # Sets 'username' cookie for 1 hour
+    return response
+
+
 @dalton_blueprint.route("/dalton")
 @dalton_blueprint.route("/dalton/")
-# @login_required()
+@check_user
 def page_index():
     """the default homepage for Dalton"""
     return render_template("/dalton/index.html", page="")
@@ -562,7 +607,7 @@ def page_index():
 # 'sensor' value includes forward slashes so this isn't a RESTful endpoint
 # and 'sensor' value must be passed as a GET parameter
 @dalton_blueprint.route("/dalton/controller_api/request_engine_conf", methods=["GET"])
-# @auth_required()
+@check_user
 def api_get_engine_conf_file():
     try:
         sensor = request.args["sensor"]
@@ -966,7 +1011,7 @@ def post_job_results(jobid):
 
 
 @dalton_blueprint.route("/dalton/controller_api/job_status/<jobid>", methods=["GET"])
-# @login_required()
+@check_user
 def get_ajax_job_status_msg(jobid):
     """return the job status msg (as a string)"""
     redis = get_redis()
@@ -1001,7 +1046,7 @@ def get_ajax_job_status_msg(jobid):
 @dalton_blueprint.route(
     "/dalton/controller_api/job_status_code/<jobid>", methods=["GET"]
 )
-# @login_required()
+@check_user
 def get_ajax_job_status_code(jobid):
     """return the job status code (AS A STRING! -- you need to cast the return value as an int if you want to use it as an int)"""
     redis = get_redis()
@@ -1080,7 +1125,7 @@ def clear_old_agents(redis):
 
 
 @dalton_blueprint.route("/dalton/sensor", methods=["GET"])
-# @login_required()
+@check_user
 def page_sensor_default(return_dict=False):
     """the default sensor page"""
     redis = get_redis()
@@ -1146,6 +1191,7 @@ def validate_jobid(jid):
 
 
 @dalton_blueprint.route("/dalton/coverage/job/<jid>", methods=["GET"])
+@check_user
 def page_coverage_jid(jid, error=None):
     redis = get_redis()
 
@@ -1237,7 +1283,7 @@ def page_coverage_jid(jid, error=None):
 
 
 @dalton_blueprint.route("/dalton/coverage/<sensor_tech>/", methods=["GET"])
-# @login_required()
+@check_user
 def page_coverage_default(sensor_tech, error=None):
     """the default coverage wizard page"""
     redis = get_redis()
@@ -1348,7 +1394,7 @@ def page_coverage_default(sensor_tech, error=None):
 
 
 @dalton_blueprint.route("/dalton/job/<jid>")
-# @auth_required()
+@check_user
 def page_show_job(jid):
     redis = get_redis()
     tech = redis.get("%s-tech" % jid)
@@ -1673,8 +1719,7 @@ def submit_job():
 
 
 @dalton_blueprint.route("/dalton/coverage/summary", methods=["POST"])
-# @auth_required()
-# ^^ can change and add resource and group permissions if we want to restrict who can submit jobs
+@check_user
 def page_coverage_summary():
     """Handle job submission from UI."""
     # user submitting a job to Dalton via the web interface
@@ -2986,7 +3031,7 @@ def page_coverage_summary():
 
 
 @dalton_blueprint.route("/dalton/queue")
-# @login_required()
+@check_user
 def page_queue_default():
     """the default queue page"""
     redis = get_redis()
@@ -3080,7 +3125,7 @@ def page_queue_default():
 
 
 @dalton_blueprint.route("/dalton/about")
-# @login_required()
+@check_user
 def page_about_default():
     """the about/help page"""
     # Need to `import app` here, not at the top of the file.
@@ -3211,7 +3256,7 @@ def controller_api_get_job_data(redis, jid, requested_data):
 @dalton_blueprint.route(
     "/dalton/controller_api/v2/<jid>/<requested_data>/<raw>", methods=["GET"]
 )
-# @auth_required()
+@check_user
 def controller_api_get_request(jid, requested_data, raw):
     logger.debug(
         f"controller_api_get_request() called, raw: {'True' if raw == 'raw' else 'False'}"
@@ -3249,6 +3294,7 @@ def controller_api_get_request(jid, requested_data, raw):
 @dalton_blueprint.route(
     "/dalton/controller_api/get-current-sensors/<engine>", methods=["GET"]
 )
+@check_user
 def controller_api_get_current_sensors(engine):
     """Returns a list of current active sensors"""
     redis = get_redis()
@@ -3300,6 +3346,7 @@ def controller_api_get_current_sensors(engine):
 @dalton_blueprint.route(
     "/dalton/controller_api/get-current-sensors-json-full", methods=["GET"]
 )
+@check_user
 def controller_api_get_current_sensors_json_full():
     """Returns json with details about all the current active sensors"""
     sensors = page_sensor_default(return_dict=True)
@@ -3312,6 +3359,7 @@ def controller_api_get_current_sensors_json_full():
 
 
 @dalton_blueprint.route("/dalton/controller_api/get-max-pcap-files", methods=["GET"])
+@check_user
 def controller_api_get_max_pcap_files():
     """Returns the config value of max_pcap_files (the number of
     pcap or compressed that can be uploaded per job).

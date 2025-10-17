@@ -89,18 +89,18 @@ services:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
-# Suricata 6.0.20 from source, with Rust support
-  agent-suricata-6.0.20:
+# Suricata 7.0.12 from source, with Rust support
+  agent-suricata-7.0.12:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_suricata
       args:
-        - SURI_VERSION=6.0.20
+        - SURI_VERSION=7.0.12
         - http_proxy=${http_proxy}
         - https_proxy=${https_proxy}
         - no_proxy=${no_proxy}
-    image: suricata-6.0.20:latest
-    container_name: suricata-6.0.20
+    image: suricata-7.0.12:latest
+    container_name: suricata-7.0.12
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
@@ -424,29 +424,29 @@ services:
 ###########################
 
 # Zeek current (latest) from source
-  agent-zeek-current:
-    build:
-      context: ./dalton-agent
-      dockerfile: Dockerfiles/Dockerfile_zeek
-      args:
-        - ZEEK_VERSION=7.0.1
-    image: zeek-current:latest
-    container_name: zeek-current
-    volumes:
-      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
-    restart: always
-
-  agent-zeek-6.0.6:
-    build:
-      context: ./dalton-agent
-      dockerfile: Dockerfiles/Dockerfile_zeek
-      args:
-        - ZEEK_VERSION=6.0.6
-    image: zeek-6.0.6
-    container_name: zeek-6.0.6
-    volumes:
-      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
-    restart: always
+#  agent-zeek-current:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_zeek
+#      args:
+#        - ZEEK_VERSION=7.0.1
+#    image: zeek-current:latest
+#    container_name: zeek-current
+#    volumes:
+#      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
+#    restart: always
+#
+#  agent-zeek-6.0.6:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_zeek
+#      args:
+#        - ZEEK_VERSION=6.0.6
+#    image: zeek-6.0.6
+#    container_name: zeek-6.0.6
+#    volumes:
+#      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
+#    restart: always
 
 ###########################
 ## Cyberchef Integration ##
