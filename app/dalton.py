@@ -1730,8 +1730,8 @@ def page_coverage_summary():
 
     prod_ruleset_name = None
 
-    # get the user who submitted the job .. not implemented
-    user = "undefined"
+    # get the user who submitted the job
+    user = request.cookies.get('dalton_user')
 
     # generate job_id based of pcap filenames and timestamp
     digest.update(str(datetime.datetime.now()).encode("utf-8"))
