@@ -574,7 +574,7 @@ def index():
 @dalton_blueprint.route("/logout/", methods=["GET"])
 def logout():
     response = redirect(url_for('dalton_blueprint.set_user'))
-    response.set_cookie('dalton_user', "", domain='.app.localhost')
+    response.set_cookie('dalton_user', "")
     return response
 
 
@@ -592,7 +592,7 @@ def set_user():
         return render_template("/dalton/setuser.html", user="")
 
     response = redirect(url_for('dalton_blueprint.page_index'))
-    response.set_cookie('dalton_user', user, max_age=432000, domain='.app.localhost') # Sets 'username' cookie for 1 hour
+    response.set_cookie('dalton_user', user, max_age=432000)
     return response
 
 
