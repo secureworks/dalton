@@ -92,6 +92,7 @@ try:
     MAX_PCAP_FILES = dalton_config.getint("dalton", "max_pcap_files")
     DEBUG = dalton_config.getboolean("dalton", "debug")
     AUTH_PREFIX = dalton_config.get("dalton", "auth_prefix")
+    AUTH_MAX = dalton_config.getint("dalton", "auth_max")
 
     # options for flowsynth
     FS_BIN_PATH = dalton_config.get(
@@ -541,7 +542,7 @@ def check_user(f):
             user = request.cookies.get('dalton_user')
         except Exception as e:
             user = None
-        if user is None or not user.startswith(AUTH_PREFIX):
+        if user is None or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
             return redirect(url_for('dalton_blueprint.set_user'))
         return f(*args, **kwargs)
     return check_user_fun
@@ -588,7 +589,7 @@ def set_user():
             user = request.cookies.get('dalton_user')
     except Exception as e:
         user = None
-    if user is None or not user.startswith(AUTH_PREFIX):
+    if user is None or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
         return render_template("/dalton/setuser.html", user="")
 
     response = redirect(url_for('dalton_blueprint.page_index'))
@@ -3104,8 +3105,16 @@ def page_queue_default():
                     job["jid"] = jid
                     job["tech"] = "%s" % redis.get("%s-tech" % jid)
                     job["time"] = "%s" % redis.get("%s-submission_time" % jid)
-                    job["user"] = "%s" % redis.get("%s-user" % jid)
                     job["status"] = status_msg
+                    # strip out auth prefix for display on queue page
+                    user = redis.get("%s-user" % jid)
+                    if user is None:
+                        pass  # handled by template
+                    elif user.startswith(AUTH_PREFIX):
+                        user = user[len(AUTH_PREFIX):]
+                    elif '_' in user:
+                        user = user.split('_', 1)[1]
+                    job["user"] = user
                     alert_count = get_alert_count(redis, jid)
                     if status != STAT_CODE_DONE:
                         job["alert_count"] = "-"
