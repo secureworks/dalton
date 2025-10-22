@@ -107,6 +107,7 @@ except Exception as e:
         "Problem parsing config file '%s': %s" % (dalton_config_filename, e)
     )
 
+
 if DEBUG or ("CONTROLLER_DEBUG" in os.environ and int(os.getenv("CONTROLLER_DEBUG"))):
     logger.setLevel(logging.DEBUG)
     DEBUG = True
@@ -551,23 +552,7 @@ def check_user(f):
 @dalton_blueprint.route("/")
 @check_user
 def index():
-    logger.debug("ENVIRON:\n%s" % request.environ)
-
-    # make sure redirect is set to use http or https as appropriate
-    rurl = url_for("dalton_blueprint.page_index", _external=True)
-    if rurl.startswith("http"):
-        if "HTTP_X_FORWARDED_PROTO" in request.environ:
-            # if original request was https, make sure redirect uses https
-            rurl = rurl.replace("http", request.environ["HTTP_X_FORWARDED_PROTO"])
-        else:
-            logger.warning(
-                "Could not find request.environ['HTTP_X_FORWARDED_PROTO']. Make sure the web server (proxy) is configured to send it."
-            )
-    else:
-        # this shouldn't be the case with '_external=True' passed to url_for()
-        logger.warning("URL does not start with 'http': %s" % rurl)
-    return redirect(rurl)
-
+    return redirect(url_for("dalton_blueprint.page_index"))
 
 @dalton_blueprint.route("/dalton/logout", methods=["GET"])
 @dalton_blueprint.route("/dalton/logout/", methods=["GET"])
@@ -3010,24 +2995,9 @@ def page_coverage_summary():
             # make sure redirect is set to use http or https as appropriate
             if bSplitCap:
                 # TODO: something better than just redirect to queue page
-                rurl = url_for("dalton_blueprint.page_queue_default", _external=True)
+                rurl = url_for("dalton_blueprint.page_queue_default")
             else:
-                rurl = url_for(
-                    "dalton_blueprint.page_show_job", jid=jid, _external=True
-                )
-            if rurl.startswith("http"):
-                if "HTTP_X_FORWARDED_PROTO" in request.environ:
-                    # if original request was https, make sure redirect uses https
-                    rurl = rurl.replace(
-                        "http", request.environ["HTTP_X_FORWARDED_PROTO"]
-                    )
-                else:
-                    logger.warning(
-                        "Could not find request.environ['HTTP_X_FORWARDED_PROTO']. Make sure the web server (proxy) is configured to send it."
-                    )
-            else:
-                # this shouldn't be the case with '_external=True' passed to url_for()
-                logger.warning("URL does not start with 'http': %s" % rurl)
+                rurl = url_for("dalton_blueprint.page_show_job", jid=jid)
             return redirect(rurl)
 
 
