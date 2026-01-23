@@ -538,6 +538,9 @@ def delete_old_job_files():
 def check_user(f):
     @wraps(f)
     def check_user_fun(*args, **kwargs):
+        if AUTH_PREFIX == 'disabled':
+            # auth disabled
+            return f(*args, **kwargs)
         user = None
         try:
             user = request.cookies.get('dalton_user')
@@ -566,6 +569,10 @@ def logout():
 
 @dalton_blueprint.route("/dalton/setuser", methods=["GET", "POST"])
 def set_user():
+    if AUTH_PREFIX == 'disabled':
+        # auth disabled
+        return redirect(url_for('dalton_blueprint.page_index'))
+
     user = None
     try:
         if request.method == 'POST':
@@ -574,7 +581,7 @@ def set_user():
             user = request.cookies.get('dalton_user')
     except Exception as e:
         user = None
-    if user is None or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
+    if user is None or len(user) == 0 or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
         return render_template("/dalton/setuser.html", user="")
 
     response = redirect(url_for('dalton_blueprint.page_index'))
@@ -1718,6 +1725,8 @@ def page_coverage_summary():
 
     # get the user who submitted the job
     user = request.cookies.get('dalton_user')
+    if user is None:
+        user = ""
 
     # generate job_id based of pcap filenames and timestamp
     digest.update(str(datetime.datetime.now()).encode("utf-8"))
