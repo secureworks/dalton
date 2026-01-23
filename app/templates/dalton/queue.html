@@ -23,7 +23,9 @@
             <table class="table table-striped">
                 <tr>
                     <th>Job ID</th>
+                    {% if non_empty_user_count > 0 %}
                     <th>User</th>
+                    {% endif %}
                     <th>Alert Count</th>
                     <th>Queue</th>
         		    <th>Submission Time</th>
@@ -32,7 +34,9 @@
                 {% for job in queue %}
 			<tr>
 				<td><a href="/dalton/job/{{job.jid}}">{{ job.jid }}</td>
+                {% if non_empty_user_count > 0 %}
                 <td>{{ job.user }}</td>
+                {% endif %}
 				<td>
                     {% if job.alert_count is number %}
                         {{ job.alert_count|int }}

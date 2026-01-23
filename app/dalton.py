@@ -546,7 +546,7 @@ def check_user(f):
             user = request.cookies.get('dalton_user')
         except Exception as e:
             user = None
-        if user is None or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
+        if user is None or len(user) == 0 or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
             return redirect(url_for('dalton_blueprint.set_user'))
         return f(*args, **kwargs)
     return check_user_fun
@@ -3109,6 +3109,7 @@ def page_queue_default():
         queued_jobs=queued_jobs,
         running_jobs=running_jobs,
         num_jobs=num_jobs_to_show,
+        non_empty_user_count=len([x['user'] for x in queue if x['user'] != "" and x["user"] is not None]),
     )
 
 
