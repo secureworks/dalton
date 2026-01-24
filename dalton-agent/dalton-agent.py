@@ -366,6 +366,9 @@ if USE_SURICATA_SOCKET_CONTROL:
                 )
             )
         )
+    else:
+        # downloaded by Dockerfile
+        sys.path.insert(0, '/opt/python-suricatasc-main')
     # Used as Suricata default-log-dir when in SC mode
     os.makedirs(os.path.dirname(SURICATA_SOCKET_NAME), exist_ok=True)
 
@@ -657,10 +660,14 @@ if USE_SURICATA_SOCKET_CONTROL:
     try:
         import suricatasc
     except Exception:
-        logger.error(
-            f"Unable to import 'suricatasc' module (SURICATA_SC_PYTHON_MODULE set to '{SURICATA_SC_PYTHON_MODULE}'). Suricata Socket Control will be disabled."
-        )
-        USE_SURICATA_SOCKET_CONTROL = False
+        sys.path.insert(0, '/opt/python-suricatasc-main')
+        try:
+            import suricatasc
+        except Exception:
+            logger.error(
+                f"Unable to import 'suricatasc' module (SURICATA_SC_PYTHON_MODULE set to '{SURICATA_SC_PYTHON_MODULE}'). Suricata Socket Control will be disabled."
+            )
+            USE_SURICATA_SOCKET_CONTROL = False
 
 
 # ****************************************

@@ -24,6 +24,11 @@ RUN apt-get update -y && \
 # for debugging agent
 #RUN apt-get install -y less nano
 
+# get suricatasc; needed for Suricata 8 and later because it is no longer included with the Suricata source
+WORKDIR /opt
+ADD https://github.com/jasonish/python-suricatasc/archive/refs/heads/main.tar.gz suricatasc.tar.gz
+RUN tar -zxf suricatasc.tar.gz
+
 # download, build, and install Suricata from source
 RUN mkdir -p /src/suricata-${SURI_VERSION}
 WORKDIR /src
