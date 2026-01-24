@@ -544,7 +544,7 @@ def check_user(f):
         user = None
         try:
             user = request.cookies.get('dalton_user')
-        except Exception as e:
+        except Exception:
             user = None
         if user is None or len(user) == 0 or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
             return redirect(url_for('dalton_blueprint.set_user'))
@@ -579,7 +579,7 @@ def set_user():
             user = request.form.get("username")
         else:
             user = request.cookies.get('dalton_user')
-    except Exception as e:
+    except Exception:
         user = None
     if user is None or len(user) == 0 or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
         return render_template("/dalton/setuser.html", user="")
