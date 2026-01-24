@@ -437,19 +437,20 @@ services:
 ####### Zeek Agents #######
 ###########################
 
-# Zeek current (latest) from source
-#  agent-zeek-current:
-#    build:
-#      context: ./dalton-agent
-#      dockerfile: Dockerfiles/Dockerfile_zeek
-#      args:
-#        - ZEEK_VERSION=7.0.1
-#    image: zeek-current:latest
-#    container_name: zeek-current
-#    volumes:
-#      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
-#    restart: always
-#
+# Zeek 7.0.11
+  agent-zeek-current:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_zeek
+      args:
+        - ZEEK_VERSION=7.0.11
+    image: zeek-current:latest
+    container_name: zeek-current
+    volumes:
+      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
+    restart: always
+
+# Zeek 6.0.6
 #  agent-zeek-6.0.6:
 #    build:
 #      context: ./dalton-agent

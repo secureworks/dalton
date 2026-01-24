@@ -194,3 +194,14 @@ in a sort of pre-release mode.
 * Contributions from @da667 - thank you!
   * Added cyberchef container (#235)
   * Updated base OS to Ubuntu 24.04 (#234)
+
+3.6.0 (2026-01-24)
+##################
+
+* Moved to using **Docker Compose Version 2** in start-dalton.sh
+* Added functionality for users to set username, along with simple shared auth (see dalton.conf)
+* Updated queue page to display user who submitted the job (if so configured)
+* Fixed support for Suricata Socket Control in Suricata version 8 and later.  
+  The necessary Python libraries for suricatasc are no longer included with the Suricata 
+  source beginning with Suricata version 8.
+* Updated docker-compose to have more recent versions of the Suriata and Zeek agents by default
