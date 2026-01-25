@@ -3010,33 +3010,19 @@ def page_coverage_summary():
             return redirect(rurl)
 
 
-@dalton_blueprint.route("/dalton/queue")
-@check_user
-def page_queue_default():
-    """the default queue page"""
-    redis = get_redis()
-    num_jobs_to_show_default = 25
+def get_queue_data(redis, num_jobs_to_show):
+    """Fetch queue data from Redis.
 
-    # clear old job files from disk
-    # spin off a thread in case deleting files from
-    #  disk takes a while; this way we won't block the
-    #  queue page from loading
-    Thread(target=delete_old_job_files).start()
-
-    try:
-        num_jobs_to_show = int(request.args["numjobs"])
-    except Exception:
-        num_jobs_to_show = num_jobs_to_show_default
-
-    if not num_jobs_to_show or num_jobs_to_show < 0:
-        num_jobs_to_show = num_jobs_to_show_default
-
-    # use a list of dictionaries instead of a dict of dicts to preserve order when it gets passed to render_template
+    Returns a dict with:
+        - jobs: list of job dicts
+        - queued_jobs: count of queued jobs
+        - running_jobs: count of running jobs
+        - has_users: boolean indicating if any jobs have users
+    """
     queue = []
     queued_jobs = 0
     running_jobs = 0
     if redis.exists("recent_jobs") and redis.llen("recent_jobs") > 0:
-        # get the last num_jobs_to_show jobs; can adjust if you want (default set above in exception handler)
         count = 0
         jobs = redis.lrange("recent_jobs", 0, -1)
         for jid in jobs:
@@ -3050,14 +3036,13 @@ def page_queue_default():
                 "%s-status" % jid
             ):
                 # job has expired
-                logger.debug("Dalton in page_queue_default(): removing job: %s" % jid)
+                logger.debug("Dalton in get_queue_data(): removing job: %s" % jid)
                 redis.lrem("recent_jobs", 0, jid)
                 # just in case, expire all keys associated with jid
                 expire_all_keys(redis, jid)
             else:
                 status = int(get_job_status(redis, jid))
                 # ^^ have to cast as an int since it gets stored as a string (everything in redis is a string apparently....)
-                # logger.debug("Dalton in page_queue_default(): Job %s, stat code: %d" % (jid, status))
                 status_msg = "Unknown"
                 if status == STAT_CODE_QUEUED:
                     status_msg = "Queued"
@@ -3085,6 +3070,7 @@ def page_queue_default():
                     job["tech"] = "%s" % redis.get("%s-tech" % jid)
                     job["time"] = "%s" % redis.get("%s-submission_time" % jid)
                     job["status"] = status_msg
+                    job["status_code"] = status
                     # strip out auth prefix for display on queue page
                     user = redis.get("%s-user" % jid)
                     if user is None:
@@ -3103,13 +3089,46 @@ def page_queue_default():
                         job["alert_count"] = "?"
                     queue.append(job)
                 count += 1
+
+    has_users = len([x['user'] for x in queue if x['user'] != "" and x["user"] is not None]) > 0
+    return {
+        "jobs": queue,
+        "queued_jobs": queued_jobs,
+        "running_jobs": running_jobs,
+        "has_users": has_users,
+    }
+
+
+@dalton_blueprint.route("/dalton/queue")
+@check_user
+def page_queue_default():
+    """the default queue page"""
+    redis = get_redis()
+    num_jobs_to_show_default = 25
+
+    # clear old job files from disk
+    # spin off a thread in case deleting files from
+    #  disk takes a while; this way we won't block the
+    #  queue page from loading
+    Thread(target=delete_old_job_files).start()
+
+    try:
+        num_jobs_to_show = int(request.args["numjobs"])
+    except Exception:
+        num_jobs_to_show = num_jobs_to_show_default
+
+    if not num_jobs_to_show or num_jobs_to_show < 0:
+        num_jobs_to_show = num_jobs_to_show_default
+
+    data = get_queue_data(redis, num_jobs_to_show)
+
     return render_template(
         "/dalton/queue.html",
-        queue=queue,
-        queued_jobs=queued_jobs,
-        running_jobs=running_jobs,
+        queue=data["jobs"],
+        queued_jobs=data["queued_jobs"],
+        running_jobs=data["running_jobs"],
         num_jobs=num_jobs_to_show,
-        non_empty_user_count=len([x['user'] for x in queue if x['user'] != "" and x["user"] is not None]),
+        non_empty_user_count=1 if data["has_users"] else 0,
     )
 
 
@@ -3341,6 +3360,50 @@ def controller_api_get_current_sensors_json_full():
     sensors = page_sensor_default(return_dict=True)
     return Response(
         json.dumps(sensors),
+        status=200,
+        mimetype="application/json",
+        headers={"X-Dalton-Webapp": "OK"},
+    )
+
+
+@dalton_blueprint.route("/dalton/controller_api/get-queue-json", methods=["GET"])
+@check_user
+def controller_api_get_queue_json():
+    """Returns JSON with details about job queue.
+
+    Query parameters:
+        num_jobs (optional): Number of jobs to return (default 50)
+
+    Returns JSON with:
+        - jobs: list of job objects with jid, user, alert_count, tech, time, status, status_code
+        - summary: object with queued_jobs, running_jobs, total_displayed
+        - has_users: boolean indicating if any jobs have usernames
+    """
+    redis = get_redis()
+    num_jobs_to_show_default = 50
+
+    try:
+        num_jobs_to_show = int(request.args.get("num_jobs", num_jobs_to_show_default))
+    except (ValueError, TypeError):
+        num_jobs_to_show = num_jobs_to_show_default
+
+    if not num_jobs_to_show or num_jobs_to_show < 0:
+        num_jobs_to_show = num_jobs_to_show_default
+
+    data = get_queue_data(redis, num_jobs_to_show)
+
+    response = {
+        "jobs": data["jobs"],
+        "summary": {
+            "queued_jobs": data["queued_jobs"],
+            "running_jobs": data["running_jobs"],
+            "total_displayed": len(data["jobs"]),
+        },
+        "has_users": data["has_users"],
+    }
+
+    return Response(
+        json.dumps(response),
         status=200,
         mimetype="application/json",
         headers={"X-Dalton-Webapp": "OK"},
