@@ -45,7 +45,7 @@
                 {% endif %}
 			    </td>
 				<td>{{ job.time }}</td>
-				<td>{{ job.status }}</td>
+				<td class="{% if 'Success' in job.status %}status-success{% elif 'Error' in job.status %}status-error{% elif job.status == 'Running' %}status-running{% elif job.status == 'Timeout' %}status-timeout{% elif job.status == 'Interrupted' %}status-interrupted{% else %}status-queued{% endif %}">{{ job.status }}</td>
 			</tr>
                 {% endfor %}
                 </tbody>
@@ -60,6 +60,16 @@
         var currentNumJobs = {{ num_jobs }};
         var lastUpdateTime = new Date();
         var pollTimer = null;
+        var previousJobStates = {};  // { jid: status }
+
+        function getStatusClass(status) {
+            if (status.indexOf('Success') !== -1) return 'status-success';
+            if (status.indexOf('Error') !== -1) return 'status-error';
+            if (status === 'Running') return 'status-running';
+            if (status === 'Timeout') return 'status-timeout';
+            if (status === 'Interrupted') return 'status-interrupted';
+            return 'status-queued';
+        }
 
         function titleCase(str) {
             return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -154,10 +164,17 @@
             var tbody = document.getElementById('queue-table-body');
             if (!tbody) return;
 
+            var newJobStates = {};
             var rows = [];
             for (var i = 0; i < jobs.length; i++) {
                 var job = jobs[i];
                 var userCell = '<td class="user-column"' + (hasUsers ? '' : ' style="display: none;"') + '>' + escapeHtml(job.user) + '</td>';
+
+                // Determine status class and whether status changed
+                var statusClass = getStatusClass(job.status);
+                var statusChanged = previousJobStates[job.jid] !== undefined && previousJobStates[job.jid] !== job.status;
+                var highlightClass = statusChanged ? ' status-highlight' : '';
+                newJobStates[job.jid] = job.status;
 
                 var row = '<tr>' +
                     '<td><a href="/dalton/job/' + escapeHtml(job.jid) + '">' + escapeHtml(job.jid) + '</a></td>' +
@@ -165,10 +182,13 @@
                     '<td>' + formatAlertCount(job.alert_count) + '</td>' +
                     '<td>' + escapeHtml(formatTechnology(job.tech)) + '</td>' +
                     '<td>' + escapeHtml(job.time) + '</td>' +
-                    '<td>' + escapeHtml(job.status) + '</td>' +
+                    '<td class="' + statusClass + highlightClass + '">' + escapeHtml(job.status) + '</td>' +
                     '</tr>';
                 rows.push(row);
             }
+
+            // Update previous states for next comparison
+            previousJobStates = newJobStates;
 
             if (rows.length === 0) {
                 var colspan = hasUsers ? 6 : 5;
@@ -231,6 +251,11 @@
 
         // Update "last updated" display every second
         setInterval(updateLastUpdatedDisplay, 1000);
+
+        // Initialize previous job states from server-rendered data
+        {% for job in queue %}
+        previousJobStates['{{ job.jid }}'] = '{{ job.status }}';
+        {% endfor %}
 
         // Initialize
         renderNumJobsSelector();
