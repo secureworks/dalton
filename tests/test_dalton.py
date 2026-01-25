@@ -10,6 +10,8 @@ import pytest
 from app.dalton import (
     REDIS_EXPIRE,
     STAT_CODE_DONE,
+    STAT_CODE_QUEUED,
+    STAT_CODE_RUNNING,
     create_hash,
     prefix_strip,
 )
@@ -130,3 +132,130 @@ class TestDalton(unittest.TestCase):
             res.data.decode(),
         )
         self.assertEqual("Error", res.headers["X-Dalton-Webapp"])
+
+    @mock.patch("app.dalton.get_redis")
+    def test_queue_json_api_empty(self, get_redis):
+        """Test queue JSON API returns proper structure when empty."""
+        redis = mock.Mock()
+        redis.exists.return_value = False
+        get_redis.return_value = redis
+
+        res = self.client.get("/dalton/controller_api/get-queue-json")
+        self.assertEqual(res.status_code, 200)
+
+        data = json.loads(res.data)
+        self.assertIn("jobs", data)
+        self.assertIn("summary", data)
+        self.assertIn("has_users", data)
+        self.assertEqual(data["jobs"], [])
+        self.assertEqual(data["summary"]["queued_jobs"], 0)
+        self.assertEqual(data["summary"]["running_jobs"], 0)
+        self.assertEqual(data["summary"]["total_displayed"], 0)
+        self.assertEqual(data["has_users"], False)
+
+    @mock.patch("app.dalton.get_redis")
+    def test_queue_json_api_with_jobs(self, get_redis):
+        """Test queue JSON API returns jobs correctly."""
+        redis = mock.Mock()
+        redis.llen.return_value = 2
+        redis.lrange.return_value = ["job1", "job2"]
+
+        # Define which keys exist
+        existing_keys = {
+            "recent_jobs", "job1-submission_time", "job1-status",
+            "job2-submission_time", "job2-status", "job1-alert"
+        }
+
+        def mock_exists(key):
+            return key in existing_keys
+
+        def mock_get(key):
+            values = {
+                "job1-submission_time": "Jan 24 10:00:00",
+                "job1-statcode": str(STAT_CODE_DONE),
+                "job1-tech": "suricata/7.0.14",
+                "job1-user": "testuser",
+                "job1-error": None,
+                "job1-teapotjob": None,
+                "job1-alert": "[**] Alert 1 [**]\n[**] Alert 2 [**]",
+                "job2-submission_time": "Jan 24 10:05:00",
+                "job2-statcode": str(STAT_CODE_QUEUED),
+                "job2-tech": "snort/2.9.20",
+                "job2-user": None,
+                "job2-error": None,
+                "job2-teapotjob": None,
+            }
+            return values.get(key)
+
+        redis.exists.side_effect = mock_exists
+        redis.get.side_effect = mock_get
+        get_redis.return_value = redis
+
+        res = self.client.get("/dalton/controller_api/get-queue-json?num_jobs=10")
+        self.assertEqual(res.status_code, 200)
+
+        data = json.loads(res.data)
+        self.assertEqual(len(data["jobs"]), 2)
+        self.assertEqual(data["summary"]["queued_jobs"], 1)
+        self.assertEqual(data["has_users"], True)
+
+        # Check first job structure
+        job1 = data["jobs"][0]
+        self.assertEqual(job1["jid"], "job1")
+        self.assertEqual(job1["tech"], "suricata/7.0.14")
+        self.assertEqual(job1["user"], "testuser")
+        self.assertEqual(job1["alert_count"], 2)  # 2 alerts from mock data
+        self.assertIn("status", job1)
+        self.assertIn("status_code", job1)
+
+    @mock.patch("app.dalton.get_redis")
+    def test_queue_json_api_num_jobs_param(self, get_redis):
+        """Test queue JSON API respects num_jobs parameter."""
+        redis = mock.Mock()
+        redis.exists.return_value = True
+        redis.llen.return_value = 5
+        redis.lrange.return_value = [f"job{i}" for i in range(5)]
+
+        def mock_get(key):
+            # Default values for all jobs
+            if "-submission_time" in key:
+                return "Jan 24 10:00:00"
+            if "-statcode" in key:
+                return str(STAT_CODE_DONE)
+            if "-tech" in key:
+                return "suricata/7.0.14"
+            if "-user" in key:
+                return None
+            if "-error" in key:
+                return None
+            if "-alert" in key:
+                return "0"
+            if "-teapotjob" in key:
+                return None
+            return None
+
+        redis.get.side_effect = mock_get
+        get_redis.return_value = redis
+
+        # Request only 2 jobs
+        res = self.client.get("/dalton/controller_api/get-queue-json?num_jobs=2")
+        self.assertEqual(res.status_code, 200)
+
+        data = json.loads(res.data)
+        self.assertEqual(len(data["jobs"]), 2)
+        self.assertEqual(data["summary"]["total_displayed"], 2)
+
+    @mock.patch("app.dalton.get_redis")
+    def test_queue_json_api_invalid_num_jobs(self, get_redis):
+        """Test queue JSON API handles invalid num_jobs gracefully."""
+        redis = mock.Mock()
+        redis.exists.return_value = False
+        get_redis.return_value = redis
+
+        # Test with invalid string
+        res = self.client.get("/dalton/controller_api/get-queue-json?num_jobs=invalid")
+        self.assertEqual(res.status_code, 200)
+
+        # Test with negative number (should use default)
+        res = self.client.get("/dalton/controller_api/get-queue-json?num_jobs=-5")
+        self.assertEqual(res.status_code, 200)

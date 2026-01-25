@@ -3,15 +3,18 @@
     <div class="row">
         <div class="span11">
             <h2>Sensors</h2>
-            <br/>
+            <p id="sensors-last-updated" class="text-muted" style="font-size: 0.85em;"></p>
             <table class="table table-striped">
-                <tr>
-                    <th>Sensor ID</th>
-                    <th>Technology</th>
-                    <th>Agent Version</th>
-                    <th>IP Address</th>
-                    <th>Last Heartbeat</th>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>Sensor ID</th>
+                        <th>Technology</th>
+                        <th>Agent Version</th>
+                        <th>IP Address</th>
+                        <th>Last Heartbeat</th>
+                    </tr>
+                </thead>
+                <tbody id="sensors-table-body">
 		{% for sensor,data in sensors.items() %}
 			<tr>
 				<td>{{ data.uid }}</td>
@@ -29,10 +32,129 @@
 				</td>
                 <td>{{ data.agent_version }}</td>
 				<td>{{ data.ip }}</td>
-				<td>{{ data.time }}</td>			
+				<td>{{ data.time }}</td>
 			</tr>
 		{% endfor %}
+                </tbody>
             </table>
         </div>
     </div>
+
+    <script type="text/javascript">
+    (function() {
+        var POLL_INTERVAL = 5000; // 5 seconds
+        var lastUpdateTime = new Date();
+        var pollTimer = null;
+
+        function titleCase(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+        }
+
+        function formatTechnology(tech) {
+            var tlist = tech.split('/');
+            if (tlist.length > 1) {
+                if (tlist[1].indexOf('rust_') === 0) {
+                    var version = tlist[1].substring(5);
+                    var extra = tlist.length > 2 ? tlist[2] + ' - ' : '';
+                    return titleCase(tlist[0]) + ' ' + version + ' (' + extra + 'with Rust support)';
+                } else {
+                    var suffix = tlist.length > 2 ? ' (' + tlist[2] + ')' : '';
+                    return titleCase(tlist[0]) + ' ' + tlist[1] + suffix;
+                }
+            } else {
+                return titleCase(tech);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateLastUpdatedDisplay() {
+            var el = document.getElementById('sensors-last-updated');
+            if (el) {
+                var now = new Date();
+                var seconds = Math.floor((now - lastUpdateTime) / 1000);
+                el.textContent = 'Last updated: ' + seconds + ' second' + (seconds !== 1 ? 's' : '') + ' ago';
+            }
+        }
+
+        function rebuildSensorsTable(sensors) {
+            var tbody = document.getElementById('sensors-table-body');
+            if (!tbody) return;
+
+            var rows = [];
+            for (var sensorKey in sensors) {
+                if (sensors.hasOwnProperty(sensorKey)) {
+                    var data = sensors[sensorKey];
+                    var row = '<tr>' +
+                        '<td>' + escapeHtml(data.uid) + '</td>' +
+                        '<td>' + escapeHtml(formatTechnology(data.tech)) + '</td>' +
+                        '<td>' + escapeHtml(data.agent_version) + '</td>' +
+                        '<td>' + escapeHtml(data.ip) + '</td>' +
+                        '<td>' + escapeHtml(data.time) + '</td>' +
+                        '</tr>';
+                    rows.push(row);
+                }
+            }
+
+            if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No active sensors</td></tr>';
+            } else {
+                tbody.innerHTML = rows.join('');
+            }
+        }
+
+        function pollSensors() {
+            $.ajax({
+                url: '/dalton/controller_api/get-current-sensors-json-full',
+                method: 'GET',
+                dataType: 'json',
+                success: function(sensors) {
+                    rebuildSensorsTable(sensors);
+                    lastUpdateTime = new Date();
+                    updateLastUpdatedDisplay();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Failed to fetch sensors:', error);
+                    // Don't clear table on error - keep stale data visible
+                }
+            });
+        }
+
+        function startPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+            }
+            pollTimer = setInterval(pollSensors, POLL_INTERVAL);
+        }
+
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        // Handle tab visibility - pause polling when tab is hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                pollSensors(); // Immediate refresh when tab becomes visible
+                startPolling();
+            }
+        });
+
+        // Update "last updated" display every second
+        setInterval(updateLastUpdatedDisplay, 1000);
+
+        // Initialize
+        updateLastUpdatedDisplay();
+        startPolling();
+    })();
+    </script>
 {% endblock %}

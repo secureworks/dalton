@@ -3,40 +3,28 @@
     <div class="row">
         <div class="span11">
             <h2>Recent Jobs</h2>
-            <h4>Queued Jobs: {{ queued_jobs }}&nbsp;&nbsp;|&nbsp;&nbsp;Running Jobs: {{ running_jobs }}</h4>
+            <h4 id="queue-summary">Queued Jobs: <span id="queued-count">{{ queued_jobs }}</span>&nbsp;&nbsp;|&nbsp;&nbsp;Running Jobs: <span id="running-count">{{ running_jobs }}</span></h4>
             <h5>Show Recent:
             &nbsp;
-            <script type='text/javascript'>
-            var showOptions=[25,50,100,200,300,500,1000];
-            for(var i=0; i < showOptions.length; i++) {
-                if (i != 0) {
-                    document.write("&nbsp;|&nbsp;");
-                }
-                if (showOptions[i] == {{ num_jobs }}) {
-                    document.write(showOptions[i]);
-                } else {
-                    document.write("<a href=\"queue?numjobs=" + showOptions[i] + "\">" + showOptions[i] + "</a>");
-                }   
-            }
-            </script>
+            <span id="num-jobs-selector"></span>
+            <span id="queue-last-updated" class="text-muted" style="font-size: 0.85em; margin-left: 15px;"></span>
             </h5>
             <table class="table table-striped">
-                <tr>
-                    <th>Job ID</th>
-                    {% if non_empty_user_count > 0 %}
-                    <th>User</th>
-                    {% endif %}
-                    <th>Alert Count</th>
-                    <th>Queue</th>
-        		    <th>Submission Time</th>
-                    <th>Status</th>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>Job ID</th>
+                        <th id="user-column-header" {% if non_empty_user_count == 0 %}style="display: none;"{% endif %}>User</th>
+                        <th>Alert Count</th>
+                        <th>Queue</th>
+                        <th>Submission Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="queue-table-body">
                 {% for job in queue %}
 			<tr>
-				<td><a href="/dalton/job/{{job.jid}}">{{ job.jid }}</td>
-                {% if non_empty_user_count > 0 %}
-                <td>{{ job.user }}</td>
-                {% endif %}
+				<td><a href="/dalton/job/{{job.jid}}">{{ job.jid }}</a></td>
+                <td class="user-column" {% if non_empty_user_count == 0 %}style="display: none;"{% endif %}>{{ job.user }}</td>
 				<td>
                     {% if job.alert_count is number %}
                         {{ job.alert_count|int }}
@@ -60,7 +48,194 @@
 				<td>{{ job.status }}</td>
 			</tr>
                 {% endfor %}
+                </tbody>
             </table>
         </div>
     </div><!--/row-->
+
+    <script type="text/javascript">
+    (function() {
+        var POLL_INTERVAL = 3000; // 3 seconds
+        var showOptions = [25, 50, 100, 200, 300, 500, 1000];
+        var currentNumJobs = {{ num_jobs }};
+        var lastUpdateTime = new Date();
+        var pollTimer = null;
+
+        function titleCase(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+        }
+
+        function formatTechnology(tech) {
+            var tlist = tech.split('/');
+            if (tlist.length > 1) {
+                if (tlist[1].indexOf('rust_') === 0) {
+                    var version = tlist[1].substring(5);
+                    var extra = tlist.length > 2 ? tlist[2] + ' - ' : '';
+                    return titleCase(tlist[0]) + ' ' + version + ' (' + extra + 'with Rust support)';
+                } else {
+                    var suffix = tlist.length > 2 ? ' (' + tlist[2] + ')' : '';
+                    return titleCase(tlist[0]) + ' ' + tlist[1] + suffix;
+                }
+            } else {
+                return titleCase(tech);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatAlertCount(alertCount) {
+            if (typeof alertCount === 'number') {
+                return Math.floor(alertCount).toString();
+            }
+            return escapeHtml(alertCount);
+        }
+
+        function updateLastUpdatedDisplay() {
+            var el = document.getElementById('queue-last-updated');
+            if (el) {
+                var now = new Date();
+                var seconds = Math.floor((now - lastUpdateTime) / 1000);
+                el.textContent = 'Updated: ' + seconds + 's ago';
+            }
+        }
+
+        function renderNumJobsSelector() {
+            var container = document.getElementById('num-jobs-selector');
+            if (!container) return;
+
+            var html = [];
+            for (var i = 0; i < showOptions.length; i++) {
+                if (i !== 0) {
+                    html.push('&nbsp;|&nbsp;');
+                }
+                if (showOptions[i] === currentNumJobs) {
+                    html.push(showOptions[i]);
+                } else {
+                    html.push('<a href="#" class="num-jobs-link" data-num="' + showOptions[i] + '">' + showOptions[i] + '</a>');
+                }
+            }
+            container.innerHTML = html.join('');
+
+            // Bind click handlers
+            var links = container.querySelectorAll('.num-jobs-link');
+            for (var j = 0; j < links.length; j++) {
+                links[j].addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var num = parseInt(this.getAttribute('data-num'), 10);
+                    currentNumJobs = num;
+                    renderNumJobsSelector();
+                    pollQueue(); // Immediate refresh
+                    // Update URL without reload
+                    if (window.history && window.history.replaceState) {
+                        window.history.replaceState({}, '', 'queue?numjobs=' + num);
+                    }
+                });
+            }
+        }
+
+        function updateUserColumnVisibility(hasUsers) {
+            var header = document.getElementById('user-column-header');
+            var cells = document.querySelectorAll('.user-column');
+
+            if (header) {
+                header.style.display = hasUsers ? '' : 'none';
+            }
+            for (var i = 0; i < cells.length; i++) {
+                cells[i].style.display = hasUsers ? '' : 'none';
+            }
+        }
+
+        function rebuildQueueTable(jobs, hasUsers) {
+            var tbody = document.getElementById('queue-table-body');
+            if (!tbody) return;
+
+            var rows = [];
+            for (var i = 0; i < jobs.length; i++) {
+                var job = jobs[i];
+                var userCell = '<td class="user-column"' + (hasUsers ? '' : ' style="display: none;"') + '>' + escapeHtml(job.user) + '</td>';
+
+                var row = '<tr>' +
+                    '<td><a href="/dalton/job/' + escapeHtml(job.jid) + '">' + escapeHtml(job.jid) + '</a></td>' +
+                    userCell +
+                    '<td>' + formatAlertCount(job.alert_count) + '</td>' +
+                    '<td>' + escapeHtml(formatTechnology(job.tech)) + '</td>' +
+                    '<td>' + escapeHtml(job.time) + '</td>' +
+                    '<td>' + escapeHtml(job.status) + '</td>' +
+                    '</tr>';
+                rows.push(row);
+            }
+
+            if (rows.length === 0) {
+                var colspan = hasUsers ? 6 : 5;
+                tbody.innerHTML = '<tr><td colspan="' + colspan + '" class="text-center">No recent jobs</td></tr>';
+            } else {
+                tbody.innerHTML = rows.join('');
+            }
+        }
+
+        function updateSummary(summary) {
+            var queuedEl = document.getElementById('queued-count');
+            var runningEl = document.getElementById('running-count');
+
+            if (queuedEl) queuedEl.textContent = summary.queued_jobs;
+            if (runningEl) runningEl.textContent = summary.running_jobs;
+        }
+
+        function pollQueue() {
+            $.ajax({
+                url: '/dalton/controller_api/get-queue-json?num_jobs=' + currentNumJobs,
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    updateSummary(data.summary);
+                    updateUserColumnVisibility(data.has_users);
+                    rebuildQueueTable(data.jobs, data.has_users);
+                    lastUpdateTime = new Date();
+                    updateLastUpdatedDisplay();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Failed to fetch queue:', error);
+                    // Don't clear table on error - keep stale data visible
+                }
+            });
+        }
+
+        function startPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+            }
+            pollTimer = setInterval(pollQueue, POLL_INTERVAL);
+        }
+
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        // Handle tab visibility - pause polling when tab is hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                pollQueue(); // Immediate refresh when tab becomes visible
+                startPolling();
+            }
+        });
+
+        // Update "last updated" display every second
+        setInterval(updateLastUpdatedDisplay, 1000);
+
+        // Initialize
+        renderNumJobsSelector();
+        updateLastUpdatedDisplay();
+        startPolling();
+    })();
+    </script>
 {% endblock %}
