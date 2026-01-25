@@ -1,6 +1,6 @@
 {% extends "dalton/layout.html" %}
 {% block js %}
-    $(window).unload(function(){
+    $(window).on('beforeunload', function(){
         $('#uploadDialog').modal('hide');
     });
 
