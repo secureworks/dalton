@@ -90,6 +90,7 @@ try:
     U2_ANALYZER = dalton_config.get("dalton", "u2_analyzer")
     RULECAT_SCRIPT = dalton_config.get("dalton", "rulecat_script")
     MAX_PCAP_FILES = dalton_config.getint("dalton", "max_pcap_files")
+    ENABLE_QUEUE_CLEARING = dalton_config.getboolean("dalton", "enable_queue_clearing")
     DEBUG = dalton_config.getboolean("dalton", "debug")
     AUTH_PREFIX = dalton_config.get("dalton", "auth_prefix")
     AUTH_MAX = dalton_config.getint("dalton", "auth_max")
@@ -3431,6 +3432,69 @@ def controller_api_get_max_pcap_files():
     submitter can ensure all the files will be processed.
     """
     return str(MAX_PCAP_FILES)
+
+
+@dalton_blueprint.route("/dalton/controller_api/clear_queue", methods=["GET"])
+@check_user
+def controller_api_clear_queue():
+    """Expires all job data in Redis, clears all job queues, and deletes
+    all job zip files from disk. Only functional when enable_queue_clearing
+    is set to True in dalton.conf.
+    """
+    if not ENABLE_QUEUE_CLEARING:
+        return Response(
+            "Not Supported: Queue clearing is not enabled on this Dalton instance.",
+            status=403,
+            mimetype="text/plain",
+        )
+
+    if request.args.get("force", "").lower() != "true":
+        return render_template("dalton/clear_queue_confirm.html")
+
+    redis = get_redis()
+    jobs_cleared = 0
+    files_deleted = 0
+    queues_cleared = set()
+
+    # get all job IDs from the recent_jobs list
+    if redis.exists("recent_jobs") and redis.llen("recent_jobs") > 0:
+        jobs = redis.lrange("recent_jobs", 0, -1)
+        for jid in jobs:
+            # collect the sensor_tech queue key so we can clear it
+            tech = redis.get("%s-tech" % jid)
+            if tech:
+                queues_cleared.add(tech)
+            expire_all_keys(redis, jid)
+            jobs_cleared += 1
+        redis.delete("recent_jobs")
+
+    # clear any remaining items in sensor_tech queue lists
+    for queue_key in queues_cleared:
+        redis.delete(queue_key)
+
+    # delete all job zip files from disk
+    if os.path.exists(JOB_STORAGE_PATH):
+        for file in glob.glob(os.path.join(JOB_STORAGE_PATH, "*.zip")):
+            if os.path.isfile(file):
+                os.unlink(file)
+                files_deleted += 1
+
+    logger.info(
+        "clear_queue: cleared %d job(s), %d queue(s), deleted %d file(s)"
+        % (jobs_cleared, len(queues_cleared), files_deleted)
+    )
+
+    return Response(
+        json.dumps({
+            "success": True,
+            "jobs_cleared": jobs_cleared,
+            "queues_cleared": len(queues_cleared),
+            "files_deleted": files_deleted,
+        }),
+        status=200,
+        mimetype="application/json",
+        headers={"X-Dalton-Webapp": "OK"},
+    )
 
 
 def parseZeekASCIILog(logtext):

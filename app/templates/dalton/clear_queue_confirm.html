@@ -1,0 +1,20 @@
+{% extends "dalton/layout.html" %}
+{% block body %}
+    <div class="row">
+        <div class="alert alert-block">
+            <h2><span>Warning: Clear Queue</span></h2>
+        </div>
+        <div class="span9">
+            <p>This will <strong>irreversibly delete all submitted job data</strong> from this Dalton instance, including:</p>
+            <ul>
+                <li>All job results and metadata in Redis</li>
+                <li>All pending jobs in sensor queues</li>
+                <li>All job zip files on disk</li>
+            </ul>
+            <p>This action cannot be undone.</p>
+            <br>
+            <a href="/dalton/" class="btn">Cancel</a>
+            <a href="{{ url_for('dalton_blueprint.controller_api_clear_queue', force='True') }}" class="btn btn-danger">Continue and clear queue</a>
+        </div>
+    </div>
+{% endblock %}
