@@ -75,7 +75,7 @@ ignore = ["E501"]
 "dalton-agent/dalton-agent.py" = ["B"]
 
 [tool.bumpversion]
-current_version = "3.5.0"
+current_version = "3.6.0"
 
 commit = true
 allow_dirty = false
