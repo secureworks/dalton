@@ -27,10 +27,9 @@ RUN apt-get update -y && \
 # get suricatasc; needed for Suricata 8 and later because it is no longer included with the Suricata source
 WORKDIR /opt
 ADD https://github.com/jasonish/python-suricatasc/archive/refs/heads/main.tar.gz suricatasc.tar.gz
-RUN tar -zxf suricatasc.tar.gz
 
-# download, build, and install Suricata from source
-RUN mkdir -p /src/suricata-${SURI_VERSION}
+# extract suricatasc; download, build, and install Suricata from source
+RUN tar -zxf suricatasc.tar.gz && mkdir -p /src/suricata-${SURI_VERSION}
 WORKDIR /src
 ADD https://www.openinfosecfoundation.org/download/suricata-${SURI_VERSION}.tar.gz suricata-${SURI_VERSION}.tar.gz
 RUN tar -zxf suricata-${SURI_VERSION}.tar.gz -C suricata-${SURI_VERSION} --strip-components=1
