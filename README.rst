@@ -23,7 +23,7 @@ or this which does the same thing:
 
 .. code:: text
 
-    docker-compose build && docker-compose up -d
+    docker compose build && docker compose up -d
 
 Then navigate to ``http://<docker-host>/dalton/``
 
@@ -157,7 +157,8 @@ Requirements
 ============
 
 -  `Docker <https://www.docker.com/get-docker>`__
--  `Docker Compose <https://docs.docker.com/compose/install/>`__
+-  `Docker Compose V2 <https://docs.docker.com/compose/install/>`__.
+   Note that this should be `Docker Compose Version 2 <https://www.docker.com/blog/announcing-compose-v2-general-availability/>`__
 -  Internet connection (to build)
 
 Installing and Running Dalton
@@ -175,7 +176,7 @@ or this which does the same thing:
 
 .. code:: bash
 
-    docker-compose build && docker-compose up -d
+    docker compose build && docker compose up -d
 
 To specify or add what agents (specific sensors and versions) are built
 and run, edit the docker-compose.yml file as appropriate. See also

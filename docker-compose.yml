@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   controller:
     build:
@@ -73,7 +71,7 @@ services:
 # to "--enable-rust". e.g.:
 #        - ENABLE_RUST=--enable-rust
 
-# Suricata current (latest) from source
+# Suricata current (latest) from source; will be v8.x until late 2026
   agent-suricata-current:
     build:
       context: ./dalton-agent
@@ -89,21 +87,37 @@ services:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
 
-# Suricata 6.0.20 from source, with Rust support
-  agent-suricata-6.0.20:
+# Suricata 7.0.14 from source, with Rust support
+  agent-suricata-7.0.14:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_suricata
       args:
-        - SURI_VERSION=6.0.20
+        - SURI_VERSION=7.0.14
         - http_proxy=${http_proxy}
         - https_proxy=${https_proxy}
         - no_proxy=${no_proxy}
-    image: suricata-6.0.20:latest
-    container_name: suricata-6.0.20
+    image: suricata-7.0.14:latest
+    container_name: suricata-7.0.14
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     restart: always
+
+# Suricata 6.0.20 from source, with Rust support
+#  agent-suricata-6.0.20:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_suricata
+#      args:
+#        - SURI_VERSION=6.0.20
+#        - http_proxy=${http_proxy}
+#        - https_proxy=${https_proxy}
+#        - no_proxy=${no_proxy}
+#    image: suricata-6.0.20:latest
+#    container_name: suricata-6.0.20
+#    environment:
+#      - AGENT_DEBUG=${AGENT_DEBUG}
+#    restart: always
 
 # Suricata 5.0.6 from source, with Rust support
 #  agent-suricata-5.0.7:
@@ -423,30 +437,31 @@ services:
 ####### Zeek Agents #######
 ###########################
 
-# Zeek current (latest) from source
+# Zeek 7.0.11
   agent-zeek-current:
     build:
       context: ./dalton-agent
       dockerfile: Dockerfiles/Dockerfile_zeek
       args:
-        - ZEEK_VERSION=7.0.1
+        - ZEEK_VERSION=7.0.11
     image: zeek-current:latest
     container_name: zeek-current
     volumes:
       - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
     restart: always
 
-  agent-zeek-6.0.6:
-    build:
-      context: ./dalton-agent
-      dockerfile: Dockerfiles/Dockerfile_zeek
-      args:
-        - ZEEK_VERSION=6.0.6
-    image: zeek-6.0.6
-    container_name: zeek-6.0.6
-    volumes:
-      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
-    restart: always
+# Zeek 6.0.6
+#  agent-zeek-6.0.6:
+#    build:
+#      context: ./dalton-agent
+#      dockerfile: Dockerfiles/Dockerfile_zeek
+#      args:
+#        - ZEEK_VERSION=6.0.6
+#    image: zeek-6.0.6
+#    container_name: zeek-6.0.6
+#    volumes:
+#      - ./rulesets/zeek:/opt/dalton-agent/zeek_scripts:ro
+#    restart: always
 
 ###########################
 ## Cyberchef Integration ##
