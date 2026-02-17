@@ -368,7 +368,7 @@ if USE_SURICATA_SOCKET_CONTROL:
         )
     else:
         # downloaded by Dockerfile
-        sys.path.insert(0, '/opt/python-suricatasc-main')
+        sys.path.insert(0, "/opt/python-suricatasc-main")
     # Used as Suricata default-log-dir when in SC mode
     os.makedirs(os.path.dirname(SURICATA_SOCKET_NAME), exist_ok=True)
 
@@ -660,7 +660,7 @@ if USE_SURICATA_SOCKET_CONTROL:
     try:
         import suricatasc
     except Exception:
-        sys.path.insert(0, '/opt/python-suricatasc-main')
+        sys.path.insert(0, "/opt/python-suricatasc-main")
         try:
             import suricatasc
         except Exception:

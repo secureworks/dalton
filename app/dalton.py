@@ -538,17 +538,23 @@ def delete_old_job_files():
 def check_user(f):
     @wraps(f)
     def check_user_fun(*args, **kwargs):
-        if AUTH_PREFIX == 'disabled':
+        if AUTH_PREFIX == "disabled":
             # auth disabled
             return f(*args, **kwargs)
         user = None
         try:
-            user = request.cookies.get('dalton_user')
+            user = request.cookies.get("dalton_user")
         except Exception:
             user = None
-        if user is None or len(user) == 0 or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
-            return redirect(url_for('dalton_blueprint.set_user'))
+        if (
+            user is None
+            or len(user) == 0
+            or not user.startswith(AUTH_PREFIX)
+            or len(user) > AUTH_MAX
+        ):
+            return redirect(url_for("dalton_blueprint.set_user"))
         return f(*args, **kwargs)
+
     return check_user_fun
 
 
@@ -557,35 +563,41 @@ def check_user(f):
 def index():
     return redirect(url_for("dalton_blueprint.page_index"))
 
+
 @dalton_blueprint.route("/dalton/logout", methods=["GET"])
 @dalton_blueprint.route("/dalton/logout/", methods=["GET"])
 @dalton_blueprint.route("/logout", methods=["GET"])
 @dalton_blueprint.route("/logout/", methods=["GET"])
 def logout():
-    response = redirect(url_for('dalton_blueprint.set_user'))
-    response.set_cookie('dalton_user', "")
+    response = redirect(url_for("dalton_blueprint.set_user"))
+    response.set_cookie("dalton_user", "")
     return response
 
 
 @dalton_blueprint.route("/dalton/setuser", methods=["GET", "POST"])
 def set_user():
-    if AUTH_PREFIX == 'disabled':
+    if AUTH_PREFIX == "disabled":
         # auth disabled
-        return redirect(url_for('dalton_blueprint.page_index'))
+        return redirect(url_for("dalton_blueprint.page_index"))
 
     user = None
     try:
-        if request.method == 'POST':
+        if request.method == "POST":
             user = request.form.get("username")
         else:
-            user = request.cookies.get('dalton_user')
+            user = request.cookies.get("dalton_user")
     except Exception:
         user = None
-    if user is None or len(user) == 0 or not user.startswith(AUTH_PREFIX) or len(user) > AUTH_MAX:
+    if (
+        user is None
+        or len(user) == 0
+        or not user.startswith(AUTH_PREFIX)
+        or len(user) > AUTH_MAX
+    ):
         return render_template("/dalton/setuser.html", user="")
 
-    response = redirect(url_for('dalton_blueprint.page_index'))
-    response.set_cookie('dalton_user', user, max_age=432000)
+    response = redirect(url_for("dalton_blueprint.page_index"))
+    response.set_cookie("dalton_user", user, max_age=432000)
     return response
 
 
@@ -1724,7 +1736,7 @@ def page_coverage_summary():
     prod_ruleset_name = None
 
     # get the user who submitted the job
-    user = request.cookies.get('dalton_user')
+    user = request.cookies.get("dalton_user")
     if user is None:
         user = ""
 
@@ -3090,9 +3102,9 @@ def page_queue_default():
                     if user is None:
                         pass  # handled by template
                     elif user.startswith(AUTH_PREFIX):
-                        user = user[len(AUTH_PREFIX):]
-                    elif '_' in user:
-                        user = user.split('_', 1)[1]
+                        user = user[len(AUTH_PREFIX) :]
+                    elif "_" in user:
+                        user = user.split("_", 1)[1]
                     job["user"] = user
                     alert_count = get_alert_count(redis, jid)
                     if status != STAT_CODE_DONE:
@@ -3109,7 +3121,9 @@ def page_queue_default():
         queued_jobs=queued_jobs,
         running_jobs=running_jobs,
         num_jobs=num_jobs_to_show,
-        non_empty_user_count=len([x['user'] for x in queue if x['user'] != "" and x["user"] is not None]),
+        non_empty_user_count=len(
+            [x["user"] for x in queue if x["user"] != "" and x["user"] is not None]
+        ),
     )
 
 
