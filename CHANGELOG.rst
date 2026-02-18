@@ -201,7 +201,16 @@ in a sort of pre-release mode.
 * Moved to using **Docker Compose Version 2** in start-dalton.sh
 * Added functionality for users to set username, along with simple shared auth (see dalton.conf)
 * Updated queue page to display user who submitted the job (if so configured)
-* Fixed support for Suricata Socket Control in Suricata version 8 and later.  
-  The necessary Python libraries for suricatasc are no longer included with the Suricata 
+* Fixed support for Suricata Socket Control in Suricata version 8 and later.
+  The necessary Python libraries for suricatasc are no longer included with the Suricata
   source beginning with Suricata version 8.
 * Updated docker-compose to have more recent versions of the Suriata and Zeek agents by default
+
+4.0.0 (2026-02-18)
+##################
+
+* Upgraded jQuery from 2.0.3 to 3.7.1
+* Fixed UI issue where custom rules text area would be incorrectly hidden when browsing back to the submission page
+* Added dynamic polling to queue and sensors pages for real-time updates
+* Added status coloring and animation to queue page for better visual feedback
+* Added ``/clear_queue`` API endpoint to expire all jobs and delete job files
