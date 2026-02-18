@@ -11,7 +11,6 @@ from app.dalton import (
     REDIS_EXPIRE,
     STAT_CODE_DONE,
     STAT_CODE_QUEUED,
-    STAT_CODE_RUNNING,
     create_hash,
     prefix_strip,
 )
@@ -162,8 +161,12 @@ class TestDalton(unittest.TestCase):
 
         # Define which keys exist
         existing_keys = {
-            "recent_jobs", "job1-submission_time", "job1-status",
-            "job2-submission_time", "job2-status", "job1-alert"
+            "recent_jobs",
+            "job1-submission_time",
+            "job1-status",
+            "job2-submission_time",
+            "job2-status",
+            "job1-alert",
         }
 
         def mock_exists(key):

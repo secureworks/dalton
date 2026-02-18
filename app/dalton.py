@@ -3103,7 +3103,9 @@ def get_queue_data(redis, num_jobs_to_show):
                     queue.append(job)
                 count += 1
 
-    has_users = len([x['user'] for x in queue if x['user'] != "" and x["user"] is not None]) > 0
+    has_users = (
+        len([x["user"] for x in queue if x["user"] != "" and x["user"] is not None]) > 0
+    )
     return {
         "jobs": queue,
         "queued_jobs": queued_jobs,
@@ -3485,12 +3487,14 @@ def controller_api_clear_queue():
     )
 
     return Response(
-        json.dumps({
-            "success": True,
-            "jobs_cleared": jobs_cleared,
-            "queues_cleared": len(queues_cleared),
-            "files_deleted": files_deleted,
-        }),
+        json.dumps(
+            {
+                "success": True,
+                "jobs_cleared": jobs_cleared,
+                "queues_cleared": len(queues_cleared),
+                "files_deleted": files_deleted,
+            }
+        ),
         status=200,
         mimetype="application/json",
         headers={"X-Dalton-Webapp": "OK"},
