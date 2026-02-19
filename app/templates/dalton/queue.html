@@ -58,9 +58,8 @@
         var POLL_INTERVAL = 3000; // 3 seconds
         var showOptions = [25, 50, 100, 200, 300, 500, 1000];
         var currentNumJobs = {{ num_jobs }};
-        var lastUpdateTime = new Date();
-        var pollTimer = null;
         var previousJobStates = {};  // { jid: status }
+        var tracker = DaltonUtils.createLastUpdatedTracker('queue-last-updated');
 
         function getStatusClass(status) {
             if (status.indexOf('Success') !== -1) return 'status-success';
@@ -71,47 +70,11 @@
             return 'status-queued';
         }
 
-        function titleCase(str) {
-            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-        }
-
-        function formatTechnology(tech) {
-            var tlist = tech.split('/');
-            if (tlist.length > 1) {
-                if (tlist[1].indexOf('rust_') === 0) {
-                    var version = tlist[1].substring(5);
-                    var extra = tlist.length > 2 ? tlist[2] + ' - ' : '';
-                    return titleCase(tlist[0]) + ' ' + version + ' (' + extra + 'with Rust support)';
-                } else {
-                    var suffix = tlist.length > 2 ? ' (' + tlist[2] + ')' : '';
-                    return titleCase(tlist[0]) + ' ' + tlist[1] + suffix;
-                }
-            } else {
-                return titleCase(tech);
-            }
-        }
-
-        function escapeHtml(text) {
-            if (text === null || text === undefined) return '';
-            var div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
         function formatAlertCount(alertCount) {
             if (typeof alertCount === 'number') {
                 return Math.floor(alertCount).toString();
             }
-            return escapeHtml(alertCount);
-        }
-
-        function updateLastUpdatedDisplay() {
-            var el = document.getElementById('queue-last-updated');
-            if (el) {
-                var now = new Date();
-                var seconds = Math.floor((now - lastUpdateTime) / 1000);
-                el.textContent = 'Updated: ' + seconds + 's ago';
-            }
+            return DaltonUtils.escapeHtml(alertCount);
         }
 
         function renderNumJobsSelector() {
@@ -168,7 +131,7 @@
             var rows = [];
             for (var i = 0; i < jobs.length; i++) {
                 var job = jobs[i];
-                var userCell = '<td class="user-column"' + (hasUsers ? '' : ' style="display: none;"') + '>' + escapeHtml(job.user) + '</td>';
+                var userCell = '<td class="user-column"' + (hasUsers ? '' : ' style="display: none;"') + '>' + DaltonUtils.escapeHtml(job.user) + '</td>';
 
                 // Determine status class and whether status changed
                 var statusClass = getStatusClass(job.status);
@@ -177,12 +140,12 @@
                 newJobStates[job.jid] = job.status;
 
                 var row = '<tr>' +
-                    '<td><a href="/dalton/job/' + escapeHtml(job.jid) + '">' + escapeHtml(job.jid) + '</a></td>' +
+                    '<td><a href="/dalton/job/' + DaltonUtils.escapeHtml(job.jid) + '">' + DaltonUtils.escapeHtml(job.jid) + '</a></td>' +
                     userCell +
                     '<td>' + formatAlertCount(job.alert_count) + '</td>' +
-                    '<td>' + escapeHtml(formatTechnology(job.tech)) + '</td>' +
-                    '<td>' + escapeHtml(job.time) + '</td>' +
-                    '<td class="' + statusClass + highlightClass + '">' + escapeHtml(job.status) + '</td>' +
+                    '<td>' + DaltonUtils.escapeHtml(DaltonUtils.formatTechnology(job.tech)) + '</td>' +
+                    '<td>' + DaltonUtils.escapeHtml(job.time) + '</td>' +
+                    '<td class="' + statusClass + highlightClass + '">' + DaltonUtils.escapeHtml(job.status) + '</td>' +
                     '</tr>';
                 rows.push(row);
             }
@@ -215,8 +178,7 @@
                     updateSummary(data.summary);
                     updateUserColumnVisibility(data.has_users);
                     rebuildQueueTable(data.jobs, data.has_users);
-                    lastUpdateTime = new Date();
-                    updateLastUpdatedDisplay();
+                    tracker.markUpdated();
                 },
                 error: function(xhr, status, error) {
                     console.error('Failed to fetch queue:', error);
@@ -225,33 +187,6 @@
             });
         }
 
-        function startPolling() {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-            }
-            pollTimer = setInterval(pollQueue, POLL_INTERVAL);
-        }
-
-        function stopPolling() {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-                pollTimer = null;
-            }
-        }
-
-        // Handle tab visibility - pause polling when tab is hidden
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                stopPolling();
-            } else {
-                pollQueue(); // Immediate refresh when tab becomes visible
-                startPolling();
-            }
-        });
-
-        // Update "last updated" display every second
-        setInterval(updateLastUpdatedDisplay, 1000);
-
         // Initialize previous job states from server-rendered data
         {% for job in queue %}
         previousJobStates['{{ job.jid }}'] = '{{ job.status }}';
@@ -259,8 +194,7 @@
 
         // Initialize
         renderNumJobsSelector();
-        updateLastUpdatedDisplay();
-        startPolling();
+        DaltonUtils.createPoller(pollQueue, POLL_INTERVAL).start();
     })();
     </script>
 {% endblock %}

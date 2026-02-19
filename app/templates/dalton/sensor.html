@@ -43,44 +43,7 @@
     <script type="text/javascript">
     (function() {
         var POLL_INTERVAL = 5000; // 5 seconds
-        var lastUpdateTime = new Date();
-        var pollTimer = null;
-
-        function titleCase(str) {
-            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-        }
-
-        function formatTechnology(tech) {
-            var tlist = tech.split('/');
-            if (tlist.length > 1) {
-                if (tlist[1].indexOf('rust_') === 0) {
-                    var version = tlist[1].substring(5);
-                    var extra = tlist.length > 2 ? tlist[2] + ' - ' : '';
-                    return titleCase(tlist[0]) + ' ' + version + ' (' + extra + 'with Rust support)';
-                } else {
-                    var suffix = tlist.length > 2 ? ' (' + tlist[2] + ')' : '';
-                    return titleCase(tlist[0]) + ' ' + tlist[1] + suffix;
-                }
-            } else {
-                return titleCase(tech);
-            }
-        }
-
-        function escapeHtml(text) {
-            if (text === null || text === undefined) return '';
-            var div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function updateLastUpdatedDisplay() {
-            var el = document.getElementById('sensors-last-updated');
-            if (el) {
-                var now = new Date();
-                var seconds = Math.floor((now - lastUpdateTime) / 1000);
-                el.textContent = 'Last updated: ' + seconds + ' second' + (seconds !== 1 ? 's' : '') + ' ago';
-            }
-        }
+        var tracker = DaltonUtils.createLastUpdatedTracker('sensors-last-updated');
 
         function rebuildSensorsTable(sensors) {
             var tbody = document.getElementById('sensors-table-body');
@@ -91,11 +54,11 @@
                 if (sensors.hasOwnProperty(sensorKey)) {
                     var data = sensors[sensorKey];
                     var row = '<tr>' +
-                        '<td>' + escapeHtml(data.uid) + '</td>' +
-                        '<td>' + escapeHtml(formatTechnology(data.tech)) + '</td>' +
-                        '<td>' + escapeHtml(data.agent_version) + '</td>' +
-                        '<td>' + escapeHtml(data.ip) + '</td>' +
-                        '<td>' + escapeHtml(data.time) + '</td>' +
+                        '<td>' + DaltonUtils.escapeHtml(data.uid) + '</td>' +
+                        '<td>' + DaltonUtils.escapeHtml(DaltonUtils.formatTechnology(data.tech)) + '</td>' +
+                        '<td>' + DaltonUtils.escapeHtml(data.agent_version) + '</td>' +
+                        '<td>' + DaltonUtils.escapeHtml(data.ip) + '</td>' +
+                        '<td>' + DaltonUtils.escapeHtml(data.time) + '</td>' +
                         '</tr>';
                     rows.push(row);
                 }
@@ -115,8 +78,7 @@
                 dataType: 'json',
                 success: function(sensors) {
                     rebuildSensorsTable(sensors);
-                    lastUpdateTime = new Date();
-                    updateLastUpdatedDisplay();
+                    tracker.markUpdated();
                 },
                 error: function(xhr, status, error) {
                     console.error('Failed to fetch sensors:', error);
@@ -125,36 +87,8 @@
             });
         }
 
-        function startPolling() {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-            }
-            pollTimer = setInterval(pollSensors, POLL_INTERVAL);
-        }
-
-        function stopPolling() {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-                pollTimer = null;
-            }
-        }
-
-        // Handle tab visibility - pause polling when tab is hidden
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                stopPolling();
-            } else {
-                pollSensors(); // Immediate refresh when tab becomes visible
-                startPolling();
-            }
-        });
-
-        // Update "last updated" display every second
-        setInterval(updateLastUpdatedDisplay, 1000);
-
         // Initialize
-        updateLastUpdatedDisplay();
-        startPolling();
+        DaltonUtils.createPoller(pollSensors, POLL_INTERVAL).start();
     })();
     </script>
 {% endblock %}
