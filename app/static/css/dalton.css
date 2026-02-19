@@ -1,4 +1,37 @@
 /* dalton.css */
+
+/* Queue page status cell coloring (Bootstrap 2.3.2 semantic colors) */
+/* Use !important to override table-striped alternating row backgrounds */
+.status-success {
+    background-color: #dff0d8 !important;
+    color: #468847;
+}
+.status-error {
+    background-color: #f2dede !important;
+    color: #b94a48;
+}
+.status-running {
+    background-color: #d9edf7 !important;
+    color: #3a87ad;
+}
+.status-timeout,
+.status-interrupted {
+    background-color: #fcf8e3 !important;
+    color: #c09853;
+}
+.status-queued {
+    background-color: #ffffff !important;
+}
+
+/* Status change highlight animation */
+.status-highlight {
+    animation: status-flash 1s ease-out;
+}
+@keyframes status-flash {
+    0% { background-color: #ffffd0; }
+    100% { background-color: inherit; }
+}
+
 body {
         font-family:"Tahoma";
 /*        background-image: url("/static/images/dalton.png"); */

@@ -283,7 +283,7 @@ def hash_file(filenames):
 # *** Constant Variables ***
 # **************************
 
-AGENT_VERSION = "3.1.2"
+AGENT_VERSION = "4.0.0"
 HTTP_HEADERS = {"User-Agent": f"Dalton Agent/{AGENT_VERSION}"}
 
 # check options from config file
