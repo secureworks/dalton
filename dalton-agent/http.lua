@@ -1,3 +1,22 @@
+local dalton
+do
+    local ok, mod = pcall(require, "dalton-suricata")
+    if ok then
+        dalton = mod
+    else
+        local chunk = loadfile("dalton-suricata.lua")
+        if chunk == nil then
+            chunk = loadfile("/opt/dalton-agent/dalton-suricata.lua")
+        end
+        if chunk then
+            dalton = chunk()
+        end
+    end
+end
+if dalton == nil then
+    error("failed to load dalton-suricata compatibility layer")
+end
+
 function init (args)
     local needs = {}
     needs["protocol"] = "http"
@@ -5,18 +24,28 @@ function init (args)
     return needs
 end
 
+local LOG_NAME = "dalton-http-buffers.log"
+
 function setup (args)
-    filename = SCLogPath() .. "/" .. "dalton-http-buffers.log"
-    file, err = io.open(filename, "a")
-    if file then
-        SCLogInfo("HTTP OPENED Log Filename " .. filename)
-    else
-        SCLogNotice("Error opening Lua log:" .. err)
+    file = nil
+    http_count = 0
+end
+
+function ensure_file()
+    if file == nil then
+        file, err = dalton.open_log(LOG_NAME)
+        if file then
+            dalton.info("HTTP OPENED Log Filename " .. dalton.log_path() .. "/" .. LOG_NAME)
+        else
+            dalton.notice("Error opening Lua log: " .. tostring(err))
+        end
     end
-    http = 0
 end
 
 function HexDump(buf)
+    if buf == nil or #buf == 0 then
+        return ""
+    end
     local s = {}
     s.output = ''
     for byte=1, #buf, 16 do
@@ -30,20 +59,29 @@ function HexDump(buf)
 end
 
 function log(args)
-    SCLogNotice("Pulling HTTP buffers");
+    dalton.notice("Pulling HTTP buffers")
+    ensure_file()
 
-    http_req_line = HttpGetRequestLine()
-    http_raw_uri = HttpGetRequestUriRaw()
-	http_req_headers = HttpGetRawRequestHeaders()
-	http_resp_headers = HttpGetRawResponseHeaders()
-	http_req_body, o, e = HttpGetRequestBody()
-	http_resp_body, o, e = HttpGetResponseBody()
-	http_uri = HttpGetRequestUriNormalized()
-    http_ua = HttpGetRequestHeader("User-Agent")
-    http_cookie = HttpGetRequestHeader("Cookie")
+    if dalton.suri8 then
+        local tx, err = require("suricata.http").get_tx()
+        if not dalton.is_tx(tx) then
+            dalton.notice("HTTP log skipped: " .. tostring(err or tx))
+            return
+        end
+    end
 
-    timestring = SCPacketTimeString()
-    ip_version, src_ip, dst_ip, protocol, src_port, dst_port = SCFlowTuple()
+    http_req_line = dalton.http_request_line()
+    http_raw_uri = dalton.http_request_uri_raw()
+    http_req_headers = dalton.http_request_headers_raw()
+    http_resp_headers = dalton.http_response_headers_raw()
+    http_req_body = dalton.http_request_body()
+    http_resp_body = dalton.http_response_body()
+    http_uri = dalton.http_request_uri_normalized()
+    http_ua = dalton.http_request_header("User-Agent")
+    http_cookie = dalton.http_request_header("Cookie")
+
+    ip_version, src_ip, dst_ip, protocol, src_port, dst_port = dalton.flow_tuple()
+    timestring = dalton.packet_timestring()
 
     outstring = "=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n\n"
     outstring = outstring .. "Raw Packet:\n"
@@ -59,24 +97,24 @@ function log(args)
         outstring = outstring .. HexDump(http_raw_uri) .. "\n"
     end
 
-	if http_req_headers then
+    if http_req_headers then
         outstring = outstring .. "REQ_HEADERS_DUMP, " .. tostring(string.len(http_req_headers)) .. "\n\n"
         outstring = outstring .. HexDump(http_req_headers) .. "\n"
     end
 
-	if http_resp_headers then
+    if http_resp_headers then
         outstring = outstring .. "RESP_HEADERS_DUMP, " .. tostring(string.len(http_resp_headers)) .. "\n\n"
         outstring = outstring .. HexDump(http_resp_headers) .. "\n"
     end
 
-	if http_req_body then
-        outstring = outstring .. "REQ_BODY_DUMP, " .. tostring(string.len(http_req_body[1])) .. "\n\n"
-		outstring = outstring .. HexDump(http_req_body[1]) .. "\n"
+    if http_req_body then
+        outstring = outstring .. "REQ_BODY_DUMP, " .. tostring(string.len(http_req_body)) .. "\n\n"
+        outstring = outstring .. HexDump(http_req_body) .. "\n"
     end
 
-	if http_resp_body then
-        outstring = outstring .. "RESP_BODY_DUMP, " .. tostring(string.len(http_resp_body[1])) .. "\n\n"
-		outstring = outstring .. HexDump(http_resp_body[1]) .. "\n"
+    if http_resp_body then
+        outstring = outstring .. "RESP_BODY_DUMP, " .. tostring(string.len(http_resp_body)) .. "\n\n"
+        outstring = outstring .. HexDump(http_resp_body) .. "\n"
     end
 
     if http_uri then
@@ -84,24 +122,28 @@ function log(args)
         outstring = outstring .. HexDump(http_uri) .. "\n"
     end
 
-	if http_ua then
+    if http_ua then
         outstring = outstring .. "USER_AGENT_DUMP, " .. tostring(string.len(http_ua)) .. "\n\n"
         outstring = outstring .. HexDump(http_ua) .. "\n"
     end
 
-	if http_cookie then
+    if http_cookie then
         outstring = outstring .. "COOKIE_DUMP, " .. tostring(string.len(http_cookie)) .. "\n\n"
         outstring = outstring .. HexDump(http_cookie) .. "\n"
     end
 
-    file:write (outstring)
-    --SCLogNotice("Output to file: ".. outstring)
-    file:flush()
+    if file then
+        file:write (outstring)
+        file:flush()
+    end
 
-    http = http + 1
+    http_count = http_count + 1
 end
 
 function deinit (args)
-    SCLogInfo ("HTTP transactions logged: " .. http);
-    file:close(file)
+    dalton.info ("HTTP transactions logged: " .. http_count)
+    if file then
+        file:close()
+        file = nil
+    end
 end

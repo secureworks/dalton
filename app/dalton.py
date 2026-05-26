@@ -2636,6 +2636,7 @@ def page_coverage_summary():
                         "lua": {
                             "enabled": True,
                             "scripts-dir": "/opt/dalton-agent",
+                            "path": "/opt/dalton-agent/?.lua",
                             "scripts": ["http.lua", "tls.lua", "dns.lua"],
                         }
                     }
