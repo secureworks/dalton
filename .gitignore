@@ -10,6 +10,10 @@ rulesets/zeek/
 app/static/engine-configs/snort/
 app/static/engine-configs/suricata/
 
+# don't track the contents of the data directory
+data/**
+!data/.gitkeep
+
 # don't include docker-compose
 docker-compose.yml
 #Dockerfile*
