@@ -38,13 +38,22 @@ import tarfile
 import tempfile
 import time
 import traceback
+import urllib.request
 import zipfile
 from distutils.version import LooseVersion
 from functools import lru_cache, wraps
 from logging.handlers import RotatingFileHandler
 from threading import Thread
 
-from flask import Blueprint, Response, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Response,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from redis import Redis
 from ruamel import yaml
 
@@ -91,6 +100,16 @@ try:
     RULECAT_SCRIPT = dalton_config.get("dalton", "rulecat_script")
     MAX_PCAP_FILES = dalton_config.getint("dalton", "max_pcap_files")
     ENABLE_QUEUE_CLEARING = dalton_config.getboolean("dalton", "enable_queue_clearing")
+    # Suricata rule syntax checking (optional; the linter container is a
+    # convenience, not a dependency - the controller fails open if it's
+    # unreachable). dalton.conf is the single source of truth: an absent or
+    # empty URL means the feature is off, which is what README.rst and
+    # dalton.conf tell operators removing the keys will do.
+    RULE_CHECK_URL = dalton_config.get("dalton", "rule_check_url", fallback="")
+    RULE_CHECK_TIMEOUT = dalton_config.getint(
+        "dalton", "rule_check_timeout", fallback=6
+    )
+    KEYWORDS_URL = dalton_config.get("dalton", "keywords_url", fallback="")
     DEBUG = dalton_config.getboolean("dalton", "debug")
     AUTH_PREFIX = dalton_config.get("dalton", "auth_prefix")
     AUTH_MAX = dalton_config.getint("dalton", "auth_max")
@@ -723,6 +742,148 @@ def get_engine_conf_file(sensor):
         if DEBUG:
             engine_config += f"  Error: {e}\r\n{traceback.format_exc()}"
         return engine_config
+
+
+def _linter_fail_open(url, timeout, payload=None):
+    """GET a linter URL (or POST `payload` as JSON to it) and return the
+    parsed JSON object, or None on any failure. This backs an optional
+    convenience (rule syntax checking / keyword completion); a broken or
+    unreachable linter must never cost the page anything beyond that
+    feature, so every failure mode - missing config, connection refused,
+    timeout, non-200, unparseable body, and valid-JSON-but-not-an-object -
+    is treated identically as "unavailable".
+    """
+    if not url:
+        return None
+    try:
+        if payload is None:
+            req = urllib.request.Request(url)
+        else:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status != 200:
+                return None
+            body = json.loads(resp.read())
+    except Exception:
+        return None
+    if not isinstance(body, dict):
+        return None
+    return body
+
+
+# The keyword payload only changes when the linter container is rebuilt, so
+# a successful fetch is served from memory for this long before the linter
+# is asked again. Page loads with the editor preference on would otherwise
+# each pull the full keyword list through the same two gunicorn workers that
+# serve syntax checks.
+KEYWORDS_CACHE_TTL = 600
+_keywords_cache = None
+_keywords_cache_time = 0.0
+
+
+@dalton_blueprint.route("/dalton/controller_api/rule_keywords", methods=["GET"])
+@check_user
+def api_get_rule_keywords():
+    """Proxy to the linter's /keywords endpoint (Suricata keyword completion
+    data and hover docs), cached in-process. A fetch younger than
+    KEYWORDS_CACHE_TTL is served from memory without asking the linter.
+    Fails open: any problem reaching the linter falls back to the last
+    successfully cached response (marked stale) so a linter outage degrades
+    completion to stale, not absent; only a never-yet-successful linter
+    reports unavailable. A module-level cache is enough for the
+    single-process dev server this controller runs on."""
+    global _keywords_cache, _keywords_cache_time
+    now = time.monotonic()
+    if _keywords_cache is not None and now - _keywords_cache_time < KEYWORDS_CACHE_TTL:
+        fresh = dict(_keywords_cache)
+        fresh["available"] = True
+        fresh["stale"] = False
+        return jsonify(fresh)
+    body = _linter_fail_open(KEYWORDS_URL, RULE_CHECK_TIMEOUT)
+    if body is not None:
+        _keywords_cache = dict(body)
+        _keywords_cache_time = now
+        body["available"] = True
+        body["stale"] = False
+        return jsonify(body)
+    if _keywords_cache is not None:
+        stale = dict(_keywords_cache)
+        stale["available"] = True
+        stale["stale"] = True
+        return jsonify(stale)
+    return jsonify({"available": False})
+
+
+# Must match MAX_BYTES in dalton-agent/linter/guard.py. Its own constant here
+# so the controller can refuse an oversized buffer before paying to parse it.
+MAX_RULE_CHECK_BYTES = 64 * 1024
+
+
+def _oversize_diagnostic():
+    """Shaped like a language-server diagnostic so the editor renders it inline
+    rather than treating an ordinary refusal as a failure."""
+    return {
+        "range": {
+            "start": {"line": 0, "character": 0},
+            "end": {"line": 0, "character": 0},
+        },
+        "message": (
+            f"Too much text to syntax check (limit {MAX_RULE_CHECK_BYTES // 1024} KB). "
+            "The rules can still be submitted as a job."
+        ),
+        "source": "Dalton",
+        "severity": 1,
+        "content": "",
+        "sid": 0,
+    }
+
+
+@dalton_blueprint.route("/dalton/controller_api/check_rules", methods=["POST"])
+@check_user
+def api_check_rules():
+    """Proxy to the linter's /check endpoint (Suricata rule syntax
+    checking). Fails open: any problem reaching the linter, or no linter
+    configured, reports {"available": false} rather than an HTTP error -
+    this backs an optional convenience and must never cost the page
+    anything beyond its own diagnostics. Job submission never goes near
+    this endpoint."""
+    # The linter's own limit is 64KB, but it only sees the buffer after two
+    # hops, and MAX_CONTENT_LENGTH here is a gigabyte because it is sized for
+    # pcap uploads. Without this a huge "rules" string is parsed, re-serialised
+    # and re-encoded in a development server that spawns an unbounded thread
+    # per request, before anything rejects it.
+    if request.content_length and request.content_length > MAX_RULE_CHECK_BYTES * 2:
+        return jsonify({"available": True, "diagnostics": [_oversize_diagnostic()]})
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+    rules = data.get("rules") or ""
+    if not isinstance(rules, str):
+        return jsonify({"error": "'rules' must be a string"}), 400
+    if len(rules.encode("utf-8", "replace")) > MAX_RULE_CHECK_BYTES:
+        return jsonify({"available": True, "diagnostics": [_oversize_diagnostic()]})
+
+    payload = {
+        "rules": rules,
+        "engine_analysis": bool(data.get("engine_analysis", False)),
+    }
+    body = _linter_fail_open(RULE_CHECK_URL, RULE_CHECK_TIMEOUT, payload)
+    if body is None:
+        return jsonify({"available": False})
+    # Only the two fields the page uses, rather than whatever the linter
+    # returned, so a field added there later cannot leak through this proxy.
+    return jsonify(
+        {
+            "available": True,
+            "diagnostics": body.get("diagnostics", []),
+            "engine_version": body.get("engine_version"),
+        }
+    )
 
 
 @dalton_blueprint.route("/dalton/sensor_api/update/", methods=["POST"])

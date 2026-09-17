@@ -46,6 +46,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+# vendored CodeMirror, not a Python build artifact
+!app/static/codemirror/lib/
 lib64/
 parts/
 sdist/

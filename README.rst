@@ -73,6 +73,7 @@ Contents
 -  `Flowsynth WebUI <#flowsynth-webui>`__
 -  `Zeek <#zeek>`__
 -  `CyberChef <#cyberchef>`__
+-  `Suricata Rule Editor <#suricata-rule-editor>`__
 -  `Frequently Asked Questions <#frequently-asked-questions>`__
 -  `Authors <#authors>`__
 
@@ -1344,6 +1345,48 @@ For convenience, Dalton has the ability to easily build and run a
 `CyberChef <https://gchq.github.io/CyberChef/>`__ container.  This is enabled by default in the
 ``docker-compose.yml`` file.  Accessing CyberChef can be done via the 'CyberChef' link
 in the Dalton toolbar, or directly using the '/cyberchef' URI path.
+
+
+Suricata Rule Editor
+=====================
+
+The custom-rules box on the Suricata coverage page has an optional rule
+editor: syntax highlighting, keyword completion with hover documentation,
+and real syntax checking against a running Suricata engine. It is off by
+default -- tick the "Rule editor" checkbox next to the custom-rules box to
+turn it on; the plain textarea remains the default experience and stays
+available underneath. A second checkbox, "Engine analysis" (on by default
+once the editor itself is enabled), adds Suricata's own performance and
+coverage guidance (e.g. "consider adding a flow keyword") to the syntax
+check.
+
+This is backed by a new ``linter`` container, built by default alongside
+the Suricata agents (it shares their Suricata compile via a build target in
+``dalton-agent/Dockerfiles/Dockerfile_suricata``) and reached by the
+controller over HTTP. Keyword data is generated from the linter's own
+Suricata engine at startup, not from any third-party database, so it is
+Apache-2.0-clean and always matches the engine actually being checked
+against.
+
+Syntax checking uses the `Suricata Language Server
+<https://github.com/StamusNetworks/suricata-language-server>`__ (SLS),
+which is GPL-3.0-licensed. SLS runs only inside the ``linter`` container,
+where it is invoked as a separate OS process via its own ``--batch-file``
+CLI (see ``dalton-agent/linter/app.py``) -- never imported into or linked
+with the linter's own (Apache-2.0) Flask app, so the two stay arm's-length
+programs communicating over an argv/stdout boundary. The (Apache-2.0)
+controller, in turn, never talks to SLS directly at all; it only ever
+reaches the ``linter`` container over HTTP.
+
+The feature is a convenience, not a dependency: if the ``linter`` container
+is unreachable, unhealthy, or disabled, the controller fails open and the
+coverage page simply loses syntax highlighting/checking, with everything
+else -- including job submission -- unaffected. To disable it entirely,
+remove, comment out, or leave empty the ``rule_check_url`` / ``keywords_url``
+settings in ``dalton.conf`` (an absent or empty URL means "off"; there is no
+built-in default); because ``dalton.conf`` is baked into the controller image
+at build time (see ``Dockerfile-dalton``), this requires rebuilding the
+controller image, not just restarting it.
 
 
 Frequently Asked Questions
