@@ -902,9 +902,15 @@ The client is limited to GET and POST requests. It needs the ``requests`` packag
 split the pcap). If Dalton returns an error page instead, it raises ``DaltonAPIError`` with the
 page's text.
 
-Requests time out after 60 seconds. A request that gets a 429 or 5xx response is retried up to
-three times, 60 seconds apart. Job submissions are retried only on 429 and 503, which mean the
-job was not queued, so a retry can't submit the same job twice.
+Each request is tried up to three times. A GET is retried after a 429 or 5xx response, a
+connection error or a timeout. A job submission is retried only when the request can't have
+queued the job: a 429 or 503 response, or a failure to connect. Retries wait for the server's
+``Retry-After``, if it gives one, or 60 seconds.
+
+The client waits up to 60 seconds to connect and for the reply to a GET (``DaltonAPI(url,
+timeout=...)``). Dalton processes the pcap before it replies to a job submission, so by default
+there's no limit on that wait; ``submit_timeout=...`` sets one, but a submission that times out
+may still have been queued.
 
 Submit Job using the API
 ------------------------
@@ -939,10 +945,12 @@ Submit the job as a shortlived ``teapotJob`` if you plan to make multiple calls 
 
 Other useful arguments to submit a job are: 
 
-- ``custom_rules`` in which you may include the custom rules you may want to test with your job,
+- ``custom_ruleset`` in which you may include the custom rules you may want to test with your job,
+  along with ``optionCustomRuleset`` set to ``custom`` (without it, the custom rules are ignored),
 - ``optionAlertDetailed``, ``optionEveLog``, ``optionOtherLogs``: this can be set to ``True`` if you want to generate additional logs with your job.
 
-An example script can be found in ``api/examples/job_submission.py``.
+An example script can be found in ``api/examples/job_submission.py``. Run it from the repository
+root with a pcap: ``python -m api.examples.job_submission <pcap>``.
 
 Teapot Jobs
 ===========
