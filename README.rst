@@ -896,7 +896,24 @@ Dalton API Client
 -----------------
 
 An API Client has been added in ``api/dalton.py`` that performs API calls with Python requests. 
-The client is limited to GET and POST requests.
+The client is limited to GET and POST requests. It needs the ``requests`` package.
+
+``submit_job()`` submits a teapot job and returns its job ID (several, comma-separated, if Dalton
+split the pcap). If Dalton returns an error page instead, it raises ``DaltonAPIError`` with the
+error message. Pcaps can be passed as bytes or open files; a file is read from its current position,
+so pass bytes to submit the same pcap more than once.
+
+Each request is tried up to three times. A GET is retried after a 429 or 5xx response, a
+connection error or a timeout. A job submission is retried only when the request can't have
+queued the job: a 429 response, or a failure to connect. A retry after a 429 or 5xx waits for the
+server's ``Retry-After``, if it gives one in seconds (at most 300), or 60 seconds; a retry after a
+connection error waits 10 seconds. With urllib3 2, a host name that doesn't resolve isn't retried.
+
+The client waits up to 60 seconds to connect and for the reply to a GET (``DaltonAPI(url,
+timeout=...)``). Dalton processes the pcap before it replies to a job submission, so the client
+waits up to an hour for that reply (``submit_timeout=...``; ``None`` waits forever). A submission
+that times out may still have been queued. ``headers={...}`` adds headers, such as an API key, to
+every request.
 
 Submit Job using the API
 ------------------------
@@ -931,10 +948,12 @@ Submit the job as a shortlived ``teapotJob`` if you plan to make multiple calls 
 
 Other useful arguments to submit a job are: 
 
-- ``custom_rules`` in which you may include the custom rules you may want to test with your job,
+- ``custom_ruleset`` in which you may include the custom rules you may want to test with your job,
+  along with ``optionCustomRuleset`` set to ``custom`` (without it, the custom rules are ignored),
 - ``optionAlertDetailed``, ``optionEveLog``, ``optionOtherLogs``: this can be set to ``True`` if you want to generate additional logs with your job.
 
-An example script can be found in ``api/examples/submit_job.py``.
+An example script can be found in ``api/examples/job_submission.py``. Run it from the repository
+root with a pcap: ``python -m api.examples.job_submission <pcap>``.
 
 Teapot Jobs
 ===========

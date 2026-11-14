@@ -37,6 +37,8 @@ Homepage = "https://github.com/secureworks/dalton"
 
 [project.optional-dependencies]
 testing = [
+    # api/dalton.py, the API client
+    "requests",
     "pytest",
 ]
 devtools = [
