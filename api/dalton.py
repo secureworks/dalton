@@ -134,8 +134,8 @@ class DaltonAPI:
             prod_ruleset (str): path to prod ruleset. Ex. /opt/dalton/rulesets/suricata/ET-20230301-all-suricata.rules
             configuration (str): sensor configuration. Can be read from a yaml file. See "examples/job_submission.py"
             custom_rules (str): rules to be tested. Can be read from a rules file. See "examples/job_submission.py"
-            files (dict): dictionary that includes tuple with pcap file. Ex. {"coverage-pcap0": ("test_job.pcap", pcap)}.
-                A list of (name, tuple) pairs also works. An open file is read from its current
+            files (dict | list): the pcap files, as a dict or a list of (name, value) pairs.
+                Ex. {"coverage-pcap0": ("test_job.pcap", pcap)}. An open file is read from its current
                 position, as requests would; pass bytes to submit the same pcap more than once.
 
         Returns:
