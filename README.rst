@@ -905,8 +905,9 @@ so pass bytes to submit the same pcap more than once.
 
 Each request is tried up to three times. A GET is retried after a 429 or 5xx response, a
 connection error or a timeout. A job submission is retried only when the request can't have
-queued the job: a 429 or 503 response, or a failure to connect. Retries wait for the server's
-``Retry-After``, if it gives one in seconds (at most 300), or 60 seconds.
+queued the job: a 429 or 503 response, or a failure to connect. A retry after a 429 or 5xx waits
+for the server's ``Retry-After``, if it gives one in seconds (at most 300), or 60 seconds; a retry
+after a connection error waits 10 seconds. A host name that doesn't resolve isn't retried.
 
 The client waits up to 60 seconds to connect and for the reply to a GET (``DaltonAPI(url,
 timeout=...)``). Dalton processes the pcap before it replies to a job submission, so by default

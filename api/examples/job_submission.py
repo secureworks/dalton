@@ -1,4 +1,6 @@
-"""Example on how to submit a job using the Dalton Client API. Mock data is in mocks directory.
+"""Example on how to submit a job using the Dalton Client API.
+
+The engine config and custom rules come from the mocks directory, the pcap from the command line.
 
 Run it from the repository root: python -m api.examples.job_submission <pcap>
 """

@@ -6,6 +6,7 @@ import threading
 
 import pytest
 import requests
+import urllib3.exceptions
 from urllib3.exceptions import MaxRetryError, NewConnectionError, ProtocolError
 
 from api import dalton
@@ -198,10 +199,41 @@ def test_submit_files_as_a_list(fake):
     ] * 2
 
 
-def test_get_retries_connection_errors(fake):
+def test_get_retries_connection_errors(fake, sleeps):
     requests_ = fake(DROPPED, requests.ReadTimeout(), make_response(text="5"))
     assert DaltonAPI("http://dalton.test").get_max_pcaps() == 5
     assert len(requests_.calls) == 3
+    assert sleeps == [dalton.CONNECT_SLEEP_TIME] * 2
+
+
+def test_get_retries_body_read_errors(fake):
+    requests_ = fake(
+        requests.exceptions.ChunkedEncodingError(DROPPED),
+        requests.exceptions.ContentDecodingError(),
+        make_response(text="5"),
+    )
+    assert DaltonAPI("http://dalton.test").get_max_pcaps() == 5
+    assert len(requests_.calls) == 3
+
+
+def test_submit_not_retried_when_body_read_fails(fake):
+    requests_ = fake(requests.exceptions.ChunkedEncodingError(DROPPED))
+    with pytest.raises(requests.exceptions.ChunkedEncodingError):
+        submit(DaltonAPI("http://dalton.test"))
+    assert len(requests_.calls) == 1
+
+
+@pytest.mark.skipif(
+    not hasattr(urllib3.exceptions, "NameResolutionError"),
+    reason="urllib3 1.x reports DNS failures as NewConnectionError",
+)
+def test_unresolvable_host_is_not_retried(fake):
+    error = urllib3.exceptions.NameResolutionError("no-such-host", None, OSError())
+    unresolved = requests.ConnectionError(MaxRetryError(None, "/", error))
+    requests_ = fake(unresolved)
+    with pytest.raises(requests.ConnectionError):
+        DaltonAPI("http://no-such-host").get_max_pcaps()
+    assert len(requests_.calls) == 1
 
 
 def test_submit_retried_when_connection_refused(fake):
@@ -239,6 +271,12 @@ def test_retry_after_is_capped(fake, sleeps):
     fake(make_response(429, headers={"Retry-After": "86400"}), make_response(text="5"))
     DaltonAPI("http://dalton.test").get_max_pcaps()
     assert sleeps == [dalton.MAX_RETRY_AFTER]
+
+
+def test_retry_after_non_ascii_digits(fake, sleeps):
+    fake(make_response(429, headers={"Retry-After": "\u00b2"}), make_response(text="5"))
+    DaltonAPI("http://dalton.test").get_max_pcaps()
+    assert sleeps == [dalton.SLEEP_TIME]
 
 
 class Pipe:
@@ -298,24 +336,36 @@ def test_never_sent_with_real_connections():
             )
         assert dalton._never_sent(proxy.value)
 
-    # a server that reads the request and hangs up without replying
-    server = socket.socket()
-    server.bind(("127.0.0.1", 0))
-    server.listen()
+    # a server, then a proxy, that reads the request and hangs up without replying
+    for proxied in (False, True):
+        with socket.socket() as server:
+            server.bind(("127.0.0.1", 0))
+            server.listen()
+            server.settimeout(5)
+            url = "http://127.0.0.1:%d" % server.getsockname()[1]
 
-    def hang_up():
-        conn, _ = server.accept()
-        conn.recv(65536)
-        conn.close()
+            def hang_up():
+                try:
+                    conn, _ = server.accept()
+                except OSError:
+                    return
+                conn.recv(65536)
+                conn.close()
 
-    thread = threading.Thread(target=hang_up, daemon=True)
-    thread.start()
-    port = server.getsockname()[1]
-    with pytest.raises(requests.ConnectionError) as dropped:
-        session.post(f"http://127.0.0.1:{port}/", data={"a": 1}, timeout=5)
-    thread.join()
-    server.close()
-    assert not dalton._never_sent(dropped.value)
+            thread = threading.Thread(target=hang_up, daemon=True)
+            thread.start()
+            with pytest.raises(requests.ConnectionError) as dropped:
+                if proxied:
+                    session.post(
+                        "http://dalton.test/",
+                        data={"a": 1},
+                        proxies={"http": url},
+                        timeout=5,
+                    )
+                else:
+                    session.post(url + "/", data={"a": 1}, timeout=5)
+            thread.join(10)
+        assert not dalton._never_sent(dropped.value)
 
 
 def test_submit_without_custom_rules(fake):

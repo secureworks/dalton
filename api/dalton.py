@@ -5,10 +5,14 @@ import re
 import time
 
 import requests
+import urllib3.exceptions
 from urllib3.exceptions import ConnectTimeoutError, ProxyError
 
 RETRIES = 3
 SLEEP_TIME = 60
+# wait before retrying a connection failure: long enough for a restart, short
+# enough that a wrong port fails quickly
+CONNECT_SLEEP_TIME = 10
 TIMEOUT = 60
 # longest wait a server's Retry-After can ask for
 MAX_RETRY_AFTER = 300
@@ -52,9 +56,10 @@ class DaltonAPI:
 
         A retryable status waits for the server's Retry-After, if it gives one in
         seconds (up to MAX_RETRY_AFTER), or SLEEP_TIME. Connection failures are
-        retried after SLEEP_TIME: for a GET any failure, for a POST only one that
-        happened before the request was sent. Each attempt uses a new connection,
-        so a POST never goes out on a kept-alive connection the server is closing.
+        retried after CONNECT_SLEEP_TIME: for a GET any failure, for a POST only
+        one that happened before the request was sent. A host name that doesn't
+        resolve isn't retried. Each attempt uses a new connection, so a POST never
+        goes out on a kept-alive connection the server is closing.
         """
         attempts = max(1, RETRIES)
         for attempt in range(1, attempts + 1):
@@ -69,10 +74,19 @@ class DaltonAPI:
                 )
             except requests.exceptions.SSLError:
                 raise
-            except (requests.ConnectionError, requests.Timeout) as exc:
-                if last or not (method == "GET" or _never_sent(exc)):
+            except (
+                requests.ConnectionError,
+                requests.Timeout,
+                requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ContentDecodingError,
+            ) as exc:
+                if (
+                    last
+                    or _name_not_resolved(exc)
+                    or not (method == "GET" or _never_sent(exc))
+                ):
                     raise
-                time.sleep(SLEEP_TIME)
+                time.sleep(CONNECT_SLEEP_TIME)
                 continue
             if response.status_code in retry_codes and not last:
                 time.sleep(_retry_after(response))
@@ -104,7 +118,7 @@ class DaltonAPI:
         prod_ruleset: str,
         configuration: str,
         custom_rules: str,
-        files: dict,
+        files: dict | list,
     ) -> str:
         """Submits a job for a specific sensor tech, ruleset, configuration and pcap.
 
@@ -237,16 +251,29 @@ def _read_file(name, value):
     return value
 
 
-def _never_sent(exc: Exception) -> bool:
-    """Whether a request failed while connecting, before the server saw it.
-
-    urllib3 raises ProxyError only before the proxy connection is made.
-    """
+def _reason(exc: Exception):
+    """The urllib3 error behind a requests connection error, if there is one."""
     reason = getattr(exc.args[0], "reason", None) if exc.args else None
-    return isinstance(reason, (ConnectTimeoutError, ProxyError))
+    # a ProxyError can wrap a failure from before or after the request went out
+    if isinstance(reason, ProxyError):
+        reason = getattr(reason, "original_error", None)
+    return reason
+
+
+def _never_sent(exc: Exception) -> bool:
+    """Whether a request failed while connecting, before the server (or proxy) saw it."""
+    return isinstance(_reason(exc), ConnectTimeoutError)
+
+
+def _name_not_resolved(exc: Exception) -> bool:
+    """Whether the host name didn't resolve (urllib3 2 only), which a retry won't fix."""
+    error = getattr(urllib3.exceptions, "NameResolutionError", None)
+    return error is not None and isinstance(_reason(exc), error)
 
 
 def _retry_after(response: requests.Response) -> float:
     """Seconds to wait before retrying: the server's Retry-After, or SLEEP_TIME."""
     value = response.headers.get("Retry-After", "").strip()
-    return min(int(value), MAX_RETRY_AFTER) if value.isdigit() else SLEEP_TIME
+    if value.isascii() and value.isdigit():
+        return min(int(value), MAX_RETRY_AFTER)
+    return SLEEP_TIME
