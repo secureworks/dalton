@@ -1,5 +1,6 @@
 """Dalton API client."""
 
+import re
 import time
 
 import requests
@@ -7,47 +8,58 @@ from requests.exceptions import HTTPError
 
 RETRIES = 3
 SLEEP_TIME = 60
+TIMEOUT = 60
+
+# GETs are retried on any of these. A job submission (POST) is retried only on
+# the codes that mean the request wasn't processed, so a retry can't create a
+# second job.
+RETRY_CODES_GET = (429, 500, 502, 503, 504)
+RETRY_CODES_POST = (429, 503)
+
+# what a teapot job submission returns: a job ID, or several, comma-separated,
+# when the pcap was split
+TEAPOT_JIDS_RE = re.compile(r"^teapot_[0-9a-f]{16}(,teapot_[0-9a-f]{16})*$")
+
+
+class DaltonAPIError(Exception):
+    """Dalton rejected a request without an HTTP error status."""
 
 
 class DaltonAPI:
-    def __init__(self, api_link):
+    def __init__(self, api_link, timeout=TIMEOUT):
         self.api_link = api_link
+        self.timeout = timeout
+
+    def _request(
+        self, method: str, endpoint: str, retry_codes, **kwargs
+    ) -> requests.Response:
+        """Make a request, retrying after SLEEP_TIME seconds on a retryable status."""
+        for attempt in range(1, RETRIES + 1):
+            # a retried upload has to send its files from the start again
+            for value in (kwargs.get("files") or {}).values():
+                fileobj = value[1] if isinstance(value, tuple) else value
+                if hasattr(fileobj, "seek"):
+                    fileobj.seek(0)
+            response = requests.request(
+                method,
+                url=f"{self.api_link}/{endpoint}",
+                timeout=self.timeout,
+                **kwargs,
+            )
+            try:
+                response.raise_for_status()
+            except HTTPError:
+                if response.status_code in retry_codes and attempt < RETRIES:
+                    time.sleep(SLEEP_TIME)
+                    continue
+                raise
+            return response
 
     def _dalton_get(self, endpoint: str) -> requests.Response:
-        for _ in range(RETRIES):
-            try:
-                response = requests.get(url=f"{self.api_link}/{endpoint}")
-                response.raise_for_status()
-            except HTTPError as exc:
-                code = exc.response.status_code
-
-                if code in [429, 500, 502, 503, 504]:
-                    # retry after n seconds
-                    time.sleep(SLEEP_TIME)
-
-                raise
-
-        return response
+        return self._request("GET", endpoint, RETRY_CODES_GET)
 
     def _dalton_post(self, endpoint: str, data: dict, files: dict) -> requests.Response:
-        for _ in range(RETRIES):
-            try:
-                response = requests.post(
-                    url=f"{self.api_link}/{endpoint}",
-                    data=data,
-                    files=files,
-                )
-                response.raise_for_status()
-            except HTTPError as exc:
-                code = exc.response.status_code
-
-                if code in [429, 500, 502, 503, 504]:
-                    # retry after n seconds
-                    time.sleep(SLEEP_TIME)
-
-                raise
-
-        return response
+        return self._request("POST", endpoint, RETRY_CODES_POST, data=data, files=files)
 
     def submit_job(
         self,
@@ -56,7 +68,7 @@ class DaltonAPI:
         configuration: str,
         custom_rules: str,
         files: dict,
-    ) -> None:
+    ) -> str:
         """Submits a job for a specific sensor tech, ruleset, configuration and pcap.
 
         Args:
@@ -65,6 +77,13 @@ class DaltonAPI:
             configuration (str): sensor configuration. Can be read from a yaml file. See "examples/job_submission.py"
             custom_rules (str): rules to be tested. Can be read from a rules file. See "examples/job_submission.py"
             files (dict): dictionary that includes tuple with pcap file. Ex. {"coverage-pcap0": ("test_job.pcap", pcap)}
+
+        Returns:
+            str: the job ID, or a comma-separated list of job IDs if Dalton split the pcap.
+            Ex. 'teapot_0123456789abcdef'
+
+        Raises:
+            DaltonAPIError: Dalton returned an error page instead of a job ID.
         """
         data = {
             "sensor_tech": sensor_tech,
@@ -74,7 +93,14 @@ class DaltonAPI:
             "custom_ruleset": custom_rules,
             "teapotJob": 1,
         }
-        self._dalton_post("dalton/coverage/summary", data=data, files=files)
+        response = self._dalton_post("dalton/coverage/summary", data=data, files=files)
+        # a teapot job's response is its job ID; anything else is Dalton's error page
+        jids = response.text.strip()
+        if not TEAPOT_JIDS_RE.match(jids):
+            raise DaltonAPIError(
+                f"Dalton did not accept the job: {_page_text(jids)[:500]}"
+            )
+        return jids
 
     def get_sensor_tech(self, sensor: str) -> list:
         """Get sensor type and version.
@@ -146,3 +172,10 @@ class DaltonAPI:
             "dalton/controller_api/get-current-sensors-json-full"
         )
         return response.json()
+
+
+def _page_text(html: str) -> str:
+    """The visible text of an HTML page, whitespace collapsed."""
+    text = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", html)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return " ".join(text.split())

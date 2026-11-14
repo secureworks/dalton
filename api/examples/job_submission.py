@@ -29,10 +29,11 @@ for tech in dalton_sensor_techs:
     # have to reread the file to send it to multiple instances of the sensor
     pcap = open(f"{CURRENT_PATH}/api/examples/mocks/test_job.pcap", "rb")
     files = {"coverage-pcap0": ("test_job.pcap", pcap)}
-    dalton_client.submit_job(
+    jid = dalton_client.submit_job(
         sensor_tech=tech,
         prod_ruleset=dalton_rulesets[0],
         configuration=configuration,
         custom_rules=custom_rules,
         files=files,
     )
+    print(f"{tech}: {jid}")

@@ -896,7 +896,15 @@ Dalton API Client
 -----------------
 
 An API Client has been added in ``api/dalton.py`` that performs API calls with Python requests. 
-The client is limited to GET and POST requests.
+The client is limited to GET and POST requests. It needs the ``requests`` package.
+
+``submit_job()`` submits a teapot job and returns its job ID (several, comma-separated, if Dalton
+split the pcap). If Dalton returns an error page instead, it raises ``DaltonAPIError`` with the
+page's text.
+
+Requests time out after 60 seconds. A request that gets a 429 or 5xx response is retried up to
+three times, 60 seconds apart. Job submissions are retried only on 429 and 503, which mean the
+job was not queued, so a retry can't submit the same job twice.
 
 Submit Job using the API
 ------------------------
@@ -934,7 +942,7 @@ Other useful arguments to submit a job are:
 - ``custom_rules`` in which you may include the custom rules you may want to test with your job,
 - ``optionAlertDetailed``, ``optionEveLog``, ``optionOtherLogs``: this can be set to ``True`` if you want to generate additional logs with your job.
 
-An example script can be found in ``api/examples/submit_job.py``.
+An example script can be found in ``api/examples/job_submission.py``.
 
 Teapot Jobs
 ===========
