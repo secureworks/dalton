@@ -34,7 +34,7 @@ DROPPED = requests.ConnectionError(
 
 
 class FakeRequests:
-    """Stands in for Session.request: replays responses (or raises) and records calls."""
+    """Stands in for requests.request: replays responses (or raises) and records calls."""
 
     def __init__(self, *responses):
         self.responses = list(responses)
@@ -43,7 +43,7 @@ class FakeRequests:
     def __call__(self, method, url, **kwargs):
         files = kwargs.get("files") or {}
         pairs = files.items() if hasattr(files, "items") else files
-        sent = {name: value[1].read() for name, value in pairs}
+        sent = {name: value[1] for name, value in pairs}
         self.calls.append({"method": method, "url": url, **kwargs, "sent": sent})
         response = self.responses.pop(0)
         if isinstance(response, Exception):
@@ -62,7 +62,7 @@ def sleeps(monkeypatch):
 def fake(monkeypatch, sleeps):
     def install(*responses):
         fake_requests = FakeRequests(*responses)
-        monkeypatch.setattr(requests.Session, "request", fake_requests)
+        monkeypatch.setattr(dalton.requests, "request", fake_requests)
         return fake_requests
 
     return install
@@ -110,6 +110,29 @@ def test_submit_timeout_is_configurable(fake):
     assert requests_.calls[0]["timeout"] == (5, 600)
 
 
+def test_timeout_tuple(fake):
+    requests_ = fake(make_response(text="5"), make_response(text=JID))
+    client = DaltonAPI("http://dalton.test", timeout=(5, 30))
+    client.get_max_pcaps()
+    submit(client)
+    assert [call["timeout"] for call in requests_.calls] == [(5, 30), (5, None)]
+
+
+def test_headers_are_sent(fake):
+    requests_ = fake(make_response(text="5"), make_response(text=JID))
+    client = DaltonAPI("http://dalton.test", headers={"X-Api-Key": "k"})
+    client.get_max_pcaps()
+    submit(client)
+    assert [call["headers"] for call in requests_.calls] == [{"X-Api-Key": "k"}] * 2
+
+
+def test_no_retries_still_makes_one_attempt(fake, monkeypatch):
+    monkeypatch.setattr(dalton, "RETRIES", 0)
+    requests_ = fake(make_response(text="5"))
+    assert DaltonAPI("http://dalton.test").get_max_pcaps() == 5
+    assert len(requests_.calls) == 1
+
+
 def test_submit_split_pcap_job_ids(fake):
     jids = f"{JID},teapot_fedcba9876543210"
     fake(make_response(text=jids))
@@ -117,10 +140,16 @@ def test_submit_split_pcap_job_ids(fake):
 
 
 def test_submit_error_page(fake):
-    page = "<html><head><style>p {}</style></head><body><p>Error: no sensor</p></body></html>"
+    page = (
+        "<html><head><style>p {}</style></head><body>"
+        '<a href="/">Dalton Home</a>&nbsp; <div class="row">'
+        '<div class="alert alert-error"><h2><span>Error!</span></h2></div>'
+        '<div class="span9"><p>No sensor &amp; no rules.</p></div></div></body></html>'
+    )
     fake(make_response(text=page))
-    with pytest.raises(DaltonAPIError, match="Error: no sensor"):
+    with pytest.raises(DaltonAPIError) as error:
         submit(DaltonAPI("http://dalton.test"))
+    assert str(error.value) == "Dalton did not accept the job: No sensor & no rules."
 
 
 def test_get_retries_then_succeeds(fake):
@@ -206,14 +235,68 @@ def test_retry_after_is_honoured(fake, sleeps):
     assert sleeps == [7, dalton.SLEEP_TIME]
 
 
+def test_retry_after_is_capped(fake, sleeps):
+    fake(make_response(429, headers={"Retry-After": "86400"}), make_response(text="5"))
+    DaltonAPI("http://dalton.test").get_max_pcaps()
+    assert sleeps == [dalton.MAX_RETRY_AFTER]
+
+
+class Pipe:
+    """A stream that can be read but not seeked, like stdin."""
+
+    def __init__(self, data):
+        self.data = data
+
+    def read(self, *args):
+        data, self.data = self.data, b""
+        return data
+
+
+def test_submit_reads_files_from_where_they_are(fake):
+    positioned = io.BytesIO(b"headerPCAP")
+    positioned.seek(6)
+    requests_ = fake(make_response(503), make_response(text=JID))
+    files = {
+        "coverage-pcap0": ("a.pcap", positioned),
+        "coverage-pcap1": ("b.pcap", Pipe(b"piped")),
+    }
+    assert submit(DaltonAPI("http://dalton.test"), files=files) == JID
+    assert [call["sent"] for call in requests_.calls] == [
+        {"coverage-pcap0": b"PCAP", "coverage-pcap1": b"piped"}
+    ] * 2
+
+
+def test_submit_bare_file_keeps_its_name(fake, tmp_path):
+    path = tmp_path / "capture.pcap"
+    path.write_bytes(b"pcap")
+    requests_ = fake(make_response(text=JID))
+    with open(path, "rb") as pcap:
+        submit(DaltonAPI("http://dalton.test"), files={"coverage-pcap0": pcap})
+    assert requests_.calls[0]["files"] == [
+        ("coverage-pcap0", ("capture.pcap", b"pcap"))
+    ]
+
+
 def test_never_sent_with_real_connections():
-    # a port nothing listens on refuses the connection
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        closed_port = probe.getsockname()[1]
-    with pytest.raises(requests.ConnectionError) as refused:
-        requests.post(f"http://127.0.0.1:{closed_port}/", data={"a": 1}, timeout=5)
-    assert dalton._never_sent(refused.value)
+    session = requests.Session()
+    session.trust_env = False  # ignore HTTP_PROXY and friends
+    # a port that is bound but not listening refuses the connection; keeping it
+    # bound stops anything else taking it
+    with socket.socket() as refusing:
+        refusing.bind(("127.0.0.1", 0))
+        refusing_url = "http://127.0.0.1:%d" % refusing.getsockname()[1]
+        with pytest.raises(requests.ConnectionError) as refused:
+            session.post(refusing_url + "/", data={"a": 1}, timeout=5)
+        assert dalton._never_sent(refused.value)
+        # a proxy that refuses the connection
+        with pytest.raises(requests.exceptions.ProxyError) as proxy:
+            session.post(
+                "http://dalton.test/",
+                data={"a": 1},
+                proxies={"http": refusing_url},
+                timeout=5,
+            )
+        assert dalton._never_sent(proxy.value)
 
     # a server that reads the request and hangs up without replying
     server = socket.socket()
@@ -229,7 +312,7 @@ def test_never_sent_with_real_connections():
     thread.start()
     port = server.getsockname()[1]
     with pytest.raises(requests.ConnectionError) as dropped:
-        requests.post(f"http://127.0.0.1:{port}/", data={"a": 1}, timeout=5)
+        session.post(f"http://127.0.0.1:{port}/", data={"a": 1}, timeout=5)
     thread.join()
     server.close()
     assert not dalton._never_sent(dropped.value)

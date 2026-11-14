@@ -34,14 +34,15 @@ dalton_sensor_techs = dalton_client.get_sensor_tech(SENSOR_NAME)
 # since techs and rulesets are a list we use a loop to get the corresponding tech and ruleset
 # you will probably use this if you want to test with multiple versions of the sensor
 with open(PCAP, "rb") as pcap:
-    for tech in dalton_sensor_techs:
-        # the client rewinds the pcap before each upload, so one open file serves every job
-        files = {"coverage-pcap0": (os.path.basename(PCAP), pcap)}
-        jid = dalton_client.submit_job(
-            sensor_tech=tech,
-            prod_ruleset=dalton_rulesets[0],
-            configuration=configuration,
-            custom_rules=custom_rules,
-            files=files,
-        )
-        print(f"{tech}: {jid}")
+    pcap_bytes = pcap.read()
+for tech in dalton_sensor_techs:
+    # bytes can be sent any number of times; an open file would be read to its end by the first job
+    files = {"coverage-pcap0": (os.path.basename(PCAP), pcap_bytes)}
+    jid = dalton_client.submit_job(
+        sensor_tech=tech,
+        prod_ruleset=dalton_rulesets[0],
+        configuration=configuration,
+        custom_rules=custom_rules,
+        files=files,
+    )
+    print(f"{tech}: {jid}")

@@ -1,14 +1,17 @@
 """Dalton API client."""
 
+import html
 import re
 import time
 
 import requests
-from urllib3.exceptions import ConnectTimeoutError
+from urllib3.exceptions import ConnectTimeoutError, ProxyError
 
 RETRIES = 3
 SLEEP_TIME = 60
 TIMEOUT = 60
+# longest wait a server's Retry-After can ask for
+MAX_RETRY_AFTER = 300
 
 # GETs are retried on any of these. A job submission (POST) is retried only on
 # the codes that mean the request wasn't processed, so a retry can't create a
@@ -26,19 +29,21 @@ class DaltonAPIError(Exception):
 
 
 class DaltonAPI:
-    def __init__(self, api_link, timeout=TIMEOUT, submit_timeout=None):
+    def __init__(self, api_link, timeout=TIMEOUT, submit_timeout=None, headers=None):
         """
         Args:
             api_link (str): Dalton base URL. Ex. http://localhost
-            timeout (float): seconds to wait for a connection, and for a reply to a GET
+            timeout (float): seconds to wait for a connection, and for a reply to a GET.
+                A (connect, read) tuple sets the two separately.
             submit_timeout (float): seconds to wait for the reply to a job submission.
                 Dalton processes the pcap before it replies, so the default is no limit;
                 a submission that times out may still have been queued.
+            headers (dict): extra headers sent with every request, e.g. an API key
         """
         self.api_link = api_link
         self.timeout = timeout
         self.submit_timeout = submit_timeout
-        self.session = requests.Session()
+        self.headers = headers
 
     def _request(
         self, method: str, endpoint: str, retry_codes, timeout, **kwargs
@@ -46,17 +51,19 @@ class DaltonAPI:
         """Make a request, trying up to RETRIES times.
 
         A retryable status waits for the server's Retry-After, if it gives one in
-        seconds, or SLEEP_TIME. Connection failures are retried after SLEEP_TIME:
-        for a GET any failure, for a POST only one that happened before the
-        request was sent.
+        seconds (up to MAX_RETRY_AFTER), or SLEEP_TIME. Connection failures are
+        retried after SLEEP_TIME: for a GET any failure, for a POST only one that
+        happened before the request was sent. Each attempt uses a new connection,
+        so a POST never goes out on a kept-alive connection the server is closing.
         """
-        for attempt in range(1, RETRIES + 1):
-            last = attempt == RETRIES
-            _rewind(kwargs.get("files"))
+        attempts = max(1, RETRIES)
+        for attempt in range(1, attempts + 1):
+            last = attempt == attempts
             try:
-                response = self.session.request(
+                response = requests.request(
                     method,
                     url=f"{self.api_link}/{endpoint}",
+                    headers=self.headers,
                     timeout=timeout,
                     **kwargs,
                 )
@@ -76,12 +83,17 @@ class DaltonAPI:
     def _dalton_get(self, endpoint: str) -> requests.Response:
         return self._request("GET", endpoint, RETRY_CODES_GET, self.timeout)
 
-    def _dalton_post(self, endpoint: str, data: dict, files: dict) -> requests.Response:
+    def _dalton_post(self, endpoint: str, data: dict, files) -> requests.Response:
+        # read the files once, from where the caller left them, so that every
+        # attempt sends the same bytes (requests reads them into memory anyway)
+        pairs = files.items() if hasattr(files, "items") else files
+        files = [(name, _read_file(name, value)) for name, value in pairs]
+        connect = self.timeout[0] if isinstance(self.timeout, tuple) else self.timeout
         return self._request(
             "POST",
             endpoint,
             RETRY_CODES_POST,
-            (self.timeout, self.submit_timeout),
+            (connect, self.submit_timeout),
             data=data,
             files=files,
         )
@@ -102,7 +114,8 @@ class DaltonAPI:
             configuration (str): sensor configuration. Can be read from a yaml file. See "examples/job_submission.py"
             custom_rules (str): rules to be tested. Can be read from a rules file. See "examples/job_submission.py"
             files (dict): dictionary that includes tuple with pcap file. Ex. {"coverage-pcap0": ("test_job.pcap", pcap)}.
-                A list of (name, tuple) pairs also works. Open files are rewound before a retry.
+                A list of (name, tuple) pairs also works. An open file is read from its current
+                position, as requests would; pass bytes to submit the same pcap more than once.
 
         Returns:
             str: the job ID, or a comma-separated list of job IDs if Dalton split the pcap.
@@ -127,7 +140,7 @@ class DaltonAPI:
         jids = response.text.strip()
         if not TEAPOT_JIDS_RE.match(jids):
             raise DaltonAPIError(
-                f"Dalton did not accept the job: {_page_text(jids)[:500]}"
+                f"Dalton did not accept the job: {_error_text(jids)[:500]}"
             )
         return jids
 
@@ -203,31 +216,37 @@ class DaltonAPI:
         return response.json()
 
 
-def _page_text(html: str) -> str:
-    """The visible text of an HTML page, whitespace collapsed."""
-    text = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", html)
+def _error_text(page: str) -> str:
+    """The message on Dalton's error page, or the page's text if it isn't one."""
+    match = re.search(r'(?is)<div class="span9">(.*?)</div>', page)
+    text = match.group(1) if match else page
+    text = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", text)
     text = re.sub(r"<[^>]+>", " ", text)
-    return " ".join(text.split())
+    return " ".join(html.unescape(text).split())
 
 
-def _rewind(files) -> None:
-    """Seek open files back to the start, so a retry sends them whole."""
-    if not files:
-        return
-    values = files.values() if hasattr(files, "values") else (v for _, v in files)
-    for value in values:
-        fileobj = value[1] if isinstance(value, tuple) else value
-        if hasattr(fileobj, "seek"):
-            fileobj.seek(0)
+def _read_file(name, value):
+    """A requests files value with any open file replaced by its contents."""
+    if isinstance(value, tuple):
+        if hasattr(value[1], "read"):
+            return (value[0], value[1].read(), *value[2:])
+        return value
+    if hasattr(value, "read"):
+        # requests names the upload after the file; keep that name
+        return (requests.utils.guess_filename(value) or name, value.read())
+    return value
 
 
 def _never_sent(exc: Exception) -> bool:
-    """Whether a request failed while connecting, before the server saw it."""
+    """Whether a request failed while connecting, before the server saw it.
+
+    urllib3 raises ProxyError only before the proxy connection is made.
+    """
     reason = getattr(exc.args[0], "reason", None) if exc.args else None
-    return isinstance(reason, ConnectTimeoutError)
+    return isinstance(reason, (ConnectTimeoutError, ProxyError))
 
 
 def _retry_after(response: requests.Response) -> float:
     """Seconds to wait before retrying: the server's Retry-After, or SLEEP_TIME."""
     value = response.headers.get("Retry-After", "").strip()
-    return int(value) if value.isdigit() else SLEEP_TIME
+    return min(int(value), MAX_RETRY_AFTER) if value.isdigit() else SLEEP_TIME
