@@ -907,6 +907,7 @@ The endpoint to submit a job is ``/dalton/coverage/summary``.
 Additional parameters that are mandatory and will need to be included in the json payload of the POST request are listed below:
 
 .. code:: javascript
+
     data = {
         "sensor_tech": <string that has the sensor technology>,
         "optionProdRuleset": "prod",
@@ -923,6 +924,7 @@ The rules path is ``/opt/dalton/rulesets/<sensor_name>/<rule_file_name>`` where 
 It is also necessary to submit a file using the following format:
 
 .. code:: javascript
+
     files = {"coverage-pcap*": (<pcap_filename>, <pcap_bytes>)}
 
 You can upload up to 10 files with one job, so substitute * with a number from 0-9.
