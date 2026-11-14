@@ -101,8 +101,8 @@ def test_submit_returns_job_id_and_posts_once(fake):
     assert data["teapotJob"] == 1
     assert data["optionCustomRuleset"] == "custom"
     assert data["custom_ruleset"].startswith("alert ")
-    # Dalton processes the pcap before replying: no read timeout by default
-    assert requests_.calls[0]["timeout"] == (dalton.TIMEOUT, None)
+    # Dalton processes the pcap before replying: a long read timeout by default
+    assert requests_.calls[0]["timeout"] == (dalton.TIMEOUT, dalton.SUBMIT_TIMEOUT)
 
 
 def test_submit_timeout_is_configurable(fake):
@@ -116,7 +116,10 @@ def test_timeout_tuple(fake):
     client = DaltonAPI("http://dalton.test", timeout=(5, 30))
     client.get_max_pcaps()
     submit(client)
-    assert [call["timeout"] for call in requests_.calls] == [(5, 30), (5, None)]
+    assert [call["timeout"] for call in requests_.calls] == [
+        (5, 30),
+        (5, dalton.SUBMIT_TIMEOUT),
+    ]
 
 
 def test_headers_are_sent(fake):
@@ -174,16 +177,18 @@ def test_not_found_is_not_retried(fake):
 
 
 def test_submit_retry_resends_the_whole_pcap(fake):
-    requests_ = fake(make_response(503), make_response(text=JID))
+    requests_ = fake(make_response(429), make_response(text=JID))
     assert submit(DaltonAPI("http://dalton.test"), pcap=b"0123456789") == JID
     assert [call["sent"]["coverage-pcap0"] for call in requests_.calls] == [
         b"0123456789"
     ] * 2
 
 
-def test_submit_not_retried_when_it_may_have_run(fake):
-    # a 500 may come after the job was queued; retrying could submit it twice
-    requests_ = fake(make_response(500))
+@pytest.mark.parametrize("status", [500, 502, 503, 504])
+def test_submit_not_retried_when_it_may_have_run(fake, status):
+    # a 5xx (even a proxy's 503) may come after the job was queued; retrying
+    # could submit it twice
+    requests_ = fake(make_response(status))
     with pytest.raises(requests.HTTPError):
         submit(DaltonAPI("http://dalton.test"))
     assert len(requests_.calls) == 1
@@ -191,7 +196,7 @@ def test_submit_not_retried_when_it_may_have_run(fake):
 
 def test_submit_files_as_a_list(fake):
     pcap = io.BytesIO(b"0123456789")
-    requests_ = fake(make_response(503), make_response(text=JID))
+    requests_ = fake(make_response(429), make_response(text=JID))
     files = [("coverage-pcap0", ("test.pcap", pcap))]
     assert submit(DaltonAPI("http://dalton.test"), files=files) == JID
     assert [call["sent"]["coverage-pcap0"] for call in requests_.calls] == [
@@ -293,7 +298,7 @@ class Pipe:
 def test_submit_reads_files_from_where_they_are(fake):
     positioned = io.BytesIO(b"headerPCAP")
     positioned.seek(6)
-    requests_ = fake(make_response(503), make_response(text=JID))
+    requests_ = fake(make_response(429), make_response(text=JID))
     files = {
         "coverage-pcap0": ("a.pcap", positioned),
         "coverage-pcap1": ("b.pcap", Pipe(b"piped")),
@@ -378,3 +383,18 @@ def test_submit_without_custom_rules(fake):
         files={"coverage-pcap0": ("test.pcap", io.BytesIO(b"x"))},
     )
     assert "optionCustomRuleset" not in requests_.calls[0]["data"]
+
+
+def test_submit_file_in_a_list_value_is_read_once(fake):
+    requests_ = fake(make_response(429), make_response(text=JID))
+    files = {"coverage-pcap0": ["a.pcap", io.BytesIO(b"pcap")]}
+    assert submit(DaltonAPI("http://dalton.test"), files=files) == JID
+    assert [call["sent"]["coverage-pcap0"] for call in requests_.calls] == [b"pcap"] * 2
+
+
+def test_submit_without_files(fake):
+    page = '<div class="span9"><p>You must specify a PCAP file.</p></div>'
+    requests_ = fake(make_response(text=page))
+    with pytest.raises(DaltonAPIError, match="You must specify a PCAP file"):
+        DaltonAPI("http://dalton.test").submit_job("s", "r", "c", "", None)
+    assert requests_.calls[0]["files"] == []

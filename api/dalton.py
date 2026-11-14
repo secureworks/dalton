@@ -1,5 +1,7 @@
 """Dalton API client."""
 
+from __future__ import annotations
+
 import html
 import re
 import time
@@ -14,14 +16,17 @@ SLEEP_TIME = 60
 # enough that a wrong port fails quickly
 CONNECT_SLEEP_TIME = 10
 TIMEOUT = 60
+# Dalton processes the pcap before it answers a job submission; this only
+# stops the client waiting forever
+SUBMIT_TIMEOUT = 3600
 # longest wait a server's Retry-After can ask for
 MAX_RETRY_AFTER = 300
 
 # GETs are retried on any of these. A job submission (POST) is retried only on
-# the codes that mean the request wasn't processed, so a retry can't create a
-# second job.
+# a 429, which means the request wasn't processed, so a retry can't create a
+# second job (a proxy's 503 can come after Dalton queued it).
 RETRY_CODES_GET = (429, 500, 502, 503, 504)
-RETRY_CODES_POST = (429, 503)
+RETRY_CODES_POST = (429,)
 
 # what a teapot job submission returns: a job ID, or several, comma-separated,
 # when the pcap was split
@@ -33,15 +38,17 @@ class DaltonAPIError(Exception):
 
 
 class DaltonAPI:
-    def __init__(self, api_link, timeout=TIMEOUT, submit_timeout=None, headers=None):
+    def __init__(
+        self, api_link, timeout=TIMEOUT, submit_timeout=SUBMIT_TIMEOUT, headers=None
+    ):
         """
         Args:
             api_link (str): Dalton base URL. Ex. http://localhost
             timeout (float): seconds to wait for a connection, and for a reply to a GET.
                 A (connect, read) tuple sets the two separately.
             submit_timeout (float): seconds to wait for the reply to a job submission.
-                Dalton processes the pcap before it replies, so the default is no limit;
-                a submission that times out may still have been queued.
+                Dalton processes the pcap before it replies, so the default is an hour;
+                None waits forever. A submission that times out may still have been queued.
             headers (dict): extra headers sent with every request, e.g. an API key
         """
         self.api_link = api_link
@@ -100,7 +107,7 @@ class DaltonAPI:
     def _dalton_post(self, endpoint: str, data: dict, files) -> requests.Response:
         # read the files once, from where the caller left them, so that every
         # attempt sends the same bytes (requests reads them into memory anyway)
-        pairs = files.items() if hasattr(files, "items") else files
+        pairs = files.items() if hasattr(files, "items") else (files or [])
         files = [(name, _read_file(name, value)) for name, value in pairs]
         connect = self.timeout[0] if isinstance(self.timeout, tuple) else self.timeout
         return self._request(
@@ -241,8 +248,8 @@ def _error_text(page: str) -> str:
 
 def _read_file(name, value):
     """A requests files value with any open file replaced by its contents."""
-    if isinstance(value, tuple):
-        if hasattr(value[1], "read"):
+    if isinstance(value, (tuple, list)):
+        if len(value) > 1 and hasattr(value[1], "read"):
             return (value[0], value[1].read(), *value[2:])
         return value
     if hasattr(value, "read"):
