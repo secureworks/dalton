@@ -73,6 +73,7 @@ Contents
 -  `Flowsynth WebUI <#flowsynth-webui>`__
 -  `Zeek <#zeek>`__
 -  `CyberChef <#cyberchef>`__
+-  `rule2pcap Agent Skill <#rule2pcap-agent-skill>`__
 -  `Frequently Asked Questions <#frequently-asked-questions>`__
 -  `Authors <#authors>`__
 
@@ -1346,6 +1347,70 @@ For convenience, Dalton has the ability to easily build and run a
 `CyberChef <https://gchq.github.io/CyberChef/>`__ container.  This is enabled by default in the
 ``docker-compose.yml`` file.  Accessing CyberChef can be done via the 'CyberChef' link
 in the Dalton toolbar, or directly using the '/cyberchef' URI path.
+
+
+rule2pcap Agent Skill
+=====================
+
+``.agents/skills/rule2pcap/`` is an `Agent Skill <https://agentskills.io/>`__
+for AI coding agents. Given a Suricata rule, the agent researches the traffic
+behind it, builds a realistic pcap that fires the rule, and proves it by
+running the pcap through Dalton on every Suricata version available. It
+reports what is confirmed by public sources and what was invented.
+
+.. note::
+
+   rule2pcap has sundry uses, but proving that a rule detects real threat
+   traffic is not one of them. If you develop rules and want a test case
+   that shows a rule catches the exploit, malware or other malicious
+   behavior it targets, start from a capture of that traffic. A pcap built
+   afterwards from the rule itself begs the question: it shows the rule
+   matches what the rule describes, not that it matches the threat.
+
+   If you want a pcap that checks a rule's syntax and structure (that it
+   loads, that its buffers, modifiers and options do what you expect, and
+   that it fires on traffic of the shape it describes), rule2pcap is a good
+   fit.
+
+The skill is plain files: ``SKILL.md`` holds the instructions, ``scripts/``
+holds helper tools, ``templates/`` holds starting build scripts, and
+``references/`` holds background notes. Any agent that reads the Agent Skills
+format can use it. Agents that only look for skills in their own
+tool-specific directory can be pointed at it with a symlink.
+
+What it needs:
+
+- Python 3.10 or later. The agent creates its own venv
+  (``.venv-rule2pcap``) from the skill's ``requirements.txt``, which pins
+  Flowsynth, Scapy, ruamel.yaml and cryptography. Nothing is installed into
+  the system Python.
+- A running Dalton with at least one Suricata agent. The URL comes from
+  ``DALTON_URL`` (default ``http://localhost``). If Dalton requires
+  authentication, set ``DALTON_USER`` or ``DALTON_HEADERS``.
+- Optionally, web access for research.
+
+If Dalton can't be reached but Dalton's Suricata agent images are present
+in Docker, the skill can run Suricata from those images directly. It asks
+before doing so. Without either, the pcap is still built but is labelled
+unverified.
+
+To use it, open an agent session in a Dalton checkout and ask it for a pcap
+that fires a rule, pasting the rule. Results go to
+``rule2pcap-output/<sid>-<slug>/``: the pcap, a ``build.py`` that
+regenerates it byte-for-byte, the rules tested, and a ``README.md`` write-up.
+
+The helper scripts also work on their own. Run each with ``--help``:
+
+- ``scripts/dalton_client.py``: ``preflight`` checks Dalton and the
+  sensors, ``validate`` loads rules in each Suricata version, and ``test``
+  runs a pcap and reports which sids fired
+- ``scripts/rule_facts.py``: decodes a rule's contents, buffers and flow
+  direction, and notes what makes it hard to trigger
+- ``scripts/pcap_lint.py``: flags broken or unrealistic packets, such as
+  multicast source MACs, bad checksums or sequence gaps
+
+The skill's tests are ``tests/test_rule2pcap_*.py``. Run them with the
+``testing`` extras installed.
 
 
 Frequently Asked Questions

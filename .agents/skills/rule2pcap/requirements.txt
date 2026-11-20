@@ -1,0 +1,9 @@
+# Pinned so a build script makes the same bytes on every machine.
+# Install into a venv, never the system Python:
+#   python3 -m venv .venv-rule2pcap && .venv-rule2pcap/bin/pip install -r requirements.txt
+flowsynth==1.4.1
+scapy==2.8.0
+# editing the engine config for --set on the Dalton runner
+ruamel.yaml==0.17.40
+# only for TLS certificate rules (minting certs, real handshakes)
+cryptography==50.0.2

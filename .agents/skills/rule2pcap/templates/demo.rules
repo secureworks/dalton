@@ -1,0 +1,13 @@
+# Rules the templates' demo output fires. Used to check the templates still
+# work; a real build has its own test.rules.
+
+# build_flowsynth.py
+alert dns $HOME_NET any -> any any (msg:"rule2pcap demo - loader DNS lookup"; dns.query; content:"updates.example.net"; nocase; isdataat:!1,relative; sid:9000102; rev:1;)
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"rule2pcap demo - loader check-in"; flow:established,to_server; http.method; content:"POST"; http.uri; content:"/api/v2/checkin"; startswith; http.user_agent; content:"WinHTTP-Loader/1.1"; sid:9000101; rev:1;)
+
+# build_scapy.py
+alert tcp $HOME_NET any -> $EXTERNAL_NET 4444 (msg:"rule2pcap demo - raw TCP beacon burst"; flow:established,to_server; content:"R2P|01|"; depth:4; threshold:type threshold,track by_src,count 5,seconds 60; sid:9000201; rev:1;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"rule2pcap demo - ICMP echo with marker"; itype:8; content:"r2p-ping"; sid:9000202; rev:1;)
+
+# build_tls.py
+alert tls $EXTERNAL_NET any -> $HOME_NET any (msg:"rule2pcap demo - self-signed cert"; flow:established,to_client; tls.cert_subject; content:"CN=secure-login.example.org"; tls.cert_issuer; content:"CN=secure-login.example.org"; sid:9000301; rev:1;)

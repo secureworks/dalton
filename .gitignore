@@ -17,6 +17,10 @@ docker-compose.yml
 
 todo.txt
 notes.txt
+
+# rule2pcap skill: generated pcaps and its build venv
+rule2pcap-output/
+.venv-rule2pcap/
 *.save
 *.save.*
 *.swp

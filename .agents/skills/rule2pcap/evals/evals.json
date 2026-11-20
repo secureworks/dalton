@@ -1,0 +1,78 @@
+{
+  "skill_name": "rule2pcap",
+  "description": "Rules for checking the skill end to end, one per feature that changes how a pcap must be built. Give the agent only the prompt. A run passes when every expectation holds.",
+  "common_expectations": [
+    "The agent ran preflight before building and used Dalton (or asked before using the docker fallback).",
+    "The output directory holds the pcap, build.py, pcapkit.py, test.rules and README.md.",
+    "Running build.py twice gives a byte-identical pcap.",
+    "pcap_lint.py reports no errors, and any warnings are explained in the README.",
+    "dalton_client.py test passes: the sid fires on every engine that loads the rule; engines in not_loaded are reported as unsupported, not as failures.",
+    "The README lists what was invented and does not present invented details as researched."
+  ],
+  "evals": [
+    {
+      "id": "dns-bsize",
+      "prompt": "Build a pcap that fires this rule: alert dns any any -> any any (msg:\"DNS lookup of suricata.io\"; flow:to_server; dns.query; content:\"suricata|2e|io\"; bsize:11; sid:9100001; rev:1;)",
+      "expectations": ["The query name is exactly suricata.io (bsize 11), with a matching answer."]
+    },
+    {
+      "id": "dsize-raw-tcp",
+      "prompt": "Make me a pcap for: alert tcp $HOME_NET any -> $EXTERNAL_NET 6667 (msg:\"IRC bot registers with sTorM nick\"; flow:established,to_server; dsize:24; content:\"NICK|20|sTorM|5b|\"; offset:0; depth:11; nocase; content:\"|5d 0d 0a|\"; endswith; sid:9100002; rev:1;)",
+      "expectations": [
+        "The NICK line is its own 24-byte segment.",
+        "The surrounding IRC registration (server notices, USER, JOIN) is plausible."
+      ]
+    },
+    {
+      "id": "flowbits-file-data",
+      "prompt": "I need traffic that fires sid 9100004 here:\nalert http $HOME_NET any -> $EXTERNAL_NET any (msg:\"LinkedIn-themed request\"; flow:established,to_server; http.method; content:\"GET\"; http.host; content:\"linkedin.com\"; flowbits:set,linkedin.req; flowbits:noalert; sid:9100003; rev:1;)\nalert http $EXTERNAL_NET any -> $HOME_NET any (msg:\"EXE served after LinkedIn-themed request\"; flow:established,to_client; file.data; content:\"MZ\"; startswith; byte_jump:4,58,relative,little; content:\"PE|00 00|\"; distance:-64; within:4; flowbits:isset,linkedin.req; sid:9100004; rev:1;)",
+      "expectations": [
+        "The request and the EXE response share one TCP connection (flowbits are per flow).",
+        "The EXE is inert (e.g. pcapkit.inert_pe), not a working binary.",
+        "The test expects only 9100004; 9100003 is noalert."
+      ]
+    },
+    {
+      "id": "threshold",
+      "prompt": "Pcap please: alert http $EXTERNAL_NET any -> $HOME_NET any (msg:\"Scripted account registration\"; flow:established,to_server; http.method; content:\"POST\"; http.uri; content:\"/api/register\"; http.request_body; content:\"email=\"; threshold:type both, track by_src, count 5, seconds 300; sid:9100005; rev:1;)",
+      "expectations": [
+        "At least five qualifying POSTs from one source inside 300 seconds.",
+        "The test uses --set runmode=single; the README doesn't promise which packet the alert lands on in Dalton's default runmode."
+      ]
+    },
+    {
+      "id": "suricata8-keyword",
+      "prompt": "Build a pcap for: alert smtp $EXTERNAL_NET any -> $HOME_NET any (msg:\"Mail from PayPal look-alike\"; flow:established,to_server; smtp.mail_from; content:\"@paypa1.com>\"; nocase; endswith; sid:9100006; rev:1;)",
+      "expectations": [
+        "A complete SMTP session (banner through QUIT).",
+        "The result and README say the rule needs Suricata 8 (smtp.mail_from) and list older engines as not loaded."
+      ]
+    },
+    {
+      "id": "first-packet-size",
+      "prompt": "alert tcp $HOME_NET any -> $EXTERNAL_NET 8443 (msg:\"317-byte opening message\"; flow:established,to_server; dsize:317; stream_size:server,=,1; sid:9100007; rev:1;)\nCan you make a pcap that triggers that?",
+      "expectations": ["The 317-byte client message is the first data on the connection, before the server sends anything."]
+    },
+    {
+      "id": "byte-test",
+      "prompt": "Generate a pcap that fires: alert tcp any any -> any any (msg:\"Large length field in custom header\"; flow:established,to_server; byte_test:2,>,40000,4; sid:9100008; rev:1;)",
+      "expectations": ["Bytes 4-5 of the matching payload, read big-endian, exceed 40000, as part of a coherent protocol header."]
+    },
+    {
+      "id": "tls-cert-issuer",
+      "prompt": "Build a pcap for: alert tls $EXTERNAL_NET any -> any any (msg:\"ZeroSSL-issued cert on TLS 1.2\"; flow:established,from_server; tls.version:1.2; tls.cert_issuer; content:\"ZeroSSL\"; sid:9100009; rev:1;)",
+      "expectations": [
+        "A real TLS 1.2 handshake whose server certificate issuer contains ZeroSSL.",
+        "The README says the certificate is self-minted and won't verify."
+      ]
+    },
+    {
+      "id": "transform",
+      "prompt": "Make a pcap for: alert http $EXTERNAL_NET any -> $HOME_NET any (msg:\"Base64-wrapped DLL download\"; flow:established,to_client; file_data; from_base64; content:\"MZ\"; depth:2; byte_jump:4,58,relative,little; content:\"PE|00 00|\"; distance:-64; within:4; sid:9100010; rev:1;)",
+      "expectations": [
+        "The response body is base64 text of an inert PE.",
+        "The result notes the rule needs Suricata 8 (from_base64)."
+      ]
+    }
+  ]
+}
