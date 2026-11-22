@@ -69,7 +69,7 @@ Contents
    -  `Non-Docker Sensors <#non-docker-sensors>`__
    
 -  `Adding Sensor Configs <#adding-sensor-configs>`__
--  `Agent Data Directory <#agent-data-directory>`__
+-  `Sensor Data Directory <#sensor-data-directory>`__
 -  `Logging and Debugging <#logging-and-debugging>`__
 -  `Flowsynth WebUI <#flowsynth-webui>`__
 -  `Zeek <#zeek>`__
@@ -1223,10 +1223,10 @@ script located in the ``engine-configs/`` directory::
 
 
 
-Agent Data Directory
+Sensor Data Directory
 =====================
 
-The ``data`` directory at the root of the Dalton project is bind-mounted
+The ``sensor-shared-data`` directory at the root of the Dalton project is bind-mounted
 read-only into the Suricata and Snort Agent containers at
 ``/opt/dalton-agent/data``. Processes running in an Agent container (e.g.
 Suricata or Snort itself) can read files under this path, but nothing in

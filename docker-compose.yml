@@ -86,7 +86,7 @@ services:
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     volumes:
-      - ./data:/opt/dalton-agent/data:ro
+      - ./sensor-shared-data:/opt/dalton-agent/data:ro
     restart: always
 
 # Suricata 7.0.14 from source, with Rust support
@@ -104,7 +104,7 @@ services:
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     volumes:
-      - ./data:/opt/dalton-agent/data:ro
+      - ./sensor-shared-data:/opt/dalton-agent/data:ro
     restart: always
 
 # Suricata 6.0.20 from source, with Rust support
@@ -298,7 +298,7 @@ services:
     environment:
       - AGENT_DEBUG=${AGENT_DEBUG}
     volumes:
-      - ./data:/opt/dalton-agent/data:ro
+      - ./sensor-shared-data:/opt/dalton-agent/data:ro
     restart: always
 
 # Snort 2.9.18 from source
