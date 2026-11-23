@@ -1,4 +1,17 @@
 {% extends "dalton/layout.html" %}
+{% block head %}
+{% if sensor_tech.startswith('suri') %}
+    <link href="{{ url_for('static', filename='codemirror/lib/codemirror.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='codemirror/addon/hint/show-hint.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='codemirror/addon/lint/lint.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='css/suricata-editor.css') }}" rel="stylesheet" type="text/css">
+    <script src="{{ url_for('static', filename='codemirror/lib/codemirror.js') }}"></script>
+    <script src="{{ url_for('static', filename='codemirror/addon/mode/simple.js') }}"></script>
+    <script src="{{ url_for('static', filename='codemirror/addon/hint/show-hint.js') }}"></script>
+    <script src="{{ url_for('static', filename='codemirror/addon/lint/lint.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/suricata-editor.js') }}"></script>
+{% endif %}
+{% endblock %}
 {% block js %}
     $(window).on('beforeunload', function(){
         $('#uploadDialog').modal('hide');
@@ -67,6 +80,9 @@
     });
 
 	$(document).ready(function() {
+		if (window.SuricataEditor) {
+			window.SuricataEditor.init();
+		}
 		$('#prod_ruleset').show();
 		if ($('#optionRuleset').prop('checked')) {
 			$('#prod_ruleset').show();
@@ -79,6 +95,9 @@
 		}
 		if ($('#optionRulesetCustom').prop('checked')) {
 			$('#custom_ruleset').show();
+			if (window.SuricataEditor) {
+				window.SuricataEditor.refresh();
+			}
 		} else {
 			$('#custom_ruleset').hide();
 		}
@@ -121,9 +140,12 @@
 		$('#optionRulesetCustom').click( function() {
 			if ($('#optionRulesetCustom').prop('checked')) {
 				$('#custom_ruleset').show();
+				if (window.SuricataEditor) {
+					window.SuricataEditor.refresh();
+				}
 			} else {
 				$('#custom_ruleset').hide();
-			}        
+			}
 		});
 
         $("#overlay").change(function() {
@@ -470,7 +492,28 @@
 								Use custom rules
 							</label>
 							<span id="custom_ruleset">
+								{# The switch that turns the editor on sits above the box it
+								   affects, matching every other control on this page. The
+								   check button and its results stay below, next to the
+								   output they produce. #}
+								{% if sensor_tech.startswith('suri') %}
+								<label class="checkbox">
+									<input type="checkbox" id="optionRuleEditor">
+									Rule editor <small>highlighting, completion, syntax checking</small>
+								</label>
+								{% endif %}
 								<textarea rows='10' class='span'; style='margin-left:0;' name="custom_ruleset" placeholder='alert tcp any any -> any any (msg:"";);'>{% if manifest and manifest['custom-rules'] and custom_rules %}{{custom_rules}}{% endif %}</textarea>
+								{% if sensor_tech.startswith('suri') %}
+								<div id="ruleEditorControls" style="display:none;">
+									<button type="button" class="btn btn-small" id="ruleEditorCheckNow">Check rules</button>
+									<label class="checkbox inline" id="optionEngineAnalysisLabel">
+										<input type="checkbox" id="optionEngineAnalysis">
+										Engine analysis
+									</label>
+									<span id="ruleEditorStatus"></span>
+									<div id="ruleEditorResults"></div>
+								</div>
+								{% endif %}
 							</span>
 							{% endif %}
 							<div style="display:block;width:100%;padding:0;margin-bottom:5px;margin-top:25px;font-size:21px;line-height:40px;color:#333;border:0;border-top:1px solid #e5e5e5">Logs</div>

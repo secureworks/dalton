@@ -1,0 +1,109 @@
+/* suricata-editor.css — the optional rule editor on the coverage page.
+ * Loaded only by that page, alongside the CodeMirror assets. */
+
+.CodeMirror {
+    height: auto;
+    min-height: 170px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.CodeMirror-scroll {
+    min-height: 170px;
+}
+
+.CodeMirror-hints {
+    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+    font-size: 12px;
+    max-height: 22em;
+    z-index: 1100;  /* above Bootstrap 2's modals-and-dropdowns range */
+}
+
+/* ------------------------------------------------------------- controls */
+
+#ruleEditorControls {
+    margin-top: 6px;
+}
+
+#optionEngineAnalysisLabel {
+    margin-left: 12px;
+    font-size: 12px;
+    color: #555;
+}
+
+#ruleEditorStatus {
+    margin-left: 10px;
+    font-size: 12px;
+}
+
+.suri-check-busy        { color: #888; }
+.suri-check-clean       { color: #468847; }
+.suri-check-found       { color: #333; }
+.suri-check-unavailable { color: #999; font-style: italic; }
+
+/* ---------------------------------------------------------- diagnostics */
+
+.suri-diag-list {
+    list-style: none;
+    margin: 8px 0 0 0;
+    padding: 0;
+    font-size: 12px;
+    /* A hundred rules with engine analysis on would otherwise push the submit
+       button off the bottom of the page. */
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.suri-diag-list li {
+    padding: 3px 6px;
+    border-left: 3px solid #ccc;
+    margin-bottom: 2px;
+    background: #f7f7f7;
+}
+
+.suri-diag-list li.suri-diag-error   { border-left-color: #b94a48; }
+.suri-diag-list li.suri-diag-warning { border-left-color: #c09853; }
+.suri-diag-list li.suri-diag-note    { border-left-color: #3a87ad; }
+
+.suri-diag-sev {
+    display: inline-block;
+    min-width: 60px;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 10px;
+}
+
+.suri-diag-error   .suri-diag-sev { color: #b94a48; }
+.suri-diag-warning .suri-diag-sev { color: #c09853; }
+.suri-diag-note    .suri-diag-sev { color: #3a87ad; }
+
+.suri-diag-line {
+    display: inline-block;
+    min-width: 60px;
+    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+.suri-diag-msg {
+    margin-left: 6px;
+}
+
+/* The "note" severity the JS hands CodeMirror. The lint addon's stylesheet has
+   icons for "error" and "warning" only, so these are what keep a note from
+   rendering as a blank gutter gap -- or, as it did before, as a warning. */
+.CodeMirror-lint-marker-note,
+.CodeMirror-lint-message-note {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%233a87ad'/%3E%3Crect x='7.25' y='6.6' width='1.5' height='5' fill='%23fff'/%3E%3Crect x='7.25' y='4.2' width='1.5' height='1.8' fill='%23fff'/%3E%3C/svg%3E");
+}
+
+/* The in-text mark, on the same footing: a dotted blue underline in place of
+   the addon's orange squiggle. Drawn as a background so it cannot shift the
+   line height the way a border would. */
+.CodeMirror-lint-mark-note {
+    background-image: repeating-linear-gradient(to right, #3a87ad 0 1px, transparent 1px 3px);
+    background-size: 3px 1px;
+    background-repeat: repeat-x;
+    background-position: left bottom;
+}

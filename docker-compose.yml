@@ -46,7 +46,41 @@ services:
 
   redis:
     image: redis:7.4.1
-    container_name: dalton_redis  
+    container_name: dalton_redis
+    restart: always
+
+# Optional Suricata rule syntax checker for the custom-rules box on the
+# coverage page. Shares its Suricata compile with the agent-suricata-current
+# build via the "linter" target in Dockerfile_suricata. The controller fails
+# open if this container is unavailable - job submission never depends on it.
+  linter:
+    build:
+      context: ./dalton-agent
+      dockerfile: Dockerfiles/Dockerfile_suricata
+      target: linter
+      args:
+        - SURI_VERSION=current
+        - http_proxy=${http_proxy}
+        - https_proxy=${https_proxy}
+        - no_proxy=${no_proxy}
+    image: dalton-linter:latest
+    container_name: dalton_linter
+    mem_limit: 1g
+    cpus: 1.0
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "/opt/linter/venv/bin/python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: always
 
 
