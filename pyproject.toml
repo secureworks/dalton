@@ -77,7 +77,7 @@ ignore = ["E501"]
 "dalton-agent/dalton-agent.py" = ["B"]
 
 [tool.bumpversion]
-current_version = "5.0.0"
+current_version = "5.0.1"
 
 commit = true
 allow_dirty = false
@@ -91,3 +91,6 @@ tag_message = "Bump version: {current_version} → {new_version}"
 
 [[tool.bumpversion.files]]
 filename = "app/__init__.py"
+
+[[tool.bumpversion.files]]
+filename = "VERSION"
