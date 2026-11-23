@@ -2,9 +2,16 @@
 Dalton Changelog
 ****************
 
+5.0.1 (2026-11-22)
+##################
+
+* Bump werkzeug from 3.1.6 to 3.1.9 (#262)
+* Fix API client retries and return the job ID (#263)
+
 5.0.0 (2026-09-17)
 ##################
 
+* Create a 'sensor-shared-data' directory and mount it in the agent (#260).
 * **Upgrade note:** the default ``docker-compose.yml`` now includes a new
   ``linter`` service (container ``dalton_linter``, image ``dalton-linter``),
   built from the ``linter`` target of ``Dockerfile_suricata``, so a
