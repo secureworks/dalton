@@ -1,0 +1,7 @@
+Flask==3.1.3
+gunicorn==23.0.0
+# GPL-3.0. Invoked by app.py as a separate OS process via its own
+# --batch-file CLI, never imported - see app.py's SLS_BINARY comment and
+# README.rst for the licensing note. The controller (Apache-2.0) never
+# talks to this at all; it only reaches the linter container over HTTP.
+suricata-language-server==2.1.2

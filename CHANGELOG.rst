@@ -2,6 +2,40 @@
 Dalton Changelog
 ****************
 
+5.0.1 (2026-11-22)
+##################
+
+* Bump werkzeug from 3.1.6 to 3.1.9 (#262)
+* Fix API client retries and return the job ID (#263)
+
+5.0.0 (2026-09-17)
+##################
+
+* Create a 'sensor-shared-data' directory and mount it in the agent (#260).
+* **Upgrade note:** the default ``docker-compose.yml`` now includes a new
+  ``linter`` service (container ``dalton_linter``, image ``dalton-linter``),
+  built from the ``linter`` target of ``Dockerfile_suricata``, so a
+  ``docker compose up`` after upgrading builds and starts one more container.
+  It runs the GPL-3.0 Suricata Language Server as a separate process (see the
+  "Suricata Rule Editor" section of the README for the licensing note). It is
+  optional: remove the service and leave ``rule_check_url`` / ``keywords_url``
+  empty in ``dalton.conf`` to run without it
+* Added an optional CodeMirror-based rule editor to the Suricata coverage page
+  (off by default; tick "Rule editor" next to the custom-rules box) with syntax
+  highlighting, keyword completion and hover documentation, and syntax checking
+  against a real Suricata engine
+* Added a ``linter`` sidecar container (built from the ``linter`` target of
+  ``Dockerfile_suricata``, sharing the Suricata compile) that runs the
+  `Suricata Language Server <https://github.com/StamusNetworks/suricata-language-server>`__
+  as a separate process; the controller reaches it only over HTTP and fails open
+  if it is unavailable, so job submission never depends on it
+* Added ``rule_check_url``, ``rule_check_timeout`` and ``keywords_url`` settings
+  to ``dalton.conf``; leave the URLs empty or absent to disable the feature
+* Added an optional "Engine analysis" toggle (on by default when the editor is
+  enabled) that includes Suricata's own performance and coverage guidance in
+  the syntax check results
+* Brought the ``VERSION`` file back in line with ``pyproject.toml``
+
 4.0.0 (2026-02-18)
 ##################
 

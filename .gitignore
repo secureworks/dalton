@@ -10,6 +10,10 @@ rulesets/zeek/
 app/static/engine-configs/snort/
 app/static/engine-configs/suricata/
 
+# don't track the contents of the sensor-shared-data directory
+sensor-shared-data/**
+!sensor-shared-data/.gitkeep
+
 # don't include docker-compose
 docker-compose.yml
 #Dockerfile*
@@ -50,6 +54,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+# vendored CodeMirror, not a Python build artifact
+!app/static/codemirror/lib/
 lib64/
 parts/
 sdist/

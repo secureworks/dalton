@@ -15,7 +15,7 @@ dependencies = [
     "ruamel.yaml<0.18.0",
     "idstools==0.6.5",
     "flowsynth>=1.4.1",
-    "Werkzeug==3.1.6",
+    "Werkzeug==3.1.9",
     "itsdangerous==2.2.0",
 ]
 authors = [
@@ -37,6 +37,8 @@ Homepage = "https://github.com/secureworks/dalton"
 
 [project.optional-dependencies]
 testing = [
+    # api/dalton.py, the API client
+    "requests",
     "pytest",
     # the rule2pcap skill's TLS build template mints certificates
     "cryptography",
@@ -78,7 +80,7 @@ ignore = ["E501"]
 "dalton-agent/dalton-agent.py" = ["B"]
 
 [tool.bumpversion]
-current_version = "4.0.0"
+current_version = "5.0.1"
 
 commit = true
 allow_dirty = false
@@ -92,3 +94,6 @@ tag_message = "Bump version: {current_version} → {new_version}"
 
 [[tool.bumpversion.files]]
 filename = "app/__init__.py"
+
+[[tool.bumpversion.files]]
+filename = "VERSION"

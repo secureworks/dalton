@@ -1,5 +1,6 @@
-# Builds Suricata Dalton agent using Suricata source tarball
-FROM ubuntu:24.04
+# Builds Suricata Dalton agent using Suricata source tarball, and (via the
+# "linter" target) the syntax-checking sidecar that shares this compile.
+FROM ubuntu:24.04 AS base
 
 ARG SURI_VERSION
 ARG ENABLE_RUST
@@ -45,6 +46,60 @@ WORKDIR /src/suricata-${SURI_VERSION}
 # configure, make, and install
 # hadolint ignore=SC2046
 RUN ./configure --enable-profiling ${ENABLE_RUST} --enable-lua && make -j $(nproc) && make install && make install-conf && ldconfig
+
+
+####################################
+###### Suricata syntax linter ######
+####################################
+# Shares the Suricata compile above; adds nothing beyond a venv and the
+# small Flask app. Ubuntu 24.04 is PEP 668 externally-managed, so pip
+# needs a venv rather than installing into system Python.
+FROM base AS linter
+
+# hadolint ignore=DL3008
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    python3-venv && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    useradd --system --no-create-home --shell /usr/sbin/nologin --uid 1500 --user-group linter
+
+WORKDIR /opt/linter
+COPY linter/requirements.txt /opt/linter/requirements.txt
+RUN python3 -m venv /opt/linter/venv && \
+    /opt/linter/venv/bin/pip install --no-cache-dir -r /opt/linter/requirements.txt
+
+COPY linter/app.py linter/legacy_keywords.py linter/guard.py /opt/linter/
+RUN chown -R 1500:1500 /opt/linter
+
+USER 1500:1500
+EXPOSE 8081
+# Worker count is the concurrency cap -- each check now forks SLS's own
+# --batch-file CLI, which forks Suricata in turn. Measured in dev testing
+# (container capped at cpus: 1.0 in docker-compose.yml, regardless of host
+# core count): ~0.6-0.9s per check sequentially, regardless of rule count
+# (fixed interpreter/subprocess startup dominates, not analysis work); 4
+# concurrent checks queue behind the CPU limit and stretch to 2-4s each.
+# The timeout reaps a wedged run rather than letting it hold a worker long
+# after the controller (6s) gave up, and the backlog bounds the accept
+# queue. More workers would not raise throughput here without also raising
+# the CPU limit -- checks are CPU-bound, not I/O-bound.
+CMD ["/opt/linter/venv/bin/gunicorn", \
+     "--workers=2", "--threads=1", \
+     "--timeout=15", "--graceful-timeout=5", "--backlog=16", \
+     "--bind=0.0.0.0:8081", "app:app"]
+
+
+###########################
+###### Suricata agent ######
+###########################
+# Must be the last stage so a plain `docker build` with no --target still
+# produces the agent image.
+FROM base AS agent
+
+# ARG scope does not cross a FROM boundary - re-declare it here or the sed
+# substitution below silently bakes an empty version into dalton-agent.conf.
+ARG SURI_VERSION
 
 RUN mkdir -p /opt/dalton-agent/
 WORKDIR /opt/dalton-agent
