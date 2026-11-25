@@ -1386,6 +1386,7 @@ in the Dalton toolbar, or directly using the '/cyberchef' URI path.
 
 
 rule2pcap Agent Skill
+=====================
 
 ``.agents/skills/rule2pcap/`` is an `Agent Skill <https://agentskills.io/>`__
 for AI coding agents. Given a Suricata rule, the agent researches the traffic
@@ -1446,7 +1447,10 @@ The helper scripts also work on their own. Run each with ``--help``:
 
 The skill's tests are ``tests/test_rule2pcap_*.py``. Run them with the
 ``testing`` extras installed.
+
+
 Suricata Rule Editor
+=====================
 
 The custom-rules box on the Suricata coverage page has an optional rule
 editor: syntax highlighting, keyword completion with hover documentation,
