@@ -381,10 +381,29 @@ def randomize_isns(pkts, rng):
     """Give each TCP flow seeded random ISNs.
 
     Flowsynth 1.4's tcp.initialize starts every flow at ISN 10 (client) and
-    100 (server), which no real stack does. Raises ValueError if two
-    connections share addresses and ports.
+    100 (server), which no real stack does; Flowsynth 1.5 draws unseeded
+    random ISNs, which change on every build. Each side's ISN is replaced
+    with a seeded one, whatever Flowsynth started from, so the output is the
+    same with either version. Raises ValueError if two connections share
+    addresses and ports.
     """
     check_one_connection_per_tuple(pkts)
+    # each side's ISN as Flowsynth wrote it: the seq of its SYN, else of its
+    # first segment, else (a side that never sends) the peer's first ACK
+    isns, from_syn = {}, set()
+    for p in pkts:
+        if TCP not in p:
+            continue
+        src, dst = endpoints(p)
+        key = frozenset((src, dst))
+        if (key, src) not in from_syn and (p[TCP].flags.S or (key, src) not in isns):
+            isns[(key, src)] = p[TCP].seq
+            if p[TCP].flags.S:
+                from_syn.add((key, src))
+    for p in pkts:
+        if TCP in p and p[TCP].flags.A:
+            src, dst = endpoints(p)
+            isns.setdefault((frozenset((src, dst)), dst), p[TCP].ack)
     offsets, out = {}, []
     for p in pkts:
         if TCP not in p:
@@ -393,7 +412,9 @@ def randomize_isns(pkts, rng):
         src, dst = endpoints(p)
         key = frozenset((src, dst))
         for side in (src, dst):
-            offsets.setdefault((key, side), rng.randrange(SEQ_MOD))
+            if (key, side) not in offsets:
+                base = isns.get((key, side), 0)
+                offsets[(key, side)] = (rng.randrange(SEQ_MOD) - base) % SEQ_MOD
         q = p.copy()
         q[TCP].seq = (q[TCP].seq + offsets[(key, src)]) % SEQ_MOD
         if q[TCP].flags.A:

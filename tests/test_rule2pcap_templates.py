@@ -663,6 +663,38 @@ def test_stack_profile_keeps_a_whole_profile_as_it_is():
     assert pk.Host("10.0.0.1", "02:00:00:00:00:01", stack={"options": opts}).window
 
 
+def test_randomize_isns_ignores_flowsynths_isns(tmp_path):
+    """Flowsynth 1.4 starts at ISN 10 and 100, 1.5 at unseeded random ISNs:
+    the seeded output must be the same either way."""
+    import random
+
+    from scapy.layers.inet import TCP
+
+    pk = pcapkit()
+    pkts = flowsynth_flow(tmp_path, pk, size=100)
+
+    def shifted(client, server):
+        out = []
+        for p in pkts:
+            q = p.copy()
+            to_server = q[TCP].dport == 80
+            q[TCP].seq = (q[TCP].seq + (client if to_server else server)) % 2**32
+            if q[TCP].flags.A:
+                q[TCP].ack = (q[TCP].ack + (server if to_server else client)) % 2**32
+            out.append(q)
+        return out
+
+    def seqs(ps):
+        return [(p[TCP].seq, p[TCP].ack) for p in ps]
+
+    want = seqs(pk.randomize_isns(pkts, random.Random(1)))
+    for client, server in ((0, 0), (12345, 2**32 - 7), (2**31, 99)):
+        got = pk.randomize_isns(shifted(client, server), random.Random(1))
+        assert seqs(got) == want
+    # the ISNs themselves are the seeded draws, not Flowsynth's plus an offset
+    assert want[0][0] not in (10, pkts[0][TCP].seq)
+
+
 def test_reused_ports_raise(tmp_path):
     pk = pcapkit()
     pkts = flowsynth_flow(tmp_path, pk, size=100)

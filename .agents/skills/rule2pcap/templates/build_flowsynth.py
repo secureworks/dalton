@@ -14,9 +14,9 @@ rules in templates/demo.rules (sids 9000101 and 9000102).
 
 Build the payload bytes in Python, write them as a .synth file, compile it
 with Flowsynth, then post-process with scapy. The post-processing gives
-random ISNs (Flowsynth uses 10 and 100), realistic timestamps (Flowsynth
-stamps wall-clock time) and a FIN teardown (Flowsynth emits none). Copy
-pcapkit.py next to this file.
+seeded random ISNs (Flowsynth's aren't seeded), realistic timestamps
+(Flowsynth stamps wall-clock time) and a FIN teardown (Flowsynth emits
+none). Copy pcapkit.py next to this file.
 -------------------------------------------------------------
 """
 

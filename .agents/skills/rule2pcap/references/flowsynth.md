@@ -51,14 +51,14 @@ h < ( content:"HTTP/1.1 200 OK\x0d\x0aContent-Length: 0\x0d\x0a\x0d\x0a"; );
 
 ## What it gets wrong, and the fix
 
-These are Flowsynth 1.4 defects. Fixes for the MAC, ISN, port and FIN
-problems are being prepared for Flowsynth 1.5; the pcapkit workarounds stay
-harmless with it.
+These are Flowsynth 1.4 defects (`requirements.txt` pins 1.4.1). Flowsynth
+1.5 changes some of them, and the pcapkit fixes give the same pcap with
+either version.
 
 | Problem | Fix |
 | --- | --- |
 | Random MACs (`RandMAC`) re-randomise per packet, and about half have the group (multicast) bit set | Always give `src_mac` and `dst_mac` on every flow (`pcapkit.flow_line()` does) |
-| `tcp.initialize` starts every flow at ISN 10 and 100 | `pcapkit.randomize_isns(pkts, rng)` |
+| `tcp.initialize` starts every flow at ISN 10 and 100 (1.5: unseeded random ISNs, different on every build) | `pcapkit.randomize_isns(pkts, rng)` |
 | Packets are stamped with wall-clock time at build | `pcapkit.restamp(pkts, start, gap)` |
 | No FIN support, so flows never close | `pcapkit.teardown(pkts, closer=..., idle=..., remote=WAN_HOSTS, rtt=RTT, rng=rng)`. Don't hand-roll FIN events with `tcp.flags.*`; the ACK numbers come out wrong |
 | Window 8192 on every packet, and SYNs with no TCP options | `pcapkit.set_tcp_stack(pkts, {ip: "windows" or "linux" or "macos"}, rng)`, after teardown. When both ends use timestamps, compile with `flow_line(..., mss=1448)` (`pcapkit.both_timestamp()`) |
